@@ -1,0 +1,25 @@
+# deps
+node_modules/
+.pnpm-store/
+
+# build / cache
+dist/
+.turbo/
+*.tsbuildinfo
+
+# expo
+.expo/
+.expo-shared/
+web-build/
+
+# env / secrets
+.env
+.env.local
+.env.*.local
+
+# prisma
+apps/api/prisma/*.db
+
+# os / editor
+.DS_Store
+Thumbs.db

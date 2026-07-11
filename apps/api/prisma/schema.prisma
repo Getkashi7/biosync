@@ -1,0 +1,27 @@
+// Pulse API data model. `User` mirrors Supabase auth.users by id (uuid); a
+// handle_new_user trigger (see migrations) seeds a row on signup with role USER.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+model User {
+  id        String   @id @db.Uuid
+  email     String   @unique
+  fullName  String?  @map("full_name")
+  role      Role     @default(USER)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("users")
+}
