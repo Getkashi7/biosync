@@ -1,13 +1,16 @@
 /**
  * Pulse design tokens — the single source of truth for the whole app.
  *
- * Extracted from the "Pulse Auth Flow" design spec (colors, gradient stops, spacing,
- * radii, type scale, motion timings, haptics). Every screen inherits these; components
- * must never hard-code a hex, duration, or spacing value — import from here.
+ * Final palette from the "Pulse Dashboard" spec panel (colors, gradient stops,
+ * spacing, radii, type scale, motion timings, haptics). The brand system is the
+ * orange → coral → blue gradient shared by the auth flow, dashboard, and the
+ * daily check-in. Components must never hard-code a hex, duration, or spacing
+ * value — import from here.
  *
  * Translation notes (native, not web):
  *  - Depth = elevated `surface` on `bg` + 1px `hairline` borders. No blur, no shadows.
- *  - Linear gradients (CTA, focus underline, strength bar) → expo-linear-gradient.
+ *  - Linear gradients (CTA, FAB, slider fill, focus underline, strength bar) →
+ *    expo-linear-gradient.
  *  - Radial glow blobs → react-native-svg <RadialGradient> (see `gradient.glow`).
  */
 import { Easing } from "react-native-reanimated";
@@ -18,17 +21,21 @@ export const color = {
   bg: "#0A0A0F",
   /** page/backdrop deep black (behind the device in the design) */
   bgDeep: "#060609",
-  /** elevated surface (cards, pills) */
+  /** elevated surface (cards, pills, sheet) */
   surface: "#131318",
   /** alternate elevated surface (spec panel) */
   surfaceAlt: "#101014",
   /** code/inset surface */
   surfaceCode: "#0B0B10",
+  /** tab bar + inset controls (emoji cells) */
+  inset: "#0E0E13",
 
   /** 1px hairline border on elevated surfaces */
   hairline: "rgba(255,255,255,0.08)",
   /** ghost-button / stronger border */
   border: "rgba(255,255,255,0.14)",
+  /** resting border on inset option cells (emoji buttons) */
+  optBorder: "rgba(255,255,255,0.10)",
   /** input underline, resting */
   fieldBorder: "rgba(255,255,255,0.13)",
   /** input underline, focused (non-gradient portion) */
@@ -40,13 +47,29 @@ export const color = {
   textSecondary: "rgba(255,255,255,0.60)",
   /** tertiary / caption text */
   textTertiary: "rgba(255,255,255,0.45)",
+  /** section-label / faint text */
+  textFaint: "rgba(255,255,255,0.40)",
+  /** inactive tab-bar icon stroke */
+  iconInactive: "rgba(255,255,255,0.35)",
   /** resting floating-label text */
   textLabel: "rgba(255,255,255,0.42)",
 
-  /** brand */
-  magenta: "#D6408E",
-  purple: "#7C5CFF",
-  orange: "#F2794B",
+  /** brand — orange → coral → blue */
+  orange: "#FF8C42",
+  coral: "#FF5E62",
+  blue: "#4A7DFF",
+  /** lighter blue — links, "avg"/"rising" accents */
+  blue2: "#7EA2FF",
+
+  /** selected emoji cell fill + border (orange tint) */
+  emojiSelectedBg: "rgba(255,140,66,0.14)",
+  emojiSelectedBorder: "rgba(255,140,66,0.75)",
+  /** unfilled energy-dot track */
+  dotTrack: "rgba(255,255,255,0.12)",
+  /** readiness ring / chart track */
+  track: "rgba(255,255,255,0.07)",
+  /** sheet scrim */
+  scrim: "rgba(0,0,0,0.6)",
 
   /** error text + focused label on error */
   error: "#E5645F",
@@ -54,22 +77,23 @@ export const color = {
   errorBorder: "rgba(229,100,95,0.70)",
 
   /** link / accent text */
-  link: "#B9A6FF",
-  linkHover: "#D6C6FF",
+  link: "#7EA2FF",
+  linkHover: "#A9C2FF",
 
   /** input caret */
-  caret: "#7C5CFF",
+  caret: "#4A7DFF",
   /** text on a gradient fill */
   onGradient: "#FFFFFF",
 } as const;
 
 // ── Gradient ───────────────────────────────────────────────────────────────────
-// Brand gradient used by CTA fills, focus underlines, and the strength bar.
+// Brand gradient used by CTA fills, the FAB, slider fill, focus underlines, and
+// the strength bar. SVG strokes (ring arc, charts, checkmark) reuse the same stops.
 export const gradient = {
-  brandColors: ["#D6408E", "#7C5CFF", "#F2794B"] as const,
-  brandLocations: [0, 0.52, 1] as const,
+  brandColors: ["#FF8C42", "#FF5E62", "#4A7DFF"] as const,
+  brandLocations: [0, 0.45, 1] as const,
 
-  /** CTA fill uses a slight diagonal */
+  /** CTA / FAB / slider fill use a slight diagonal */
   ctaStart: { x: 0, y: 0 } as const,
   ctaEnd: { x: 1, y: 0.6 } as const,
 
@@ -77,17 +101,19 @@ export const gradient = {
   lineStart: { x: 0, y: 0.5 } as const,
   lineEnd: { x: 1, y: 0.5 } as const,
 
-  /** logo dot uses a 135deg diagonal */
+  /** logo dot + ring arc use a 135deg diagonal */
   logoStart: { x: 0, y: 0 } as const,
   logoEnd: { x: 1, y: 1 } as const,
 
   /**
    * Ambient radial glow blobs (react-native-svg RadialGradient).
    * Animate transform only (drift) — never re-render the gradient.
+   * `purple` = the top-left blue blob; `magenta` = the bottom-right orange blob
+   * (keys kept for GlowBlobs; colors are the dashboard's blue/orange).
    */
   glow: {
-    purple: { color: "rgba(124,92,255,0.30)", mid: "rgba(124,92,255,0.10)", size: 520 },
-    magenta: { color: "rgba(214,64,142,0.22)", mid: "rgba(242,121,75,0.08)", size: 480 },
+    purple: { color: "rgba(74,125,255,0.26)", mid: "rgba(74,125,255,0.08)", size: 520 },
+    magenta: { color: "rgba(255,140,66,0.20)", mid: "rgba(255,94,98,0.07)", size: 480 },
   },
 } as const;
 
@@ -106,6 +132,10 @@ export const radius = {
   strength: 2,
   card: 16,
   cta: 16,
+  /** emoji option cell */
+  emoji: 14,
+  /** bottom sheet top corners */
+  sheet: 28,
   pill: 999,
 } as const;
 
@@ -116,9 +146,9 @@ export const size = {
   fieldRow: 64,
   /** gap between fields */
   fieldGap: 10,
-  /** CTA / ghost button height */
+  /** CTA / ghost / save-check-in button height */
   ctaHeight: 56,
-  /** minimum touch target (back button, Show/Hide toggle) */
+  /** minimum touch target */
   touchTarget: 44,
   /** strength track height */
   strengthTrack: 3,
@@ -129,6 +159,24 @@ export const size = {
   formPadBottomKeyboard: 12,
   /** logo dot */
   logoDot: 44,
+
+  /** — check-in / tab bar — */
+  /** tab bar content height (add insets.bottom) */
+  tabBar: 54,
+  /** sheet top gap below the status bar (add insets.top) */
+  sheetTopInset: 40,
+  /** grabber handle */
+  grabberW: 40,
+  grabberH: 4,
+  /** emoji option cell height */
+  emojiCell: 52,
+  /** slider track thickness + thumb + touch-row height */
+  sliderTrack: 6,
+  sliderThumb: 26,
+  sliderRow: 44,
+  /** energy dot diameter + touch-row height */
+  dot: 16,
+  dotRow: 44,
 } as const;
 
 // ── Typography ──────────────────────────────────────────────────────────────────
@@ -152,6 +200,14 @@ export const type = {
   display: { fontFamily: fontFamily.bold, fontSize: 56, lineHeight: 60, letterSpacing: -1.12 },
   title: { fontFamily: fontFamily.bold, fontSize: 28, lineHeight: 34, letterSpacing: -0.28 },
   success: { fontFamily: fontFamily.bold, fontSize: 34, lineHeight: 40, letterSpacing: -0.34 },
+  /** greeting / screen heading */
+  greeting: { fontFamily: fontFamily.bold, fontSize: 22, lineHeight: 28, letterSpacing: -0.22 },
+  /** bottom-sheet title */
+  sheetTitle: { fontFamily: fontFamily.bold, fontSize: 24, lineHeight: 30, letterSpacing: -0.24 },
+  /** big gradient number readout (slider hours) */
+  readout: { fontFamily: fontFamily.bold, fontSize: 26, lineHeight: 30, letterSpacing: -0.26 },
+  /** uppercase section label */
+  sectionLabel: { fontFamily: fontFamily.semibold, fontSize: 11, lineHeight: 14, letterSpacing: 1.32 },
   body: { fontFamily: fontFamily.regular, fontSize: 15, lineHeight: 22 },
   input: { fontFamily: fontFamily.regular, fontSize: 16, lineHeight: 22 },
   button: { fontFamily: fontFamily.semibold, fontSize: 16, lineHeight: 20 },
@@ -170,26 +226,43 @@ export const motion = {
   easeLinear: Easing.linear,
 
   duration: {
-    rise: 420, // welcome entrance per element
+    rise: 420, // entrance per element
     stagger: 100, // delay between entrance elements
     screen: 280, // push / pop
     fadeOut: 180, // fade-through out
     fadeIn: 260, // fade-through in
-    press: 120, // CTA press-in scale
+    press: 120, // CTA/FAB press-in scale
     label: 180, // floating label lift
     underline: 200, // focus underline scaleX
     strength: 250, // strength bar width
     errorBorder: 200, // error border color
     shake: 320, // error shake (total)
     spinner: 800, // CTA spinner rotation
+
+    // — check-in sheet —
+    sheetOpen: 300, // translateY 105% → 0 (Easing.out(cubic))
+    sheetScrim: 240, // scrim opacity 0 → 0.6
+    sheetClose: 260, // close mirror
+    sheetTeardown: 340, // unmount after close
+    select: 150, // emoji / dot select scale + color
+    successOverlay: 260, // success overlay opacity + scale 0.6 → 1
+    successCheck: 320, // checkmark pop
+    successCheckDelay: 80, // check pops at +80ms
+    successTextDelay1: 160, // "Check-in saved" rises at +160ms
+    successTextDelay2: 240, // streak line rises at +240ms
+    successHold: 1200, // hold before auto-dismiss (~1.2s)
   },
 
   drift1: 14000, // ambient blob A
   drift2: 18000, // ambient blob B
 
-  /** CTA press-in target scale */
-  pressScale: 0.97,
-  /** spring used on press release */
+  /** CTA / FAB press-in target scale */
+  pressScale: 0.96,
+  /** emoji / dot selected scale */
+  selectScale: 1.06,
+  /** energy dot selected scale */
+  dotSelectScale: 1.15,
+  /** spring used on press release + sheet-drag settle */
   pressSpring: { damping: 18, stiffness: 280 },
   /** floating-label lifted transform */
   labelLift: { translateY: -26, scale: 0.78 },
@@ -205,10 +278,11 @@ export const motion = {
 // ── Haptics ─────────────────────────────────────────────────────────────────────
 // Names map to expo-haptics calls in src/lib/haptics.ts.
 export const haptic = {
-  press: "light", // Haptics.impactAsync(Light) on CTA press-in
-  success: "success", // Haptics.notificationAsync(Success)
+  press: "light", // Haptics.impactAsync(Light) on CTA/FAB press-in
+  success: "success", // Haptics.notificationAsync(Success) on check-in saved
   error: "error", // Haptics.notificationAsync(Error)
-  toggle: "selection", // Haptics.selectionAsync() on Show/Hide
+  select: "selection", // Haptics.selectionAsync() on slider step / emoji / dot
+  toggle: "selection", // Haptics.selectionAsync() on Show/Hide, kg/lb
 } as const;
 
 export const theme = { color, gradient, space, radius, size, type, fontFamily, motion, haptic } as const;

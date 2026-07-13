@@ -4,6 +4,7 @@
  */
 import { z } from "zod";
 import { router, publicProcedure, protectedProcedure, adminProcedure } from "./trpc";
+import { logsRouter } from "./routers/logs";
 
 export const appRouter = router({
   /** Liveness check — no auth. */
@@ -16,6 +17,9 @@ export const appRouter = router({
   greet: protectedProcedure
     .input(z.object({ name: z.string().min(1) }))
     .query(({ input }) => ({ message: `Hello, ${input.name}.` })),
+
+  /** Daily check-in + streak. */
+  logs: logsRouter,
 
   admin: router({
     /** Admin-only — throws FORBIDDEN for non-admins. */

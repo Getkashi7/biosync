@@ -1,3 +1,3 @@
-import { HomeScreen } from "../../src/features/auth/HomeScreen";
+import { MainTabs } from "../../src/features/app/MainTabs";
 
-export default HomeScreen;
+export default MainTabs;

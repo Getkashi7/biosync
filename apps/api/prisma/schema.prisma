@@ -23,5 +23,27 @@ model User {
   role      Role     @default(USER)
   createdAt DateTime @default(now()) @map("created_at")
 
+  dailyLogs DailyLog[]
+
   @@map("users")
+}
+
+// One check-in per user per calendar day (upsert on the composite unique).
+// `date` is the user's device-local day stored as a bare DATE.
+model DailyLog {
+  id           String   @id @default(uuid()) @db.Uuid
+  userId       String   @map("user_id") @db.Uuid
+  date         DateTime @db.Date
+  sleepHours   Float    @map("sleep_hours")
+  sleepQuality Int      @map("sleep_quality")
+  energy       Int
+  mood         Int
+  weightKg     Float?   @map("weight_kg")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+  @@index([userId])
+  @@map("daily_logs")
 }

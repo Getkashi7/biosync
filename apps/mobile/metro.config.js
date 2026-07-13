@@ -1,19 +1,9 @@
-// Monorepo-aware Metro config (pnpm workspace).
+// Metro config. As of Expo SDK 54, getDefaultConfig is monorepo-aware out of the
+// box: it populates watchFolders with the workspace root's node_modules and every
+// workspace package, and sets resolver.nodeModulesPaths to [app, workspace root].
+// So no manual pnpm-workspace overrides are needed here anymore.
 const { getDefaultConfig } = require("expo/metro-config");
-const path = require("path");
 
-const projectRoot = __dirname;
-const workspaceRoot = path.resolve(projectRoot, "../..");
-
-const config = getDefaultConfig(projectRoot);
-
-// Watch the whole workspace so changes in packages/* are picked up.
-config.watchFolders = [workspaceRoot];
-
-// Resolve modules from both the app and the workspace root (pnpm hoists here).
-config.resolver.nodeModulesPaths = [
-  path.resolve(projectRoot, "node_modules"),
-  path.resolve(workspaceRoot, "node_modules"),
-];
+const config = getDefaultConfig(__dirname);
 
 module.exports = config;

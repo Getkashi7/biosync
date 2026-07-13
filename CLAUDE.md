@@ -7,7 +7,7 @@ API. This file is the source of truth for stack and conventions — follow it.
 
 - **pnpm workspaces + Turborepo.** Node ≥ 20, `pnpm@9`. Never use `npm`/`yarn` here.
 - Layout:
-  - `apps/mobile` — Expo (SDK 52) React Native app, Expo Router, TypeScript.
+  - `apps/mobile` — Expo (SDK 54) React Native app, Expo Router, TypeScript.
   - `apps/api` — standalone `@trpc/server` Node HTTP server + Prisma (Supabase Postgres).
   - `packages/*` — shared code (reserved).
 - Root scripts run through Turbo: `pnpm typecheck`, `pnpm test`, `pnpm lint`, `pnpm build`.
@@ -15,7 +15,7 @@ API. This file is the source of truth for stack and conventions — follow it.
 
 ## Mobile (`apps/mobile`)
 
-- **Stack:** Expo Router · React Native 0.76 · Reanimated 3 · expo-linear-gradient ·
+- **Stack:** Expo Router · React Native 0.81 · Reanimated 4 · expo-linear-gradient ·
   react-native-svg · expo-haptics · react-native-safe-area-context · @supabase/supabase-js.
 - **Design tokens live in `src/ui/theme.ts`** and are the single source of truth for color,
   gradient, spacing, radii, type scale, motion timings, and haptics. Never hard-code a hex,
