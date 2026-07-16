@@ -16,6 +16,31 @@ enum Role {
   ADMIN
 }
 
+// What a Metric measures. Objective point measurements live here; the subjective
+// daily check-in stays in DailyLog.
+enum MetricType {
+  SLEEP_HOURS
+  SLEEP_QUALITY
+  RESTING_HR
+  HRV
+  GLUCOSE
+  WEIGHT
+  HYDRATION
+  ENERGY
+  MOOD
+}
+
+// Where a Metric came from. Only MANUAL is written today; the rest are the
+// device integrations a later slice will sync from.
+enum MetricSource {
+  MANUAL
+  HEALTH_CONNECT
+  APPLE_HEALTH
+  OURA
+  WHOOP
+  LIBRE
+}
+
 model User {
   id        String   @id @db.Uuid
   email     String   @unique
@@ -24,6 +49,8 @@ model User {
   createdAt DateTime @default(now()) @map("created_at")
 
   dailyLogs DailyLog[]
+  metrics   Metric[]
+  goals     Goal[]
 
   @@map("users")
 }
@@ -46,4 +73,36 @@ model DailyLog {
   @@unique([userId, date])
   @@index([userId])
   @@map("daily_logs")
+}
+
+// A single point measurement at an instant — unlike DailyLog there is one row per
+// reading, so a type can be logged many times a day (and later synced from a
+// device). The index serves the range query: one user, one type, ordered by time.
+model Metric {
+  id         String       @id @default(uuid()) @db.Uuid
+  userId     String       @map("user_id") @db.Uuid
+  type       MetricType
+  value      Float
+  source     MetricSource @default(MANUAL)
+  recordedAt DateTime     @default(now()) @map("recorded_at")
+  createdAt  DateTime     @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, type, recordedAt])
+  @@map("metrics")
+}
+
+// A user's stated goal, optionally tied to the metric that measures it.
+model Goal {
+  id           String      @id @default(uuid()) @db.Uuid
+  userId       String      @map("user_id") @db.Uuid
+  description  String
+  targetMetric MetricType? @map("target_metric")
+  createdAt    DateTime    @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("goals")
 }

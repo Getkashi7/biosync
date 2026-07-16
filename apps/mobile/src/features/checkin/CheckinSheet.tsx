@@ -40,6 +40,7 @@ import { GradientText } from "../../ui/GradientText";
 import { GradientSlider } from "../../ui/GradientSlider";
 import { SuccessCheck } from "../../ui/SuccessCheck";
 import { errorHaptic, selectionHaptic, successHaptic } from "../../lib/haptics";
+import { prettyToday } from "../../lib/date";
 import { color, motion, radius, size, space, type } from "../../ui/theme";
 import { todayLocal, type CheckinInput } from "./checkinApi";
 
@@ -48,16 +49,7 @@ const QUALITY_LABELS = ["Terrible", "Poor", "Okay", "Good", "Great"] as const;
 const MOOD_EMOJI = ["\u{1F61E}", "\u{1F615}", "\u{1F610}", "\u{1F642}", "\u{1F604}"] as const; // 😞 😕 😐 🙂 😄
 const MOOD_LABELS = ["Awful", "Low", "Neutral", "Good", "Great"] as const;
 
-const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-const MONTHS = [
-  "January", "February", "March", "April", "May", "June",
-  "July", "August", "September", "October", "November", "December",
-];
 const LB_PER_KG = 2.2046226218;
-
-function prettyToday(d = new Date()): string {
-  return `${WEEKDAYS[d.getDay()]}, ${MONTHS[d.getMonth()]} ${d.getDate()}`;
-}
 
 type Props = {
   /** unmount the sheet (called after the close animation finishes) */

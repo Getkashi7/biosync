@@ -49,8 +49,14 @@ export const color = {
   textTertiary: "rgba(255,255,255,0.45)",
   /** section-label / faint text */
   textFaint: "rgba(255,255,255,0.40)",
+  /** an unfilled metric value ("—") */
+  textPlaceholder: "rgba(255,255,255,0.30)",
+  /** the "(optional)" qualifier inside a section label */
+  textOptional: "rgba(255,255,255,0.25)",
   /** inactive tab-bar icon stroke */
   iconInactive: "rgba(255,255,255,0.35)",
+  /** log-chooser row icon stroke */
+  iconStrong: "rgba(255,255,255,0.70)",
   /** resting floating-label text */
   textLabel: "rgba(255,255,255,0.42)",
 
@@ -119,6 +125,7 @@ export const gradient = {
 
 // ── Spacing & radii (dp) ─────────────────────────────────────────────────────────
 export const space = {
+  xxs: 2,
   xs: 4,
   sm: 8,
   md: 12,
@@ -177,6 +184,26 @@ export const size = {
   /** energy dot diameter + touch-row height */
   dot: 16,
   dotRow: 44,
+
+  /** — log sheets (chooser / quick log) — */
+  /** sheet top padding above the grabber */
+  sheetPadTop: 10,
+  /** grabber → sheet title */
+  sheetTitleGap: 18,
+  /** log-chooser option row */
+  chooserCard: 72,
+  /** chooser row icon → its text */
+  chooserIconGap: 14,
+  /** gap between quick-log fields */
+  metricFieldGap: 20,
+  /** metric value cell horizontal padding */
+  metricCellPadX: 14,
+  /** breathing room between the last field and the Save CTA */
+  quickLogSaveGap: 64,
+  /** Save CTA → the hairline above the home indicator */
+  saveDividerGap: 14,
+  /** quick-log success checkmark */
+  successCheck: 84,
 } as const;
 
 // ── Typography ──────────────────────────────────────────────────────────────────
@@ -208,6 +235,8 @@ export const type = {
   readout: { fontFamily: fontFamily.bold, fontSize: 26, lineHeight: 30, letterSpacing: -0.26 },
   /** uppercase section label */
   sectionLabel: { fontFamily: fontFamily.semibold, fontSize: 11, lineHeight: 14, letterSpacing: 1.32 },
+  /** log-chooser option title */
+  cardTitle: { fontFamily: fontFamily.bold, fontSize: 16, lineHeight: 21 },
   body: { fontFamily: fontFamily.regular, fontSize: 15, lineHeight: 22 },
   input: { fontFamily: fontFamily.regular, fontSize: 16, lineHeight: 22 },
   button: { fontFamily: fontFamily.semibold, fontSize: 16, lineHeight: 20 },

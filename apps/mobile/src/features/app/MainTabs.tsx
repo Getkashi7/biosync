@@ -1,11 +1,11 @@
 /**
  * Authenticated app shell: the 5-tab bottom bar + the current tab's body, with
- * the Daily Check-in sheet mounted as a full-screen overlay above everything.
+ * the logging sheets mounted as full-screen overlays above everything.
  *
- * Only the center "Log" tab opens the sheet; the other tabs are placeholders
- * until their features land (the Home dashboard waits on workout/meal logs and
- * the readiness formula). The save handler is injected so the sheet stays
- * presentation-only — MainTabs owns how a check-in is persisted.
+ * The center "Log" tab opens a chooser, which routes to either the Daily
+ * Check-in or Quick Log; the other tabs are placeholders until their features
+ * land (the Home dashboard waits on the readiness formula). Save handlers are
+ * injected so the sheets stay presentation-only — MainTabs owns persistence.
  */
 import { useCallback, useState } from "react";
 import { StyleSheet, View } from "react-native";
@@ -17,17 +17,27 @@ import type { TabKey } from "../../ui/TabBarIcons";
 import { size, space } from "../../ui/theme";
 import { useAuth } from "../auth/AuthProvider";
 import { Placeholder } from "./Placeholder";
+import { LogChooser } from "./LogChooser";
 import { CheckinSheet } from "../checkin/CheckinSheet";
 import { submitCheckin, type CheckinInput } from "../checkin/checkinApi";
+import { QuickLogSheet } from "../metrics/QuickLogSheet";
+import { submitMetrics, type MetricEntry } from "../metrics/metricApi";
+
+/** Which logging overlay is up, if any. */
+type Sheet = "none" | "chooser" | "checkin" | "quicklog";
 
 export function MainTabs() {
   const insets = useSafeAreaInsets();
   const { signOut } = useAuth();
   const [active, setActive] = useState<TabKey>("home");
-  const [sheetOpen, setSheetOpen] = useState(false);
+  const [sheet, setSheet] = useState<Sheet>("none");
 
   const handleSubmit = useCallback(async (input: CheckinInput): Promise<number> => {
     return submitCheckin(input);
+  }, []);
+
+  const handleMetrics = useCallback(async (entries: MetricEntry[]): Promise<number> => {
+    return submitMetrics(entries);
   }, []);
 
   return (
@@ -47,10 +57,24 @@ export function MainTabs() {
           )}
         </View>
 
-        <TabBar active={active} onSelect={setActive} onLog={() => setSheetOpen(true)} bottomInset={insets.bottom} />
+        <TabBar active={active} onSelect={setActive} onLog={() => setSheet("chooser")} bottomInset={insets.bottom} />
       </View>
 
-      {sheetOpen ? <CheckinSheet onClose={() => setSheetOpen(false)} onSubmit={handleSubmit} /> : null}
+      {sheet === "chooser" ? (
+        <LogChooser
+          onClose={() => setSheet("none")}
+          onCheckin={() => setSheet("checkin")}
+          onQuickLog={() => setSheet("quicklog")}
+        />
+      ) : null}
+
+      {sheet === "checkin" ? (
+        <CheckinSheet onClose={() => setSheet("none")} onSubmit={handleSubmit} />
+      ) : null}
+
+      {sheet === "quicklog" ? (
+        <QuickLogSheet onClose={() => setSheet("none")} onSubmit={handleMetrics} />
+      ) : null}
     </Screen>
   );
 }
