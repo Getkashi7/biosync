@@ -78,7 +78,18 @@ API. This file is the source of truth for stack and conventions — follow it.
   middleware, not resolvers.
 - **Data:** `User` mirrors Supabase `auth.users` by `id` (uuid). A `handle_new_user` Postgres
   trigger seeds `public.users` on signup with the default `USER` role. Roles are a Prisma enum.
-  Schema changes always ship a migration (`prisma migrate dev`), never `db push` on shared DBs.
+  Schema changes always ship a migration, never `db push` on shared DBs.
+- **Migrations — `prisma migrate dev` does not work here.** It fails `P3006`: the shadow database
+  can't replay `0001_init`, because that migration's `handle_new_user` trigger references Supabase's
+  `auth` schema, which no shadow DB has. Instead, with the API server stopped:
+  1. Edit `schema.prisma`, then `prisma migrate status` to confirm the live DB has no drift.
+  2. Generate the SQL by diffing the **live** DB (no shadow DB involved):
+     `mkdir -p prisma/migrations/<NNNN>_<name> && pnpm exec prisma migrate diff
+     --from-schema-datasource prisma/schema.prisma --to-schema-datamodel prisma/schema.prisma
+     --script > prisma/migrations/<NNNN>_<name>/migration.sql`
+  3. **Read the SQL before applying it.** It must be additive — any `DROP`/`TRUNCATE` means the diff
+     misread the live schema; stop and investigate rather than run it.
+  4. `pnpm exec prisma migrate deploy` (applies without a shadow DB), then `prisma generate`.
 - **Type sharing:** the API exports its `AppRouter` type; the mobile client imports it type-only
   for end-to-end type safety. No runtime dependency from mobile on API code.
 
