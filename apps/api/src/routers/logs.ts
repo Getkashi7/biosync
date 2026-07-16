@@ -7,21 +7,9 @@ import { Role } from "@prisma/client";
 import { checkinInput, streakInput, computeStreak } from "@pulse/shared";
 import { router, requireRole } from "../trpc";
 import { prisma } from "../db";
+import { toDbDate, fromDbDate } from "../dbDate";
 
 const userProcedure = requireRole(Role.USER);
-
-/** A bare YYYY-MM-DD string → a Date at UTC midnight for the `@db.Date` column. */
-function toDbDate(dateString: string): Date {
-  return new Date(`${dateString}T00:00:00.000Z`);
-}
-
-/** A `@db.Date` value (UTC-midnight Date) → its YYYY-MM-DD string. */
-function fromDbDate(d: Date): string {
-  const y = d.getUTCFullYear();
-  const m = String(d.getUTCMonth() + 1).padStart(2, "0");
-  const day = String(d.getUTCDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
 
 export const logsRouter = router({
   /** Upsert today's check-in (one row per user per calendar day). */

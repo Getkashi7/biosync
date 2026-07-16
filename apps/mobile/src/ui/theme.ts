@@ -53,6 +53,12 @@ export const color = {
   textPlaceholder: "rgba(255,255,255,0.30)",
   /** the "(optional)" qualifier inside a section label */
   textOptional: "rgba(255,255,255,0.25)",
+  /** readiness-ring status label ("Ready to train") */
+  textStatus: "rgba(255,255,255,0.55)",
+  /** chip / pill text on surface */
+  textStrong: "rgba(255,255,255,0.70)",
+  /** low-confidence hint dot halo (orange tint) */
+  warnDotBg: "rgba(255,140,66,0.20)",
   /** inactive tab-bar icon stroke */
   iconInactive: "rgba(255,255,255,0.35)",
   /** log-chooser row icon stroke */
@@ -204,6 +210,31 @@ export const size = {
   saveDividerGap: 14,
   /** quick-log success checkmark */
   successCheck: 84,
+
+  /** — dashboard — */
+  /** readiness ring box + geometry (r/stroke from the design's 208 viewBox) */
+  readinessRing: 208,
+  ringRadius: 88,
+  ringStroke: 11,
+  /** header streak pill height */
+  streakPill: 34,
+  /** metric chip pill height */
+  chip: 30,
+  /** colored dot inside a chip */
+  chipDot: 6,
+  /** dot → text gap inside chips and the streak pill */
+  chipGap: 6,
+  /** vertical rhythm between dashboard sections (header → ring → cards) */
+  dashSectionGap: 18,
+  /** ring → chips / under-ring caption gap */
+  chipRowGap: 14,
+  /** chips → low-confidence hint gap */
+  hintGap: 10,
+  /** low-confidence hint dot halo + core */
+  hintDot: 12,
+  hintDotCore: 4,
+  /** max width of centered under-ring captions */
+  hintMaxW: 280,
 } as const;
 
 // ── Typography ──────────────────────────────────────────────────────────────────
@@ -233,6 +264,12 @@ export const type = {
   sheetTitle: { fontFamily: fontFamily.bold, fontSize: 24, lineHeight: 30, letterSpacing: -0.24 },
   /** big gradient number readout (slider hours) */
   readout: { fontFamily: fontFamily.bold, fontSize: 26, lineHeight: 30, letterSpacing: -0.26 },
+  /** readiness score in the ring (design -0.02em × 58) */
+  score: { fontFamily: fontFamily.bold, fontSize: 58, lineHeight: 60, letterSpacing: -1.16 },
+  /** streak-pill count */
+  chipValue: { fontFamily: fontFamily.semibold, fontSize: 14, lineHeight: 18 },
+  /** centered under-ring caption (empty/error states) */
+  hint: { fontFamily: fontFamily.regular, fontSize: 13, lineHeight: 19 },
   /** uppercase section label */
   sectionLabel: { fontFamily: fontFamily.semibold, fontSize: 11, lineHeight: 14, letterSpacing: 1.32 },
   /** log-chooser option title */
@@ -267,6 +304,9 @@ export const motion = {
     errorBorder: 200, // error border color
     shake: 320, // error shake (total)
     spinner: 800, // CTA spinner rotation
+
+    // — dashboard —
+    ringFill: 800, // readiness ring sweep + score count-up
 
     // — check-in sheet —
     sheetOpen: 300, // translateY 105% → 0 (Easing.out(cubic))

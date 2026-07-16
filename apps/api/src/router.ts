@@ -6,6 +6,7 @@ import { z } from "zod";
 import { router, publicProcedure, protectedProcedure, adminProcedure } from "./trpc";
 import { logsRouter } from "./routers/logs";
 import { metricsRouter } from "./routers/metrics";
+import { readinessRouter } from "./routers/readiness";
 
 export const appRouter = router({
   /** Liveness check — no auth. */
@@ -24,6 +25,9 @@ export const appRouter = router({
 
   /** Point metrics — log a reading, read a range. */
   metrics: metricsRouter,
+
+  /** Daily readiness score. */
+  readiness: readinessRouter,
 
   admin: router({
     /** Admin-only — throws FORBIDDEN for non-admins. */

@@ -12,7 +12,13 @@ import { AppState } from "react-native";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "../../lib/supabase";
 
-export type AuthSession = { userId: string; email: string; accessToken: string };
+export type AuthSession = {
+  userId: string;
+  email: string;
+  accessToken: string;
+  /** from Supabase user_metadata.full_name (collected at sign-up) */
+  fullName: string | null;
+};
 
 export type AuthContextValue = {
   session: AuthSession | null;
@@ -30,10 +36,12 @@ const CONFIRM_EMAIL_MESSAGE = "Check your inbox to confirm your email, then log 
 
 function toSession(session: Session | null): AuthSession | null {
   if (!session) return null;
+  const fullName = session.user.user_metadata?.full_name;
   return {
     userId: session.user.id,
     email: session.user.email ?? "",
     accessToken: session.access_token,
+    fullName: typeof fullName === "string" && fullName.trim() ? fullName : null,
   };
 }
 

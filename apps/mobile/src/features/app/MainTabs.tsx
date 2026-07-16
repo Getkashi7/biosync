@@ -3,9 +3,10 @@
  * the logging sheets mounted as full-screen overlays above everything.
  *
  * The center "Log" tab opens a chooser, which routes to either the Daily
- * Check-in or Quick Log; the other tabs are placeholders until their features
- * land (the Home dashboard waits on the readiness formula). Save handlers are
- * injected so the sheets stay presentation-only — MainTabs owns persistence.
+ * Check-in or Quick Log; Home shows the readiness dashboard, and the remaining
+ * tabs are placeholders until their features land. Save handlers are injected
+ * so the sheets stay presentation-only — MainTabs owns persistence, and bumps
+ * refreshKey when a logging sheet closes so the dashboard refetches.
  */
 import { useCallback, useState } from "react";
 import { StyleSheet, View } from "react-native";
@@ -22,6 +23,7 @@ import { CheckinSheet } from "../checkin/CheckinSheet";
 import { submitCheckin, type CheckinInput } from "../checkin/checkinApi";
 import { QuickLogSheet } from "../metrics/QuickLogSheet";
 import { submitMetrics, type MetricEntry } from "../metrics/metricApi";
+import { DashboardScreen } from "../dashboard/DashboardScreen";
 
 /** Which logging overlay is up, if any. */
 type Sheet = "none" | "chooser" | "checkin" | "quicklog";
@@ -31,6 +33,13 @@ export function MainTabs() {
   const { signOut } = useAuth();
   const [active, setActive] = useState<TabKey>("home");
   const [sheet, setSheet] = useState<Sheet>("none");
+  // Bumped when a logging sheet closes so the dashboard refetches its score.
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  const closeSheet = useCallback(() => {
+    setSheet("none");
+    setRefreshKey((k) => k + 1);
+  }, []);
 
   const handleSubmit = useCallback(async (input: CheckinInput): Promise<number> => {
     return submitCheckin(input);
@@ -45,7 +54,7 @@ export function MainTabs() {
       <View style={styles.root}>
         <View style={[styles.body, { paddingTop: insets.top + space.sm }]}>
           {active === "home" ? (
-            <Placeholder title="No check-ins yet" subtitle="Log your first check-in to see your dashboard." />
+            <DashboardScreen onQuickLog={() => setSheet("quicklog")} refreshKey={refreshKey} />
           ) : active === "profile" ? (
             <Placeholder
               title="Profile"
@@ -68,13 +77,9 @@ export function MainTabs() {
         />
       ) : null}
 
-      {sheet === "checkin" ? (
-        <CheckinSheet onClose={() => setSheet("none")} onSubmit={handleSubmit} />
-      ) : null}
+      {sheet === "checkin" ? <CheckinSheet onClose={closeSheet} onSubmit={handleSubmit} /> : null}
 
-      {sheet === "quicklog" ? (
-        <QuickLogSheet onClose={() => setSheet("none")} onSubmit={handleMetrics} />
-      ) : null}
+      {sheet === "quicklog" ? <QuickLogSheet onClose={closeSheet} onSubmit={handleMetrics} /> : null}
     </Screen>
   );
 }
