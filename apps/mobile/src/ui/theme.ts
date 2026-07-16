@@ -61,6 +61,10 @@ export const color = {
   textStrong: "rgba(255,255,255,0.70)",
   /** low-confidence hint dot halo (orange tint) */
   warnDotBg: "rgba(255,140,66,0.20)",
+  /** faintest text — version footer */
+  textGhost: "rgba(255,255,255,0.34)",
+  /** destructive button fill (error tint) */
+  errorBg: "rgba(229,100,95,0.14)",
   /** inactive tab-bar icon stroke */
   iconInactive: "rgba(255,255,255,0.35)",
   /** log-chooser row icon stroke */
@@ -153,6 +157,8 @@ export const radius = {
   cta: 16,
   /** emoji option cell */
   emoji: 14,
+  /** small segmented-toggle cell (profile units) */
+  segment: 8,
   /** bottom sheet top corners */
   sheet: 28,
   pill: 999,
@@ -261,6 +267,15 @@ export const size = {
   /** value chip height + horizontal padding */
   journalChip: 24,
   journalChipPadX: 10,
+
+  /** — profile — */
+  /** identity avatar circle */
+  avatar: 56,
+  /** settings-card row height */
+  settingsRow: 52,
+  /** units segmented-toggle cell */
+  unitCellW: 40,
+  unitCellH: 28,
 } as const;
 
 // ── Typography ──────────────────────────────────────────────────────────────────
@@ -300,6 +315,12 @@ export const type = {
   statValue: { fontFamily: fontFamily.bold, fontSize: 20, lineHeight: 26 },
   /** journal entry title / metric name + value */
   entryTitle: { fontFamily: fontFamily.semibold, fontSize: 15, lineHeight: 20 },
+  /** profile identity name */
+  identityName: { fontFamily: fontFamily.semibold, fontSize: 17, lineHeight: 22 },
+  /** profile avatar initials */
+  avatarInitials: { fontFamily: fontFamily.semibold, fontSize: 18, lineHeight: 24 },
+  /** settings-row label / value */
+  settingsLabel: { fontFamily: fontFamily.medium, fontSize: 15, lineHeight: 20 },
   /** journal value chip */
   journalChip: { fontFamily: fontFamily.medium, fontSize: 11, lineHeight: 14 },
   /** uppercase section label */

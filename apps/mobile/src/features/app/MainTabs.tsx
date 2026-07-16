@@ -12,11 +12,9 @@ import { useCallback, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Screen } from "../../ui/Screen";
-import { GradientButton } from "../../ui/GradientButton";
 import { TabBar } from "../../ui/TabBar";
 import type { TabKey } from "../../ui/TabBarIcons";
 import { size, space } from "../../ui/theme";
-import { useAuth } from "../auth/AuthProvider";
 import { Placeholder } from "./Placeholder";
 import { LogChooser } from "./LogChooser";
 import { CheckinSheet } from "../checkin/CheckinSheet";
@@ -27,13 +25,14 @@ import { DashboardScreen } from "../dashboard/DashboardScreen";
 import { TimelineScreen } from "../timeline/TimelineScreen";
 import { NewGoalSheet } from "../goals/NewGoalSheet";
 import { createGoal, type NewGoal } from "../goals/goalsApi";
+import { ProfileScreen } from "../profile/ProfileScreen";
+import { DeleteAccountSheet } from "../profile/DeleteAccountSheet";
 
-/** Which logging overlay is up, if any. */
-type Sheet = "none" | "chooser" | "checkin" | "quicklog" | "newgoal";
+/** Which overlay is up, if any. */
+type Sheet = "none" | "chooser" | "checkin" | "quicklog" | "newgoal" | "deleteaccount";
 
 export function MainTabs() {
   const insets = useSafeAreaInsets();
-  const { signOut } = useAuth();
   const [active, setActive] = useState<TabKey>("home");
   const [sheet, setSheet] = useState<Sheet>("none");
   // Bumped when a logging sheet closes so the dashboard refetches its score.
@@ -69,11 +68,7 @@ export function MainTabs() {
           ) : active === "calendar" ? (
             <TimelineScreen onLog={() => setSheet("chooser")} refreshKey={refreshKey} />
           ) : active === "profile" ? (
-            <Placeholder
-              title="Profile"
-              subtitle="Coming soon."
-              footer={<GradientButton label="Sign out" variant="ghost" onPress={() => void signOut()} />}
-            />
+            <ProfileScreen onDeleteAccount={() => setSheet("deleteaccount")} />
           ) : (
             <Placeholder title={TITLES[active]} subtitle="Coming soon." />
           )}
@@ -95,6 +90,8 @@ export function MainTabs() {
       {sheet === "quicklog" ? <QuickLogSheet onClose={closeSheet} onSubmit={handleMetrics} /> : null}
 
       {sheet === "newgoal" ? <NewGoalSheet onClose={closeSheet} onSubmit={handleGoal} /> : null}
+
+      {sheet === "deleteaccount" ? <DeleteAccountSheet onClose={() => setSheet("none")} /> : null}
     </Screen>
   );
 }

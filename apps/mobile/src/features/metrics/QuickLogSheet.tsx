@@ -37,6 +37,7 @@ import { GradientButton } from "../../ui/GradientButton";
 import { SuccessCheck } from "../../ui/SuccessCheck";
 import { errorHaptic, selectionHaptic, successHaptic } from "../../lib/haptics";
 import { prettyToday } from "../../lib/date";
+import { getUnitPref } from "../../lib/prefs";
 import { color, motion, radius, size, space, type } from "../../ui/theme";
 import type { MetricEntry } from "./metricApi";
 
@@ -112,6 +113,11 @@ export function QuickLogSheet({ onClose, onSubmit }: Props) {
     return () => {
       if (doneTimer.current) clearTimeout(doneTimer.current);
     };
+  }, []);
+
+  // Start on the user's preferred unit (Profile → Units).
+  useEffect(() => {
+    void getUnitPref().then(setUnit);
   }, []);
 
   const onSheetLayout = (h: number) => {
