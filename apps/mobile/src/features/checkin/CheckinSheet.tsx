@@ -54,8 +54,8 @@ const LB_PER_KG = 2.2046226218;
 type Props = {
   /** unmount the sheet (called after the close animation finishes) */
   onClose: () => void;
-  /** persist the check-in and resolve with the resulting streak */
-  onSubmit: (input: CheckinInput) => Promise<number>;
+  /** persist the check-in; resolves with the streak, or null when unknown */
+  onSubmit: (input: CheckinInput) => Promise<number | null>;
 };
 
 export function CheckinSheet({ onClose, onSubmit }: Props) {
@@ -69,7 +69,7 @@ export function CheckinSheet({ onClose, onSubmit }: Props) {
   const [weight, setWeight] = useState("");
   const [unit, setUnit] = useState<"kg" | "lb">("kg");
   const [status, setStatus] = useState<"idle" | "saving" | "success" | "error">("idle");
-  const [streak, setStreak] = useState(0);
+  const [streak, setStreak] = useState<number | null>(0);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const canSave = quality !== null && energy !== null && mood !== null && status !== "saving";
@@ -307,7 +307,7 @@ function FadeUp({ delay, children, style }: { delay: number; children: ReactNode
   return <Animated.View style={[style, animatedStyle]}>{children}</Animated.View>;
 }
 
-function SuccessOverlay({ streak }: { streak: number }) {
+function SuccessOverlay({ streak }: { streak: number | null }) {
   const p = useSharedValue(0);
   useEffect(() => {
     p.value = withTiming(1, { duration: motion.duration.successOverlay, easing: motion.easeOut });
@@ -322,13 +322,15 @@ function SuccessOverlay({ streak }: { streak: number }) {
       <FadeUp delay={motion.duration.successTextDelay1} style={styles.successTitleWrap}>
         <Text style={styles.successTitle}>Check-in saved</Text>
       </FadeUp>
-      <FadeUp delay={motion.duration.successTextDelay2} style={styles.streakWrap}>
-        <View style={styles.streakLine}>
-          <Text style={styles.streakLabel}>Streak: </Text>
-          <GradientText style={styles.streakNumber}>{String(streak)}</GradientText>
-          <Text style={styles.streakLabel}> {streak === 1 ? "day" : "days"} 🔥</Text>
-        </View>
-      </FadeUp>
+      {streak !== null ? (
+        <FadeUp delay={motion.duration.successTextDelay2} style={styles.streakWrap}>
+          <View style={styles.streakLine}>
+            <Text style={styles.streakLabel}>Streak: </Text>
+            <GradientText style={styles.streakNumber}>{String(streak)}</GradientText>
+            <Text style={styles.streakLabel}> {streak === 1 ? "day" : "days"} 🔥</Text>
+          </View>
+        </FadeUp>
+      ) : null}
     </Animated.View>
   );
 }

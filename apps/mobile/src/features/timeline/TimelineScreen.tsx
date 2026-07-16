@@ -6,7 +6,7 @@
  * and a "Log today" CTA that opens the Log chooser.
  */
 import { useCallback, useEffect, useState } from "react";
-import { FlatList, StyleSheet, Text, View } from "react-native";
+import { FlatList, RefreshControl, StyleSheet, Text, View } from "react-native";
 import Svg, { Path, Rect } from "react-native-svg";
 import { RiseIn } from "../../ui/RiseIn";
 import { GradientButton } from "../../ui/GradientButton";
@@ -59,6 +59,7 @@ type Props = {
 export function TimelineScreen({ onLog, refreshKey }: Props) {
   const [days, setDays] = useState<TimelineDay[] | null>(null);
   const [failed, setFailed] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
     setFailed(false);
@@ -72,6 +73,12 @@ export function TimelineScreen({ onLog, refreshKey }: Props) {
   useEffect(() => {
     void load();
   }, [load, refreshKey]);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await load();
+    setRefreshing(false);
+  }, [load]);
 
   return (
     <View style={styles.flex}>
@@ -95,12 +102,18 @@ export function TimelineScreen({ onLog, refreshKey }: Props) {
         <EmptyJournal onLog={onLog} />
       ) : days ? (
         <RiseIn index={1} style={styles.flex}>
+          {failed ? (
+            <Text style={styles.staleNote}>Couldn’t refresh — showing your last entries</Text>
+          ) : null}
           <FlatList
             data={flatten(days)}
             keyExtractor={(row) => row.key}
             renderItem={({ item }) => <TimelineRow row={item} />}
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.feed}
+            refreshControl={
+              <RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} tintColor={color.text} />
+            }
           />
         </RiseIn>
       ) : null}
@@ -304,6 +317,12 @@ const styles = StyleSheet.create({
   },
   retry: {
     alignSelf: "stretch",
+    marginTop: space.md,
+  },
+  staleNote: {
+    ...type.captionSm,
+    color: color.textTertiary,
+    textAlign: "center",
     marginTop: space.md,
   },
 });

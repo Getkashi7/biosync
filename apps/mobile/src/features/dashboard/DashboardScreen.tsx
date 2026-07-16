@@ -14,7 +14,7 @@
  *    sheet closes); stale data stays on screen during a refresh.
  */
 import { useCallback, useEffect, useState } from "react";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
 import { RiseIn } from "../../ui/RiseIn";
 import { ReadinessRing } from "../../ui/ReadinessRing";
 import { GradientButton } from "../../ui/GradientButton";
@@ -51,6 +51,7 @@ export function DashboardScreen({ onQuickLog, refreshKey }: Props) {
   const [data, setData] = useState<DashboardData | null>(null);
   const [trends, setTrends] = useState<Trends | null>(null);
   const [failed, setFailed] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
     setFailed(false);
@@ -59,7 +60,7 @@ export function DashboardScreen({ onQuickLog, refreshKey }: Props) {
       setData(dashboard);
       setTrends(trendData);
     } catch {
-      // No health values in logs (CLAUDE.md) — the error state says enough.
+      // No health values in logs (CLAUDE.md) — the error/stale states say enough.
       setFailed(true);
     }
   }, []);
@@ -68,12 +69,23 @@ export function DashboardScreen({ onQuickLog, refreshKey }: Props) {
     void load();
   }, [load, refreshKey]);
 
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await load();
+    setRefreshing(false);
+  }, [load]);
+
   const firstName = session?.fullName?.trim().split(/\s+/)[0];
   const streak = data?.streak ?? 0;
   const readiness = data?.readiness ?? null;
 
   return (
-    <ScrollView style={styles.flex} contentContainerStyle={styles.flexGrow} showsVerticalScrollIndicator={false}>
+    <ScrollView
+      style={styles.flex}
+      contentContainerStyle={styles.flexGrow}
+      showsVerticalScrollIndicator={false}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} tintColor={color.text} />}
+    >
       <RiseIn index={0}>
         <View style={styles.header}>
           <View>
@@ -91,6 +103,10 @@ export function DashboardScreen({ onQuickLog, refreshKey }: Props) {
           ) : null}
         </View>
       </RiseIn>
+
+      {data !== null && failed ? (
+        <Text style={styles.staleNote}>Couldn’t refresh — showing your last numbers</Text>
+      ) : null}
 
       {data === null && !failed ? (
         <View style={styles.centerFill}>
@@ -302,6 +318,12 @@ const styles = StyleSheet.create({
     marginTop: space.base,
   },
   errorCta: {
+    marginTop: space.md,
+  },
+  staleNote: {
+    ...type.captionSm,
+    color: color.textTertiary,
+    textAlign: "center",
     marginTop: space.md,
   },
 });

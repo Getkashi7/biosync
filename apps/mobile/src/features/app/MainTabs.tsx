@@ -42,7 +42,7 @@ export function MainTabs() {
     setRefreshKey((k) => k + 1);
   }, []);
 
-  const handleSubmit = useCallback(async (input: CheckinInput): Promise<number> => {
+  const handleSubmit = useCallback(async (input: CheckinInput): Promise<number | null> => {
     return submitCheckin(input);
   }, []);
 

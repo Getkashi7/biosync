@@ -28,9 +28,17 @@ export function todayLocal(now: Date = new Date()): string {
   return `${y}-${m}-${d}`;
 }
 
-/** Persist today's check-in and return the resulting streak. */
-export async function submitCheckin(input: CheckinInput): Promise<number> {
+/**
+ * Persist today's check-in and return the resulting streak, or null when the
+ * streak lookup fails. The check-in is saved by then — a streak hiccup must
+ * never turn a successful save into an error state.
+ */
+export async function submitCheckin(input: CheckinInput): Promise<number | null> {
   await trpc.logs.checkin.mutate(input);
-  const { streak } = await trpc.logs.streak.query({ today: input.date });
-  return streak;
+  try {
+    const { streak } = await trpc.logs.streak.query({ today: input.date });
+    return streak;
+  } catch {
+    return null;
+  }
 }

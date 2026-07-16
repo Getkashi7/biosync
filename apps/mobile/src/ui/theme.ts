@@ -339,8 +339,7 @@ export const motion = {
 
     // — dashboard —
     ringFill: 800, // readiness ring sweep + score count-up
-    chartDraw: 900, // trend sparkline draw-in
-    chartDrawDelay: 500, // sparkline starts after the ring is underway
+    chartDraw: 900, // trend sparkline draw-in (entrance offset comes from RiseIn stagger)
 
     // — check-in sheet —
     sheetOpen: 300, // translateY 105% → 0 (Easing.out(cubic))
