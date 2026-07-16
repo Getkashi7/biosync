@@ -10,3 +10,5 @@ export { metricType, metricSource, metricLogInput, metricRangeInput, METRIC_RANG
 export type { MetricType, MetricSource, MetricLogInput, MetricRangeInput } from "./metrics";
 export { readinessInput, computeReadiness, baselineMean } from "./readiness";
 export type { ReadinessInput, ReadinessInputs, ReadinessComponents, Readiness } from "./readiness";
+export { logRangeInput, metricListInput } from "./range";
+export type { LogRangeInput, MetricListInput } from "./range";

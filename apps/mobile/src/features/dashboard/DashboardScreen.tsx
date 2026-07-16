@@ -22,10 +22,10 @@ import { Spinner } from "../../ui/Spinner";
 import { prettyToday } from "../../lib/date";
 import { color, radius, size, space, type } from "../../ui/theme";
 import { useAuth } from "../auth/AuthProvider";
+import { ENERGY_WORDS, MOOD_WORDS } from "../../lib/ratings";
 import { fetchDashboard, type DashboardData, type ReadinessToday } from "./dashboardApi";
-
-const ENERGY_WORDS = ["Very low", "Low", "Okay", "High", "Very high"] as const;
-const MOOD_WORDS = ["Awful", "Low", "Neutral", "Good", "Great"] as const;
+import { fetchTrends, type Trends } from "./trendsApi";
+import { TrendCards, hasAnyTrendData } from "./TrendCards";
 
 function greeting(now: Date = new Date()): string {
   const h = now.getHours();
@@ -49,12 +49,15 @@ type Props = {
 export function DashboardScreen({ onQuickLog, refreshKey }: Props) {
   const { session } = useAuth();
   const [data, setData] = useState<DashboardData | null>(null);
+  const [trends, setTrends] = useState<Trends | null>(null);
   const [failed, setFailed] = useState(false);
 
   const load = useCallback(async () => {
     setFailed(false);
     try {
-      setData(await fetchDashboard());
+      const [dashboard, trendData] = await Promise.all([fetchDashboard(), fetchTrends()]);
+      setData(dashboard);
+      setTrends(trendData);
     } catch {
       // No health values in logs (CLAUDE.md) — the error state says enough.
       setFailed(true);
@@ -99,6 +102,12 @@ export function DashboardScreen({ onQuickLog, refreshKey }: Props) {
         <EmptyState onQuickLog={onQuickLog} />
       ) : readiness ? (
         <ReadyState readiness={readiness} />
+      ) : null}
+
+      {data !== null && trends && hasAnyTrendData(trends) ? (
+        <RiseIn index={3}>
+          <TrendCards trends={trends} />
+        </RiseIn>
       ) : null}
     </ScrollView>
   );

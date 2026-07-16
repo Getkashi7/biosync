@@ -4,7 +4,7 @@
  * schema so the mobile client infers identical types end-to-end.
  */
 import { Role } from "@prisma/client";
-import { checkinInput, streakInput, computeStreak } from "@pulse/shared";
+import { checkinInput, streakInput, logRangeInput, computeStreak } from "@pulse/shared";
 import { router, requireRole } from "../trpc";
 import { prisma } from "../db";
 import { toDbDate, fromDbDate } from "../dbDate";
@@ -38,5 +38,32 @@ export const logsRouter = router({
     });
     const dates = rows.map((r) => fromDbDate(r.date));
     return { streak: computeStreak(dates, input.today) };
+  }),
+
+  /** Check-ins in [from, to] (device-local days), newest first — trends + journal. */
+  range: userProcedure.input(logRangeInput).query(async ({ ctx, input }) => {
+    const rows = await prisma.dailyLog.findMany({
+      where: { userId: ctx.user.id, date: { gte: toDbDate(input.from), lte: toDbDate(input.to) } },
+      orderBy: { date: "desc" },
+      select: {
+        date: true,
+        sleepHours: true,
+        sleepQuality: true,
+        energy: true,
+        mood: true,
+        weightKg: true,
+        createdAt: true,
+      },
+    });
+    return rows.map((r) => ({
+      date: fromDbDate(r.date),
+      sleepHours: r.sleepHours,
+      sleepQuality: r.sleepQuality,
+      energy: r.energy,
+      mood: r.mood,
+      weightKg: r.weightKg,
+      // when the check-in was saved (drives the journal's time label)
+      createdAt: r.createdAt.toISOString(),
+    }));
   }),
 });

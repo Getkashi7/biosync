@@ -54,3 +54,19 @@ describe("logs input validation", () => {
     await expect(caller.logs.streak({ today: "07/12/2026" })).rejects.toMatchObject({ code: "BAD_REQUEST" });
   });
 });
+
+describe("logs.range", () => {
+  it("no token → UNAUTHORIZED", async () => {
+    const caller = appRouter.createCaller(ctx(null));
+    await expect(caller.logs.range({ from: "2026-07-10", to: "2026-07-16" })).rejects.toMatchObject({
+      code: "UNAUTHORIZED",
+    });
+  });
+
+  it("rejects a malformed window date", async () => {
+    const caller = appRouter.createCaller(ctx({ id: "u1", role: "USER" }));
+    await expect(caller.logs.range({ from: "07/10/2026", to: "2026-07-16" })).rejects.toMatchObject({
+      code: "BAD_REQUEST",
+    });
+  });
+});

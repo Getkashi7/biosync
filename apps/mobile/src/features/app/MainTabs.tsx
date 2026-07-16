@@ -24,6 +24,7 @@ import { submitCheckin, type CheckinInput } from "../checkin/checkinApi";
 import { QuickLogSheet } from "../metrics/QuickLogSheet";
 import { submitMetrics, type MetricEntry } from "../metrics/metricApi";
 import { DashboardScreen } from "../dashboard/DashboardScreen";
+import { TimelineScreen } from "../timeline/TimelineScreen";
 
 /** Which logging overlay is up, if any. */
 type Sheet = "none" | "chooser" | "checkin" | "quicklog";
@@ -55,6 +56,8 @@ export function MainTabs() {
         <View style={[styles.body, { paddingTop: insets.top + space.sm }]}>
           {active === "home" ? (
             <DashboardScreen onQuickLog={() => setSheet("quicklog")} refreshKey={refreshKey} />
+          ) : active === "calendar" ? (
+            <TimelineScreen onLog={() => setSheet("chooser")} refreshKey={refreshKey} />
           ) : active === "profile" ? (
             <Placeholder
               title="Profile"
@@ -86,7 +89,7 @@ export function MainTabs() {
 
 const TITLES: Record<TabKey, string> = {
   home: "Home",
-  calendar: "Calendar",
+  calendar: "Journal",
   log: "Log",
   chat: "Chat",
   profile: "Profile",

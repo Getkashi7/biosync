@@ -65,6 +65,20 @@ describe("metrics input validation", () => {
   });
 });
 
+describe("metrics.list", () => {
+  it("no token → UNAUTHORIZED", async () => {
+    const caller = appRouter.createCaller(ctx(null));
+    await expect(caller.metrics.list(validRange)).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+  });
+
+  it("rejects a non-ISO timestamp", async () => {
+    const caller = appRouter.createCaller(ctx({ id: "u1", role: "USER" }));
+    await expect(caller.metrics.list({ from: "yesterday", to: validRange.to })).rejects.toMatchObject({
+      code: "BAD_REQUEST",
+    });
+  });
+});
+
 describe("metrics ownership", () => {
   it("drops a client-supplied userId — the owner comes from the session", () => {
     const parsed = metricLogInput.parse({ ...validLog, userId: "someone-else" });

@@ -4,7 +4,7 @@
  * schema so the mobile client infers identical types end-to-end.
  */
 import { Role } from "@prisma/client";
-import { metricLogInput, metricRangeInput } from "@pulse/shared";
+import { metricLogInput, metricRangeInput, metricListInput } from "@pulse/shared";
 import { router, requireRole } from "../trpc";
 import { prisma } from "../db";
 
@@ -38,6 +38,24 @@ export const metricsRouter = router({
     });
     // Dates cross the wire as ISO strings so the client infers a plain string.
     return rows.map((r) => ({
+      value: r.value,
+      source: r.source,
+      recordedAt: r.recordedAt.toISOString(),
+    }));
+  }),
+
+  /** Every type's readings in the window, newest first — the journal feed. */
+  list: userProcedure.input(metricListInput).query(async ({ ctx, input }) => {
+    const rows = await prisma.metric.findMany({
+      where: {
+        userId: ctx.user.id,
+        recordedAt: { gte: new Date(input.from), lte: new Date(input.to) },
+      },
+      orderBy: { recordedAt: "desc" },
+      select: { type: true, value: true, source: true, recordedAt: true },
+    });
+    return rows.map((r) => ({
+      type: r.type,
       value: r.value,
       source: r.source,
       recordedAt: r.recordedAt.toISOString(),

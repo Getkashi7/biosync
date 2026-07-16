@@ -12,3 +12,12 @@ const MONTHS = [
 export function prettyToday(d: Date = new Date()): string {
   return `${WEEKDAYS[d.getDay()]}, ${MONTHS[d.getMonth()]} ${d.getDate()}`;
 }
+
+/** "7:42 AM" — a journal entry's time label, device-local. */
+export function formatTime(iso: string): string {
+  const d = new Date(iso);
+  const h = d.getHours();
+  const twelve = h % 12 === 0 ? 12 : h % 12;
+  const minutes = String(d.getMinutes()).padStart(2, "0");
+  return `${twelve}:${minutes} ${h < 12 ? "AM" : "PM"}`;
+}

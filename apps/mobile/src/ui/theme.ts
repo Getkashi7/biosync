@@ -55,6 +55,8 @@ export const color = {
   textOptional: "rgba(255,255,255,0.25)",
   /** readiness-ring status label ("Ready to train") */
   textStatus: "rgba(255,255,255,0.55)",
+  /** trend-card title ("Sleep · 7d") */
+  textStat: "rgba(255,255,255,0.50)",
   /** chip / pill text on surface */
   textStrong: "rgba(255,255,255,0.70)",
   /** low-confidence hint dot halo (orange tint) */
@@ -116,6 +118,10 @@ export const gradient = {
   /** logo dot + ring arc use a 135deg diagonal */
   logoStart: { x: 0, y: 0 } as const,
   logoEnd: { x: 1, y: 1 } as const,
+
+  /** trend-card sparkline strokes (horizontal, left → right) */
+  chartCool: ["#4A7DFF", "#7EA2FF"] as const,
+  chartWarm: ["#FF8C42", "#FF5E62"] as const,
 
   /**
    * Ambient radial glow blobs (react-native-svg RadialGradient).
@@ -235,6 +241,26 @@ export const size = {
   hintDotCore: 4,
   /** max width of centered under-ring captions */
   hintMaxW: 280,
+
+  /** — trend cards — */
+  /** sparkline drawing area */
+  statChartW: 130,
+  statChartH: 44,
+  /** sparkline stroke width */
+  statStroke: 2.5,
+  /** card vertical padding (horizontal = space.base) */
+  cardPadY: 14,
+
+  /** — journal — */
+  /** gap between entries in a day section (and card header → chips) */
+  entryGap: 10,
+  /** gap between day sections (and header → feed) */
+  daySectionGap: 20,
+  /** check-in icon in an entry card */
+  journalIcon: 20,
+  /** value chip height + horizontal padding */
+  journalChip: 24,
+  journalChipPadX: 10,
 } as const;
 
 // ── Typography ──────────────────────────────────────────────────────────────────
@@ -270,6 +296,12 @@ export const type = {
   chipValue: { fontFamily: fontFamily.semibold, fontSize: 14, lineHeight: 18 },
   /** centered under-ring caption (empty/error states) */
   hint: { fontFamily: fontFamily.regular, fontSize: 13, lineHeight: 19 },
+  /** trend-card value ("7h 24m") */
+  statValue: { fontFamily: fontFamily.bold, fontSize: 20, lineHeight: 26 },
+  /** journal entry title / metric name + value */
+  entryTitle: { fontFamily: fontFamily.semibold, fontSize: 15, lineHeight: 20 },
+  /** journal value chip */
+  journalChip: { fontFamily: fontFamily.medium, fontSize: 11, lineHeight: 14 },
   /** uppercase section label */
   sectionLabel: { fontFamily: fontFamily.semibold, fontSize: 11, lineHeight: 14, letterSpacing: 1.32 },
   /** log-chooser option title */
@@ -307,6 +339,8 @@ export const motion = {
 
     // — dashboard —
     ringFill: 800, // readiness ring sweep + score count-up
+    chartDraw: 900, // trend sparkline draw-in
+    chartDrawDelay: 500, // sparkline starts after the ring is underway
 
     // — check-in sheet —
     sheetOpen: 300, // translateY 105% → 0 (Easing.out(cubic))
