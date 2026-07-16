@@ -25,9 +25,11 @@ import { QuickLogSheet } from "../metrics/QuickLogSheet";
 import { submitMetrics, type MetricEntry } from "../metrics/metricApi";
 import { DashboardScreen } from "../dashboard/DashboardScreen";
 import { TimelineScreen } from "../timeline/TimelineScreen";
+import { NewGoalSheet } from "../goals/NewGoalSheet";
+import { createGoal, type NewGoal } from "../goals/goalsApi";
 
 /** Which logging overlay is up, if any. */
-type Sheet = "none" | "chooser" | "checkin" | "quicklog";
+type Sheet = "none" | "chooser" | "checkin" | "quicklog" | "newgoal";
 
 export function MainTabs() {
   const insets = useSafeAreaInsets();
@@ -50,12 +52,20 @@ export function MainTabs() {
     return submitMetrics(entries);
   }, []);
 
+  const handleGoal = useCallback(async (input: NewGoal): Promise<void> => {
+    return createGoal(input);
+  }, []);
+
   return (
     <Screen>
       <View style={styles.root}>
         <View style={[styles.body, { paddingTop: insets.top + space.sm }]}>
           {active === "home" ? (
-            <DashboardScreen onQuickLog={() => setSheet("quicklog")} refreshKey={refreshKey} />
+            <DashboardScreen
+              onQuickLog={() => setSheet("quicklog")}
+              onNewGoal={() => setSheet("newgoal")}
+              refreshKey={refreshKey}
+            />
           ) : active === "calendar" ? (
             <TimelineScreen onLog={() => setSheet("chooser")} refreshKey={refreshKey} />
           ) : active === "profile" ? (
@@ -83,6 +93,8 @@ export function MainTabs() {
       {sheet === "checkin" ? <CheckinSheet onClose={closeSheet} onSubmit={handleSubmit} /> : null}
 
       {sheet === "quicklog" ? <QuickLogSheet onClose={closeSheet} onSubmit={handleMetrics} /> : null}
+
+      {sheet === "newgoal" ? <NewGoalSheet onClose={closeSheet} onSubmit={handleGoal} /> : null}
     </Screen>
   );
 }

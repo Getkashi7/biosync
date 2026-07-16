@@ -26,6 +26,8 @@ import { ENERGY_WORDS, MOOD_WORDS } from "../../lib/ratings";
 import { fetchDashboard, type DashboardData, type ReadinessToday } from "./dashboardApi";
 import { fetchTrends, type Trends } from "./trendsApi";
 import { TrendCards, hasAnyTrendData } from "./TrendCards";
+import { fetchGoals, type Goal } from "../goals/goalsApi";
+import { GoalsSection } from "../goals/GoalsSection";
 
 function greeting(now: Date = new Date()): string {
   const h = now.getHours();
@@ -42,23 +44,31 @@ function formatHours(hours: number): string {
 type Props = {
   /** open the Quick Log sheet (empty-state CTA) */
   onQuickLog: () => void;
+  /** open the New-goal sheet ("+ New goal" row) */
+  onNewGoal: () => void;
   /** bump to refetch (after a logging sheet closes) */
   refreshKey: number;
 };
 
-export function DashboardScreen({ onQuickLog, refreshKey }: Props) {
+export function DashboardScreen({ onQuickLog, onNewGoal, refreshKey }: Props) {
   const { session } = useAuth();
   const [data, setData] = useState<DashboardData | null>(null);
   const [trends, setTrends] = useState<Trends | null>(null);
+  const [goals, setGoals] = useState<Goal[] | null>(null);
   const [failed, setFailed] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
     setFailed(false);
     try {
-      const [dashboard, trendData] = await Promise.all([fetchDashboard(), fetchTrends()]);
+      const [dashboard, trendData, goalData] = await Promise.all([
+        fetchDashboard(),
+        fetchTrends(),
+        fetchGoals(),
+      ]);
       setData(dashboard);
       setTrends(trendData);
+      setGoals(goalData);
     } catch {
       // No health values in logs (CLAUDE.md) — the error/stale states say enough.
       setFailed(true);
@@ -123,6 +133,12 @@ export function DashboardScreen({ onQuickLog, refreshKey }: Props) {
       {data !== null && trends && hasAnyTrendData(trends) ? (
         <RiseIn index={3}>
           <TrendCards trends={trends} />
+        </RiseIn>
+      ) : null}
+
+      {data !== null && goals !== null ? (
+        <RiseIn index={4}>
+          <GoalsSection goals={goals} onNewGoal={onNewGoal} />
         </RiseIn>
       ) : null}
     </ScrollView>

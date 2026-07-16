@@ -7,6 +7,7 @@ import { router, publicProcedure, protectedProcedure, adminProcedure } from "./t
 import { logsRouter } from "./routers/logs";
 import { metricsRouter } from "./routers/metrics";
 import { readinessRouter } from "./routers/readiness";
+import { goalsRouter } from "./routers/goals";
 
 export const appRouter = router({
   /** Liveness check — no auth. */
@@ -28,6 +29,9 @@ export const appRouter = router({
 
   /** Daily readiness score. */
   readiness: readinessRouter,
+
+  /** User goals. */
+  goals: goalsRouter,
 
   admin: router({
     /** Admin-only — throws FORBIDDEN for non-admins. */

@@ -13,6 +13,12 @@ export function prettyToday(d: Date = new Date()): string {
   return `${WEEKDAYS[d.getDay()]}, ${MONTHS[d.getMonth()]} ${d.getDate()}`;
 }
 
+/** "July 10" — a goal's since-date, device-local. */
+export function prettyDate(iso: string): string {
+  const d = new Date(iso);
+  return `${MONTHS[d.getMonth()]} ${d.getDate()}`;
+}
+
 /** "7:42 AM" — a journal entry's time label, device-local. */
 export function formatTime(iso: string): string {
   const d = new Date(iso);

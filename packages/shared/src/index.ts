@@ -12,3 +12,5 @@ export { readinessInput, computeReadiness, baselineMean } from "./readiness";
 export type { ReadinessInput, ReadinessInputs, ReadinessComponents, Readiness } from "./readiness";
 export { logRangeInput, metricListInput } from "./range";
 export type { LogRangeInput, MetricListInput } from "./range";
+export { goalInput } from "./goals";
+export type { GoalInput } from "./goals";

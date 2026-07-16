@@ -13,21 +13,9 @@ import { GradientButton } from "../../ui/GradientButton";
 import { Spinner } from "../../ui/Spinner";
 import { formatTime } from "../../lib/date";
 import { ENERGY_WORDS, MOOD_WORDS } from "../../lib/ratings";
+import { METRIC_META, FALLBACK_META } from "../../lib/metricMeta";
 import { color, radius, size, space, type } from "../../ui/theme";
 import { fetchTimeline, type CheckinEntry, type MetricEntry, type TimelineDay } from "./timelineApi";
-
-/** Display name, unit, and dot color per metric type (journal rows). */
-const METRIC_META: Record<string, { name: string; unit: string; dot: string }> = {
-  RESTING_HR: { name: "Resting HR", unit: "bpm", dot: color.blue },
-  HRV: { name: "HRV", unit: "ms", dot: color.orange },
-  GLUCOSE: { name: "Glucose", unit: "mg/dL", dot: color.coral },
-  WEIGHT: { name: "Weight", unit: "kg", dot: color.blue2 },
-  SLEEP_HOURS: { name: "Sleep", unit: "h", dot: color.blue },
-  SLEEP_QUALITY: { name: "Sleep quality", unit: "/5", dot: color.blue },
-  HYDRATION: { name: "Hydration", unit: "ml", dot: color.blue2 },
-  ENERGY: { name: "Energy", unit: "/5", dot: color.orange },
-  MOOD: { name: "Mood", unit: "/5", dot: color.coral },
-};
 
 /** 72.4 → "72.4", 72 → "72" */
 const formatValue = (v: number): string => String(Number(v.toFixed(1)));
@@ -151,7 +139,7 @@ function CheckinCard({ entry }: { entry: CheckinEntry }) {
 }
 
 function MetricRow({ entry }: { entry: MetricEntry }) {
-  const meta = METRIC_META[entry.type] ?? { name: entry.type, unit: "", dot: color.blue2 };
+  const meta = METRIC_META[entry.type] ?? FALLBACK_META;
   return (
     <View style={[styles.card, styles.metricCard]}>
       <View style={[styles.dot, { backgroundColor: meta.dot }]} />
