@@ -2,6 +2,7 @@
   "expo": {
     "name": "Pulse",
     "slug": "pulse",
+    "owner": "kaze7777",
     "scheme": "pulse",
     "version": "0.1.0",
     "orientation": "portrait",
@@ -26,13 +27,27 @@
       [
         "expo-splash-screen",
         {
+          "image": "./assets/splash.png",
           "backgroundColor": "#0A0A0F",
-          "resizeMode": "contain"
+          "resizeMode": "contain",
+          "imageWidth": 200
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#FF8C42"
         }
       ]
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "5224aedb-46a1-4c63-b703-a01121802659"
+      }
     }
   }
 }
