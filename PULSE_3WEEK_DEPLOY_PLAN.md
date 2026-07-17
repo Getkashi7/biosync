@@ -96,8 +96,14 @@ truth for stack/conventions is `CLAUDE.md`; this file is scope + sequencing only
 - **Day 8 — Insights / Chat tab:** turn the Chat placeholder into the spec's insight surface
   (start read-only: surface streak + readiness trend as plain-language insights).
 - **Day 9 — Reminders:** local notification to nudge the daily check-in (respect quiet hours).
+  **Reordered after Day 10** (see below) — `expo-notifications` isn't reliably testable in Expo Go
+  on SDK 54, so it needs the dev build first. Decisions locked: *smart* logic (skip days already
+  checked in, respect a quiet-hours window, reschedule on app-open + after check-in) and a *native*
+  time picker (`@react-native-community/datetimepicker`). Mobile-only slice — no API/schema changes.
 - **Day 10 — Leave managed workflow:** add `expo-dev-client`, run `prebuild`, produce the first
   EAS **development** build and confirm it runs on the S23. (The pack scheduled dev-client here.)
+  **Now runs before Day 9** — also `expo install expo-notifications
+  @react-native-community/datetimepicker` in this build so Day 9 is pure-JS on top (no second build).
 
 # Week 3 — ship (Days 11–15) — outline, refine as you go
 

@@ -14,3 +14,16 @@ export { logRangeInput, metricListInput } from "./range";
 export type { LogRangeInput, MetricListInput } from "./range";
 export { goalInput } from "./goals";
 export type { GoalInput } from "./goals";
+export { insightsInput, computeInsights } from "./insights";
+export type {
+  InsightsInput,
+  InsightsData,
+  Insight,
+  InsightSection,
+  InsightAccent,
+  InsightDirection,
+  InsightKind,
+  InsightDelta,
+  CheckinPoint,
+  ReadinessPoint,
+} from "./insights";

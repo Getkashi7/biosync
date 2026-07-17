@@ -8,6 +8,7 @@ import { logsRouter } from "./routers/logs";
 import { metricsRouter } from "./routers/metrics";
 import { readinessRouter } from "./routers/readiness";
 import { goalsRouter } from "./routers/goals";
+import { insightsRouter } from "./routers/insights";
 
 export const appRouter = router({
   /** Liveness check — no auth. */
@@ -32,6 +33,9 @@ export const appRouter = router({
 
   /** User goals. */
   goals: goalsRouter,
+
+  /** Read-only insight feed. */
+  insights: insightsRouter,
 
   admin: router({
     /** Admin-only — throws FORBIDDEN for non-admins. */

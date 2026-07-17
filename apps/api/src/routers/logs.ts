@@ -8,6 +8,7 @@ import { checkinInput, streakInput, logRangeInput, computeStreak } from "@pulse/
 import { router, requireRole } from "../trpc";
 import { prisma } from "../db";
 import { toDbDate, fromDbDate } from "../dbDate";
+import { storeReadinessSnapshot } from "../lib/readiness";
 
 const userProcedure = requireRole(Role.USER);
 
@@ -27,6 +28,13 @@ export const logsRouter = router({
       create: { userId: ctx.user.id, date, ...data },
       update: data,
     });
+    // Persist the day's readiness for the Insights trend. Best-effort — the
+    // check-in is already saved, and insights.list backfills a missed snapshot.
+    try {
+      await storeReadinessSnapshot(ctx.user.id, input.date, new Date());
+    } catch {
+      // swallow — a snapshot hiccup must never fail a successful check-in
+    }
     return { ok: true };
   }),
 

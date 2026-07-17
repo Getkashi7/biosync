@@ -48,9 +48,10 @@ model User {
   role      Role     @default(USER)
   createdAt DateTime @default(now()) @map("created_at")
 
-  dailyLogs DailyLog[]
-  metrics   Metric[]
-  goals     Goal[]
+  dailyLogs           DailyLog[]
+  metrics             Metric[]
+  goals               Goal[]
+  readinessSnapshots  ReadinessSnapshot[]
 
   @@map("users")
 }
@@ -91,6 +92,26 @@ model Metric {
 
   @@index([userId, type, recordedAt])
   @@map("metrics")
+}
+
+// A stored daily readiness score — the source of truth for the Insights trend.
+// Written (upserted) whenever the day's readiness inputs change: on each check-in,
+// and lazily backfilled for recent days by `insights.list`. `score` is the same
+// 0–100 `computeReadiness` produces; a day that scores null (nothing logged) is
+// simply never written. One row per user per device-local day.
+model ReadinessSnapshot {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  date      DateTime @db.Date
+  score     Int
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+  @@index([userId])
+  @@map("readiness_snapshots")
 }
 
 // A user's stated goal, optionally tied to the metric that measures it.

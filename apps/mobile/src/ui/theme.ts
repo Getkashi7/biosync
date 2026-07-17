@@ -102,6 +102,27 @@ export const color = {
   caret: "#4A7DFF",
   /** text on a gradient fill */
   onGradient: "#FFFFFF",
+
+  /** — insights feed — */
+  /** card badge tints (metric accent @ ~14%) */
+  insightBadgeSleep: "rgba(74,125,255,0.14)",
+  insightBadgeWarm: "rgba(255,140,66,0.14)", // resting HR + streak
+  insightBadgeCoral: "rgba(255,94,98,0.14)",
+  /** readiness badge — neutral, the dot carries the brand gradient */
+  insightBadgeNeutral: "rgba(255,255,255,0.06)",
+  /** nudge badge + its dot (demoted, never alarming) */
+  insightBadgeMuted: "rgba(255,255,255,0.05)",
+  insightNudgeDot: "rgba(255,255,255,0.28)",
+  /** delta-pill backgrounds (cool = readiness, warm = resting HR) */
+  insightDeltaCoolBg: "rgba(74,125,255,0.16)",
+  insightDeltaWarmBg: "rgba(255,140,66,0.14)",
+  /** empty / error big sparkle glyph */
+  insightGlyph: "rgba(255,255,255,0.22)",
+  /** disabled chat teaser */
+  teaserText: "rgba(255,255,255,0.40)",
+  teaserIcon: "rgba(255,255,255,0.30)",
+  teaserBadgeText: "rgba(255,255,255,0.35)",
+  teaserBadgeBorder: "rgba(255,255,255,0.10)",
 } as const;
 
 // ── Gradient ───────────────────────────────────────────────────────────────────
@@ -276,6 +297,38 @@ export const size = {
   /** units segmented-toggle cell */
   unitCellW: 40,
   unitCellH: 28,
+
+  /** — insights feed — */
+  /** header → first section label */
+  insightHeaderGap: 22,
+  /** headline → sub-line */
+  insightSubGap: 3,
+  /** card badge circle + its inner dot */
+  insightBadge: 26,
+  insightBadgeDot: 8,
+  /** emoji glyph inside a badge (streak) */
+  insightBadgeEmoji: 13,
+  /** badge → text row gap */
+  insightBadgeGap: 10,
+  /** trailing delta pill */
+  insightDeltaChip: 24,
+  insightDeltaPadX: 10,
+  insightDeltaArrow: 10,
+  /** arrow → label gap inside a delta pill */
+  insightDeltaGap: 5,
+  /** sparkline left indent = badge (26) + row gap (10) */
+  insightSparkIndent: 36,
+  /** headline block → sparkline gap */
+  insightSparkGap: 10,
+  /** nudge "Log it" pill (44-tall hit row around a 32 pill) */
+  insightNudgePill: 32,
+  insightNudgePillPadX: 14,
+  /** disabled chat teaser icon + "SOON" badge */
+  teaserIcon: 18,
+  teaserBadge: 20,
+  teaserBadgePadX: 8,
+  /** empty / error centered sparkle */
+  insightGlyph: 40,
 } as const;
 
 // ── Typography ──────────────────────────────────────────────────────────────────
@@ -334,6 +387,13 @@ export const type = {
   label: { fontFamily: fontFamily.regular, fontSize: 16, lineHeight: 20 },
   caption: { fontFamily: fontFamily.medium, fontSize: 13, lineHeight: 18 },
   captionSm: { fontFamily: fontFamily.medium, fontSize: 12, lineHeight: 16 },
+  /** insight card headline / sub-line / delta pill */
+  insightHeadline: { fontFamily: fontFamily.semibold, fontSize: 15.5, lineHeight: 21 },
+  insightSub: { fontFamily: fontFamily.medium, fontSize: 12.5, lineHeight: 17 },
+  insightDelta: { fontFamily: fontFamily.semibold, fontSize: 12, lineHeight: 16 },
+  /** disabled chat teaser label + "SOON" badge */
+  teaser: { fontFamily: fontFamily.medium, fontSize: 13, lineHeight: 18 },
+  teaserBadge: { fontFamily: fontFamily.semibold, fontSize: 10, lineHeight: 12, letterSpacing: 0.8 },
 } as const satisfies Record<string, TypeToken>;
 
 // ── Motion ──────────────────────────────────────────────────────────────────────

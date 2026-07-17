@@ -27,6 +27,7 @@ import { NewGoalSheet } from "../goals/NewGoalSheet";
 import { createGoal, type NewGoal } from "../goals/goalsApi";
 import { ProfileScreen } from "../profile/ProfileScreen";
 import { DeleteAccountSheet } from "../profile/DeleteAccountSheet";
+import { InsightsScreen } from "../insights/InsightsScreen";
 
 /** Which overlay is up, if any. */
 type Sheet = "none" | "chooser" | "checkin" | "quicklog" | "newgoal" | "deleteaccount";
@@ -69,6 +70,8 @@ export function MainTabs() {
             <TimelineScreen onLog={() => setSheet("chooser")} refreshKey={refreshKey} />
           ) : active === "profile" ? (
             <ProfileScreen onDeleteAccount={() => setSheet("deleteaccount")} />
+          ) : active === "chat" ? (
+            <InsightsScreen onLog={() => setSheet("chooser")} refreshKey={refreshKey} />
           ) : (
             <Placeholder title={TITLES[active]} subtitle="Coming soon." />
           )}

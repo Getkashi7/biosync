@@ -16,3 +16,19 @@
 - **7-day stat cards with sparklines** (Pulse Dashboard design): Day 4 trends slice.
 - **Greeting name from the API** instead of client-side Supabase `user_metadata` (would also
   cover users created before sign-up stored `full_name`).
+
+## From Day 8 (Insights)
+- **Readiness snapshot freshness**: a snapshot is written on check-in and backfilled by
+  `insights.list`, but a resting-HR reading logged *after* that day's check-in doesn't rewrite
+  the day's snapshot — so the trend's "today" value can lag the live dashboard until the next
+  check-in. Fix: also (re)write today's snapshot from `metrics.log` when a RESTING_HR reading
+  lands (needs the client's device-local `today` on `metricLogInput`), or recompute today's
+  snapshot on each `insights.list`.
+- **Insights refresh trigger**: the feed only refetches when a logging sheet closes (MainTabs
+  `refreshKey`) or on pull-to-refresh. A check-in made on the Home tab won't be reflected until
+  one of those — fine for now, revisit if it feels stale.
+- **Phase-2 chat**: the "Ask Pulse about your data" teaser is a static, non-pressable SOON pill.
+  The real conversational surface (LLM over the user's metrics) is a later slice.
+- **Weight-day bucketing** in `insights.list` counts WEIGHT metric readings by UTC day, not the
+  device-local day (check-in weights are already local). Only affects the nudge's "N more
+  entries" count at tz boundaries; align with the client tz if it ever matters.
