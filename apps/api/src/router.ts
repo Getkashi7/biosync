@@ -9,6 +9,7 @@ import { metricsRouter } from "./routers/metrics";
 import { readinessRouter } from "./routers/readiness";
 import { goalsRouter } from "./routers/goals";
 import { insightsRouter } from "./routers/insights";
+import { assistantRouter } from "./routers/assistant";
 
 export const appRouter = router({
   /** Liveness check — no auth. */
@@ -36,6 +37,9 @@ export const appRouter = router({
 
   /** Read-only insight feed. */
   insights: insightsRouter,
+
+  /** AI Coach — conversational wellness guide grounded in the user's data. */
+  assistant: assistantRouter,
 
   admin: router({
     /** Admin-only — throws FORBIDDEN for non-admins. */
