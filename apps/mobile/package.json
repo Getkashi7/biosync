@@ -22,7 +22,7 @@
     "@react-native-masked-view/masked-view": "0.3.2",
     "@supabase/supabase-js": "^2.46.1",
     "@trpc/client": "^11.0.0",
-    "expo": "54.0.8",
+    "expo": "54.0.36",
     "expo-blur": "~15.0.8",
     "expo-constants": "~18.0.13",
     "expo-dev-client": "~6.0.21",
