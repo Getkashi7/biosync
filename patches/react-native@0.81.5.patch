@@ -1,0 +1,51 @@
+diff --git a/Libraries/Core/setUpReactDevTools.js b/Libraries/Core/setUpReactDevTools.js
+index 9bdf66b30184b9ecedc128da1c86a944b8121502..75002b77612df99bee2bd0becc885e4bb6793dd9 100644
+--- a/Libraries/Core/setUpReactDevTools.js
++++ b/Libraries/Core/setUpReactDevTools.js
+@@ -13,7 +13,7 @@
+ import type {Domain} from '../../src/private/devsupport/rndevtools/setUpFuseboxReactDevToolsDispatcher';
+ import type {Spec as NativeReactDevToolsRuntimeSettingsModuleSpec} from '../../src/private/devsupport/rndevtools/specs/NativeReactDevToolsRuntimeSettingsModule';
+ 
+-if (__DEV__) {
++if (__DEV__ && global.__RN_RDT_INIT__ !== true) {
+   if (typeof global.queueMicrotask !== 'function') {
+     console.error(
+       'queueMicrotask should exist before setting up React DevTools.',
+@@ -29,7 +29,11 @@ if (__DEV__) {
+   }
+ }
+ 
+-if (__DEV__) {
++if (__DEV__ && global.__RN_RDT_INIT__ !== true) {
++  // Guard: expo-dev-launcher can boot RN core twice in one JS engine (launcher +
++  // app). Re-running this block redefines a frozen global and throws
++  // "property is not writable", aborting InitializeCore → blank app. Run once.
++  global.__RN_RDT_INIT__ = true;
+   // Register dispatcher on global, which can be used later by Chrome DevTools frontend
+   require('../../src/private/devsupport/rndevtools/setUpFuseboxReactDevToolsDispatcher');
+   const {
+diff --git a/src/private/devsupport/rndevtools/setUpFuseboxReactDevToolsDispatcher.js b/src/private/devsupport/rndevtools/setUpFuseboxReactDevToolsDispatcher.js
+index 79f7f4d7688ae0a4b70bb25fdfe766680faaab54..1034f7d9a34e81c67ac351be17f8c78bc333d5e5 100644
+--- a/src/private/devsupport/rndevtools/setUpFuseboxReactDevToolsDispatcher.js
++++ b/src/private/devsupport/rndevtools/setUpFuseboxReactDevToolsDispatcher.js
+@@ -105,9 +105,14 @@ class FuseboxReactDevToolsDispatcher {
+   }
+ }
+ 
+-Object.defineProperty(global, '__FUSEBOX_REACT_DEVTOOLS_DISPATCHER__', {
+-  value: FuseboxReactDevToolsDispatcher,
+-  configurable: false,
+-  enumerable: false,
+-  writable: false,
+-});
++// Idempotent: only define once per JS engine. The expo-dev-launcher can evaluate
++// RN core twice in one runtime; redefining this frozen global throws
++// "property is not writable" and blanks the app.
++if (!Object.prototype.hasOwnProperty.call(global, '__FUSEBOX_REACT_DEVTOOLS_DISPATCHER__')) {
++  Object.defineProperty(global, '__FUSEBOX_REACT_DEVTOOLS_DISPATCHER__', {
++    value: FuseboxReactDevToolsDispatcher,
++    configurable: false,
++    enumerable: false,
++    writable: false,
++  });
++}
