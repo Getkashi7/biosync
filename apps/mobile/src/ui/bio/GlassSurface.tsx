@@ -22,6 +22,8 @@ type Props = {
   /** softer sheen for secondary tiles */
   soft?: boolean;
   borderColor?: string;
+  /** make the content layer fill the surface height (for fixed-height tiles) */
+  fill?: boolean;
 };
 
 export function GlassSurface({
@@ -32,6 +34,7 @@ export function GlassSurface({
   intensity = 22,
   soft = false,
   borderColor = bio.color.border,
+  fill = false,
 }: Props) {
   return (
     <View style={[{ borderRadius: radius, overflow: "hidden", borderWidth: 1, borderColor }, style]}>
@@ -42,7 +45,11 @@ export function GlassSurface({
         end={{ x: 1, y: 1 }}
         style={StyleSheet.absoluteFill}
       />
-      <View style={{ padding }}>{children}</View>
+      <View style={[fill ? styles.fill : null, padding != null ? { padding } : null]}>{children}</View>
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  fill: { flex: 1 },
+});
