@@ -1,50 +1,77 @@
 /**
- * Journal timeline — the Calendar tab, built to the "Pulse Journal Timeline"
- * design: a reverse-chronological feed of day sections, each holding the day's
- * check-in card (with compact value chips) and slim metric rows (colored dot,
- * name, value, time). Empty variant: centered calendar icon, "No entries yet",
- * and a "Log today" CTA that opens the Log chooser.
+ * Trends & journal — BIOSYNC redesign (the "Trends" tab). Aurora field + a glass
+ * 7-day sleep bar chart, then a journal timeline of recent check-ins + metrics on
+ * a dotted spine. Full-bleed; clears the floating tab bar.
  */
 import { useCallback, useEffect, useState } from "react";
-import { FlatList, RefreshControl, StyleSheet, Text, View } from "react-native";
-import Svg, { Path, Rect } from "react-native-svg";
-import { RiseIn } from "../../ui/RiseIn";
-import { GradientButton } from "../../ui/GradientButton";
+import { RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { AuroraField } from "../../ui/bio/AuroraField";
+import { GlassSurface } from "../../ui/bio/GlassSurface";
 import { Spinner } from "../../ui/Spinner";
+import { GradientButton } from "../../ui/GradientButton";
 import { formatTime } from "../../lib/date";
+import { todayLocal } from "../checkin/checkinApi";
 import { ENERGY_WORDS, MOOD_WORDS } from "../../lib/ratings";
 import { METRIC_META, FALLBACK_META } from "../../lib/metricMeta";
-import { color, radius, size, space, type } from "../../ui/theme";
-import { fetchTimeline, type CheckinEntry, type MetricEntry, type TimelineDay } from "./timelineApi";
+import { bio, fontFamily } from "../../ui/theme";
+import { fetchTimeline, type TimelineDay } from "./timelineApi";
 
-/** 72.4 → "72.4", 72 → "72" */
-const formatValue = (v: number): string => String(Number(v.toFixed(1)));
+const WD = ["S", "M", "T", "W", "T", "F", "S"];
+const fmt = (v: number): string => String(Number(v.toFixed(1)));
 
-type Row =
-  | { kind: "label"; key: string; label: string }
-  | { kind: "checkin"; key: string; entry: CheckinEntry }
-  | { kind: "metric"; key: string; entry: MetricEntry };
+const METRIC_HUE: Record<string, string> = {
+  RESTING_HR: bio.color.coral,
+  HRV: bio.color.blue,
+  WEIGHT: bio.color.tealLt2,
+  GLUCOSE: bio.color.amber,
+  SLEEP_HOURS: bio.color.violet,
+};
+const hueFor = (t: string): string => METRIC_HUE[t] ?? bio.color.blue;
 
-function flatten(days: TimelineDay[]): Row[] {
-  const rows: Row[] = [];
-  for (const day of days) {
-    rows.push({ kind: "label", key: `label-${day.date}`, label: day.label });
-    if (day.checkin) rows.push({ kind: "checkin", key: `checkin-${day.date}`, entry: day.checkin });
-    day.metrics.forEach((entry, i) => {
-      rows.push({ kind: "metric", key: `metric-${day.date}-${i}`, entry });
-    });
+type Bar = { label: string; value: number | null };
+function last7Sleep(days: TimelineDay[]): Bar[] {
+  const byDate = new Map(days.map((d) => [d.date, d.checkin?.sleepHours ?? null]));
+  const now = new Date();
+  const out: Bar[] = [];
+  for (let i = 6; i >= 0; i--) {
+    const dt = new Date(now);
+    dt.setDate(dt.getDate() - i);
+    out.push({ label: WD[dt.getDay()]!, value: byDate.get(todayLocal(dt)) ?? null });
   }
-  return rows;
+  return out;
 }
 
-type Props = {
-  /** open the Log chooser (empty-state CTA) */
-  onLog: () => void;
-  /** bump to refetch (after a logging sheet closes) */
-  refreshKey: number;
-};
+type JEntry = { key: string; dot: string; text: string; time: string; tags: string[] };
+function journal(days: TimelineDay[]): JEntry[] {
+  const out: JEntry[] = [];
+  for (const day of days.slice(0, 4)) {
+    if (day.checkin) {
+      const c = day.checkin;
+      out.push({
+        key: `c-${day.date}`,
+        dot: bio.color.violet,
+        text: "Daily check-in",
+        time: formatTime(c.createdAt),
+        tags: [`${fmt(c.sleepHours)}h`, ENERGY_WORDS[c.energy - 1] ?? "", MOOD_WORDS[c.mood - 1] ?? ""].filter(Boolean),
+      });
+    }
+    day.metrics.forEach((m, i) => {
+      const meta = METRIC_META[m.type] ?? FALLBACK_META;
+      out.push({
+        key: `m-${day.date}-${i}`,
+        dot: hueFor(m.type),
+        text: `${meta.name} · ${fmt(m.value)} ${meta.unit}`.trim(),
+        time: formatTime(m.recordedAt),
+        tags: [],
+      });
+    });
+  }
+  return out.slice(0, 8);
+}
 
-export function TimelineScreen({ onLog, refreshKey }: Props) {
+export function TimelineScreen({ onLog, refreshKey }: { onLog: () => void; refreshKey: number }) {
+  const insets = useSafeAreaInsets();
   const [days, setDays] = useState<TimelineDay[] | null>(null);
   const [failed, setFailed] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -68,249 +95,138 @@ export function TimelineScreen({ onLog, refreshKey }: Props) {
     setRefreshing(false);
   }, [load]);
 
-  return (
-    <View style={styles.flex}>
-      <RiseIn index={0}>
-        <Text style={styles.title}>Journal</Text>
-        <Text style={styles.subtitle}>Your check-ins and metrics</Text>
-      </RiseIn>
+  const bars = days ? last7Sleep(days) : [];
+  const present = bars.filter((b) => b.value !== null).map((b) => b.value as number);
+  const max = present.length ? Math.max(...present, 8) : 8;
+  const avg = present.length ? present.reduce((s, v) => s + v, 0) / present.length : null;
+  const entries = days ? journal(days) : [];
 
-      {days === null && !failed ? (
-        <View style={styles.centerFill}>
-          <Spinner tint={color.text} />
-        </View>
-      ) : days === null && failed ? (
-        <View style={styles.centerFill}>
-          <Text style={styles.emptyCaption}>Couldn’t load your journal</Text>
-          <View style={styles.retry}>
-            <GradientButton label="Try again" variant="ghost" onPress={() => void load()} />
+  return (
+    <View style={styles.root}>
+      <AuroraField blobs={[{ hue: bio.aurora.teal, size: 400, right: -140, top: -120, stops: [{ o: 0, a: 0.24 }, { o: 70, a: 0 }] }]} />
+      <ScrollView
+        style={styles.flex}
+        contentContainerStyle={[styles.content, { paddingTop: insets.top + 14, paddingBottom: 130 }]}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} tintColor={bio.color.text} />}
+      >
+        <Text style={styles.title}>Trends</Text>
+
+        {days === null ? (
+          <View style={styles.fill}>
+            {failed ? (
+              <>
+                <Text style={styles.msg}>Couldn’t load your trends</Text>
+                <View style={styles.cta}>
+                  <GradientButton label="Try again" variant="ghost" onPress={() => void load()} />
+                </View>
+              </>
+            ) : (
+              <Spinner tint={bio.color.text} />
+            )}
           </View>
-        </View>
-      ) : days && days.length === 0 ? (
-        <EmptyJournal onLog={onLog} />
-      ) : days ? (
-        <RiseIn index={1} style={styles.flex}>
-          {failed ? (
-            <Text style={styles.staleNote}>Couldn’t refresh — showing your last entries</Text>
-          ) : null}
-          <FlatList
-            data={flatten(days)}
-            keyExtractor={(row) => row.key}
-            renderItem={({ item }) => <TimelineRow row={item} />}
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={styles.feed}
-            refreshControl={
-              <RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} tintColor={color.text} />
-            }
-          />
-        </RiseIn>
-      ) : null}
+        ) : days.length === 0 ? (
+          <View style={styles.fill}>
+            <Text style={styles.msg}>Log a few days and your trends + journal will appear here.</Text>
+            <View style={styles.cta}>
+              <GradientButton label="Log today" onPress={onLog} />
+            </View>
+          </View>
+        ) : (
+          <>
+            <GlassSurface style={styles.chartCard} padding={18}>
+              <View style={styles.chartHead}>
+                <Text style={styles.chartLabel}>Sleep · 7 days</Text>
+                {avg !== null ? (
+                  <Text style={styles.avg}>
+                    avg <Text style={{ color: bio.color.violetLt, fontFamily: fontFamily.bold }}>{fmt(avg)}h</Text>
+                  </Text>
+                ) : null}
+              </View>
+              <View style={styles.bars}>
+                {bars.map((b, i) => (
+                  <View key={i} style={styles.barCol}>
+                    <View
+                      style={[
+                        styles.bar,
+                        {
+                          height: b.value === null ? 6 : Math.max(14, (b.value / max) * 104),
+                          backgroundColor: b.value === null ? bio.alpha(0.1) : bio.color.violet,
+                          shadowColor: bio.color.violet,
+                        },
+                      ]}
+                    />
+                    <Text style={styles.barLabel}>{b.label}</Text>
+                  </View>
+                ))}
+              </View>
+            </GlassSurface>
+
+            <Text style={styles.section}>Journal · recent</Text>
+            <View style={styles.timeline}>
+              <View style={styles.spine} />
+              {entries.map((e) => (
+                <View key={e.key} style={styles.entry}>
+                  <View style={[styles.entryDot, { backgroundColor: e.dot, shadowColor: e.dot }]} />
+                  <View style={styles.entryBody}>
+                    <View style={styles.entryTop}>
+                      <Text style={styles.entryText}>{e.text}</Text>
+                      <Text style={styles.entryTime}>{e.time}</Text>
+                    </View>
+                    {e.tags.length > 0 ? (
+                      <View style={styles.tags}>
+                        {e.tags.map((t, i) => (
+                          <View key={i} style={styles.tag}>
+                            <Text style={styles.tagTxt}>{t}</Text>
+                          </View>
+                        ))}
+                      </View>
+                    ) : null}
+                  </View>
+                </View>
+              ))}
+            </View>
+          </>
+        )}
+      </ScrollView>
     </View>
-  );
-}
-
-function TimelineRow({ row }: { row: Row }) {
-  if (row.kind === "label") {
-    return <Text style={styles.dayLabel}>{row.label}</Text>;
-  }
-  if (row.kind === "checkin") {
-    return <CheckinCard entry={row.entry} />;
-  }
-  return <MetricRow entry={row.entry} />;
-}
-
-function CheckinCard({ entry }: { entry: CheckinEntry }) {
-  return (
-    <View style={styles.card}>
-      <View style={styles.cardHeader}>
-        <CheckinIcon />
-        <Text style={styles.entryTitle}>Daily check-in</Text>
-        <Text style={styles.time}>{formatTime(entry.createdAt)}</Text>
-      </View>
-      <View style={styles.chipRow}>
-        <ValueChip label={`${formatValue(entry.sleepHours)}h sleep`} />
-        <ValueChip label={`😴 ${entry.sleepQuality}/5`} />
-        <ValueChip label={`⚡ ${ENERGY_WORDS[entry.energy - 1]}`} />
-        <ValueChip label={`🙂 ${MOOD_WORDS[entry.mood - 1]}`} />
-        {entry.weightKg !== null ? <ValueChip label={`${formatValue(entry.weightKg)} kg`} /> : null}
-      </View>
-    </View>
-  );
-}
-
-function MetricRow({ entry }: { entry: MetricEntry }) {
-  const meta = METRIC_META[entry.type] ?? FALLBACK_META;
-  return (
-    <View style={[styles.card, styles.metricCard]}>
-      <View style={[styles.dot, { backgroundColor: meta.dot }]} />
-      <Text style={styles.entryTitle}>{meta.name}</Text>
-      <Text style={styles.metricValue}>
-        {formatValue(entry.value)} {meta.unit}
-      </Text>
-      <Text style={styles.time}>{formatTime(entry.recordedAt)}</Text>
-    </View>
-  );
-}
-
-function ValueChip({ label }: { label: string }) {
-  return (
-    <View style={styles.chip}>
-      <Text style={styles.chipText}>{label}</Text>
-    </View>
-  );
-}
-
-function EmptyJournal({ onLog }: { onLog: () => void }) {
-  return (
-    <RiseIn index={1} style={styles.centerFill}>
-      <CalendarIcon />
-      <Text style={styles.emptyTitle}>No entries yet</Text>
-      <Text style={styles.emptyCaption}>Your check-ins and logged metrics will appear here</Text>
-      <View style={styles.emptyCta}>
-        <GradientButton label="Log today" onPress={onLog} />
-      </View>
-    </RiseIn>
-  );
-}
-
-/** Clipboard with a tick, at journal size (LogChooser draws the 24px variant). */
-function CheckinIcon() {
-  return (
-    <Svg width={size.journalIcon} height={size.journalIcon} viewBox="0 0 24 24" fill="none">
-      <Rect x={5} y={4} width={14} height={17} rx={3} stroke={color.iconStrong} strokeWidth={2} />
-      <Path d="M9 2.5 H15 V6 H9 Z" stroke={color.iconStrong} strokeWidth={2} strokeLinejoin="round" />
-      <Path
-        d="M9 13.5 L11.2 15.7 L15.5 11"
-        stroke={color.iconStrong}
-        strokeWidth={2}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </Svg>
-  );
-}
-
-/** Calendar outline — the empty state's icon (same paths as the tab icon). */
-function CalendarIcon() {
-  return (
-    <Svg width={24} height={24} viewBox="0 0 24 24" fill="none">
-      <Rect x={4} y={5} width={16} height={15} rx={3} stroke={color.iconInactive} strokeWidth={2} />
-      <Path d="M4 10 H20 M8 3 V6 M16 3 V6" stroke={color.iconInactive} strokeWidth={2} strokeLinecap="round" />
-    </Svg>
   );
 }
 
 const styles = StyleSheet.create({
-  flex: {
-    flex: 1,
+  root: { flex: 1, backgroundColor: bio.color.ink },
+  flex: { flex: 1 },
+  content: { paddingHorizontal: 24, flexGrow: 1 },
+  fill: { flexGrow: 1, alignItems: "center", justifyContent: "center", paddingVertical: 80 },
+  title: { fontFamily: fontFamily.bold, fontSize: 24, letterSpacing: -0.24, color: bio.color.text },
+  msg: { fontFamily: fontFamily.light, fontSize: 14, lineHeight: 21, color: bio.alpha(0.55), textAlign: "center", maxWidth: 280 },
+  cta: { alignSelf: "stretch", marginTop: 18 },
+  chartCard: { marginTop: 16 },
+  chartHead: { flexDirection: "row", alignItems: "baseline", justifyContent: "space-between" },
+  chartLabel: { fontFamily: fontFamily.semibold, fontSize: 11, letterSpacing: 1.4, color: bio.alpha(0.55), textTransform: "uppercase" },
+  avg: { fontFamily: fontFamily.regular, fontSize: 12, color: bio.alpha(0.5) },
+  bars: { flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between", height: 124, marginTop: 18, paddingHorizontal: 2 },
+  barCol: { alignItems: "center", gap: 8 },
+  bar: { width: 26, borderRadius: 8, shadowOpacity: 0.5, shadowRadius: 6, shadowOffset: { width: 0, height: 0 } },
+  barLabel: { fontFamily: fontFamily.semibold, fontSize: 10, color: bio.alpha(0.4) },
+  section: {
+    fontFamily: fontFamily.semibold,
+    fontSize: 11,
+    letterSpacing: 1.76,
+    color: bio.alpha(0.45),
+    textTransform: "uppercase",
+    marginTop: 26,
+    marginBottom: 14,
   },
-  centerFill: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  title: {
-    ...type.greeting,
-    color: color.text,
-  },
-  subtitle: {
-    ...type.caption,
-    color: color.textTertiary,
-    marginTop: space.xxs,
-  },
-  feed: {
-    // first label's marginTop + this = the design's 20 header→feed gap; card
-    // marginBottom (10) + label marginTop (10) = the 20 between day sections
-    paddingTop: size.entryGap,
-    paddingBottom: space.lg,
-  },
-  dayLabel: {
-    ...type.sectionLabel,
-    color: color.textFaint,
-    marginTop: size.entryGap,
-    marginBottom: size.entryGap,
-  },
-  card: {
-    backgroundColor: color.surface,
-    borderRadius: radius.card,
-    borderWidth: 1,
-    borderColor: color.hairline,
-    paddingVertical: size.cardPadY,
-    paddingHorizontal: space.base,
-    marginBottom: size.entryGap,
-  },
-  cardHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: size.entryGap,
-  },
-  metricCard: {
-    paddingVertical: space.md,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: size.entryGap,
-  },
-  entryTitle: {
-    ...type.entryTitle,
-    color: color.text,
-    flexShrink: 1,
-  },
-  metricValue: {
-    ...type.entryTitle,
-    color: color.textStrong,
-    flex: 1,
-  },
-  time: {
-    ...type.captionSm,
-    color: color.textTertiary,
-    marginLeft: "auto",
-  },
-  chipRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: size.chipGap,
-    marginTop: size.entryGap,
-  },
-  chip: {
-    height: size.journalChip,
-    paddingHorizontal: size.journalChipPadX,
-    borderRadius: radius.pill,
-    backgroundColor: color.inset,
-    justifyContent: "center",
-  },
-  chipText: {
-    ...type.journalChip,
-    color: color.textStrong,
-  },
-  dot: {
-    width: size.chipDot,
-    height: size.chipDot,
-    borderRadius: size.chipDot / 2,
-  },
-  emptyTitle: {
-    ...type.greeting,
-    color: color.text,
-    marginTop: space.base,
-  },
-  emptyCaption: {
-    ...type.body,
-    color: color.textSecondary,
-    textAlign: "center",
-    maxWidth: size.hintMaxW,
-    marginTop: space.sm,
-  },
-  emptyCta: {
-    alignSelf: "stretch",
-    marginTop: space.base,
-  },
-  retry: {
-    alignSelf: "stretch",
-    marginTop: space.md,
-  },
-  staleNote: {
-    ...type.captionSm,
-    color: color.textTertiary,
-    textAlign: "center",
-    marginTop: space.md,
-  },
+  timeline: { position: "relative" },
+  spine: { position: "absolute", left: 5, top: 6, bottom: 6, width: 1, backgroundColor: bio.alpha(0.12) },
+  entry: { flexDirection: "row", gap: 16, marginBottom: 18 },
+  entryDot: { width: 11, height: 11, borderRadius: 6, marginTop: 3, shadowOpacity: 0.9, shadowRadius: 5, shadowOffset: { width: 0, height: 0 } },
+  entryBody: { flex: 1 },
+  entryTop: { flexDirection: "row", alignItems: "baseline", justifyContent: "space-between" },
+  entryText: { fontFamily: fontFamily.semibold, fontSize: 14, color: bio.color.text, flexShrink: 1 },
+  entryTime: { fontFamily: fontFamily.regular, fontSize: 11, color: bio.alpha(0.4), marginLeft: 8 },
+  tags: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 8 },
+  tag: { paddingVertical: 4, paddingHorizontal: 10, borderRadius: 999, backgroundColor: "rgba(255,255,255,0.06)", borderWidth: 1, borderColor: "rgba(255,255,255,0.12)" },
+  tagTxt: { fontFamily: fontFamily.semibold, fontSize: 10.5, color: bio.alpha(0.7) },
 });

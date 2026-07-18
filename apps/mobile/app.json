@@ -1,13 +1,14 @@
 {
   "expo": {
-    "name": "Pulse",
+    "name": "BIOSYNC",
     "slug": "pulse",
     "owner": "kaze7777",
     "scheme": "pulse",
     "version": "0.1.0",
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
-    "backgroundColor": "#0A0A0F",
+    "icon": "./assets/icon.png",
+    "backgroundColor": "#0B0B12",
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": false,
@@ -15,6 +16,10 @@
     },
     "android": {
       "package": "app.pulse.mobile",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/icon.png",
+        "backgroundColor": "#0B0B12"
+      },
       "softwareKeyboardLayoutMode": "resize"
     },
     "web": {
@@ -28,15 +33,15 @@
         "expo-splash-screen",
         {
           "image": "./assets/splash.png",
-          "backgroundColor": "#0A0A0F",
+          "backgroundColor": "#0B0B12",
           "resizeMode": "contain",
-          "imageWidth": 200
+          "imageWidth": 170
         }
       ],
       [
         "expo-notifications",
         {
-          "color": "#FF8C42"
+          "color": "#FF7A6E"
         }
       ]
     ],

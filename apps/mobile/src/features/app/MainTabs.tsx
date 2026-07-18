@@ -10,11 +10,11 @@
  */
 import { useCallback, useEffect, useState } from "react";
 import { AppState, StyleSheet, View } from "react-native";
+import { StatusBar } from "expo-status-bar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Screen } from "../../ui/Screen";
-import { TabBar } from "../../ui/TabBar";
+import { BioTabBar } from "../../ui/bio/BioTabBar";
 import type { TabKey } from "../../ui/TabBarIcons";
-import { size, space } from "../../ui/theme";
+import { bio } from "../../ui/theme";
 import { Placeholder } from "./Placeholder";
 import { LogChooser } from "./LogChooser";
 import { CheckinSheet } from "../checkin/CheckinSheet";
@@ -68,32 +68,29 @@ export function MainTabs() {
   }, []);
 
   return (
-    <Screen>
-      <View style={styles.root}>
-        <View style={[styles.body, { paddingTop: insets.top + space.sm }]}>
-          {active === "home" ? (
-            <DashboardScreen
-              onQuickLog={() => setSheet("quicklog")}
-              onNewGoal={() => setSheet("newgoal")}
-              refreshKey={refreshKey}
-            />
-          ) : active === "calendar" ? (
-            <TimelineScreen onLog={() => setSheet("chooser")} refreshKey={refreshKey} />
-          ) : active === "profile" ? (
-            <ProfileScreen
-              onDeleteAccount={() => setSheet("deleteaccount")}
-              onReminders={() => setSheet("reminders")}
-              refreshKey={refreshKey}
-            />
-          ) : active === "chat" ? (
-            <InsightsScreen onLog={() => setSheet("chooser")} refreshKey={refreshKey} />
-          ) : (
-            <Placeholder title={TITLES[active]} subtitle="Coming soon." />
-          )}
-        </View>
+    <View style={styles.page}>
+      <StatusBar style="light" />
+      {active === "home" ? (
+        <DashboardScreen
+          onQuickLog={() => setSheet("quicklog")}
+          onCheckin={() => setSheet("checkin")}
+          refreshKey={refreshKey}
+        />
+      ) : active === "chat" ? (
+        <InsightsScreen onLog={() => setSheet("chooser")} refreshKey={refreshKey} />
+      ) : active === "profile" ? (
+        <ProfileScreen
+          onDeleteAccount={() => setSheet("deleteaccount")}
+          onReminders={() => setSheet("reminders")}
+          refreshKey={refreshKey}
+        />
+      ) : active === "calendar" ? (
+        <TimelineScreen onLog={() => setSheet("chooser")} refreshKey={refreshKey} />
+      ) : (
+        <Placeholder title={TITLES[active]} subtitle="Coming soon." />
+      )}
 
-        <TabBar active={active} onSelect={setActive} onLog={() => setSheet("chooser")} bottomInset={insets.bottom} />
-      </View>
+      <BioTabBar active={active} onSelect={setActive} onLog={() => setSheet("chooser")} bottomInset={insets.bottom} />
 
       {sheet === "chooser" ? (
         <LogChooser
@@ -112,7 +109,7 @@ export function MainTabs() {
       {sheet === "deleteaccount" ? <DeleteAccountSheet onClose={() => setSheet("none")} /> : null}
 
       {sheet === "reminders" ? <RemindersSheet onClose={closeSheet} /> : null}
-    </Screen>
+    </View>
   );
 }
 
@@ -125,13 +122,10 @@ const TITLES: Record<TabKey, string> = {
 };
 
 const styles = StyleSheet.create({
-  root: {
+  page: {
     flex: 1,
-  },
-  body: {
-    flex: 1,
-    paddingHorizontal: size.screenPadX,
-    backgroundColor: "transparent",
+    backgroundColor: bio.color.ink,
+    overflow: "hidden",
   },
 });
 

@@ -1,21 +1,20 @@
 /**
- * Profile tab, per the "Pulse Profile" design (frame 1): identity block
- * (initials avatar, name, email), PREFERENCES card (units toggle, reminders
- * placeholder), ACCOUNT card (sign out, delete-account entry point), and a
- * version footer. Real account deletion ships in Week 3 — the row opens the
- * confirm sheet, which owns that messaging.
+ * Profile — BIOSYNC redesign. Aurora field + a breathing avatar, identity, and
+ * grouped glass settings lists (units · reminders · account). Full-bleed; clears
+ * the floating tab bar. Preferences + sign-out/delete wiring unchanged.
  */
 import { useEffect, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import Constants from "expo-constants";
-import { RiseIn } from "../../ui/RiseIn";
+import Animated, { Easing, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from "react-native-reanimated";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { AuroraField } from "../../ui/bio/AuroraField";
+import { GlassSurface } from "../../ui/bio/GlassSurface";
 import { selectionHaptic } from "../../lib/haptics";
 import { getReminderPrefs, getUnitPref, setUnitPref, type WeightUnit } from "../../lib/prefs";
 import { formatHm } from "../../lib/reminderSchedule";
-import { color, radius, size, space, type } from "../../ui/theme";
+import { bio, fontFamily } from "../../ui/theme";
 import { useAuth } from "../auth/AuthProvider";
 
-/** "Maya Kessler" → "MK"; falls back to the email's first letter. */
 function initialsOf(fullName: string | null, email: string): string {
   const words = fullName?.trim().split(/\s+/).filter(Boolean) ?? [];
   if (words.length >= 2) return `${words[0]![0]}${words[1]![0]}`.toUpperCase();
@@ -23,16 +22,10 @@ function initialsOf(fullName: string | null, email: string): string {
   return (email[0] ?? "?").toUpperCase();
 }
 
-type Props = {
-  /** open the delete-account confirm sheet */
-  onDeleteAccount: () => void;
-  /** open the reminders settings sheet */
-  onReminders: () => void;
-  /** bump to reload prefs (after the reminders sheet closes) */
-  refreshKey: number;
-};
+type Props = { onDeleteAccount: () => void; onReminders: () => void; refreshKey: number };
 
 export function ProfileScreen({ onDeleteAccount, onReminders, refreshKey }: Props) {
+  const insets = useSafeAreaInsets();
   const { session, signOut } = useAuth();
   const [unit, setUnit] = useState<WeightUnit>("kg");
   const [reminders, setReminders] = useState("Off");
@@ -40,227 +33,130 @@ export function ProfileScreen({ onDeleteAccount, onReminders, refreshKey }: Prop
   useEffect(() => {
     void getUnitPref().then(setUnit);
   }, []);
-
   useEffect(() => {
     void getReminderPrefs().then((p) => setReminders(p.enabled ? formatHm(p.time) : "Off"));
   }, [refreshKey]);
 
-  const pickUnit = (next: WeightUnit) => {
-    if (next === unit) return;
-    selectionHaptic();
-    setUnit(next);
-    void setUnitPref(next);
-  };
+  const glow = useSharedValue(0);
+  useEffect(() => {
+    glow.value = withRepeat(withTiming(1, { duration: 3000, easing: Easing.inOut(Easing.sin) }), -1, true);
+  }, [glow]);
+  const glowStyle = useAnimatedStyle(() => ({ opacity: 0.5 + glow.value * 0.45, transform: [{ scale: 1 + glow.value * 0.06 }] }));
 
   const email = session?.email ?? "";
+  const pickUnit = (u: WeightUnit) => {
+    if (u === unit) return;
+    selectionHaptic();
+    setUnit(u);
+    void setUnitPref(u);
+  };
 
   return (
-    <View style={styles.flex}>
-      <RiseIn index={0}>
-        <Text style={styles.title}>Profile</Text>
-      </RiseIn>
-
-      <RiseIn index={1}>
+    <View style={styles.root}>
+      <AuroraField
+        blobs={[{ hue: bio.aurora.teal, size: 380, cx: true, top: -140, stops: [{ o: 0, a: 0.26 }, { o: 48, a: 0.12 }, { o: 72, a: 0 }] }]}
+      />
+      <View style={[styles.content, { paddingTop: insets.top + 20 }]}>
         <View style={styles.identity}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{initialsOf(session?.fullName ?? null, email)}</Text>
-          </View>
-          <View>
-            {session?.fullName ? <Text style={styles.name}>{session.fullName}</Text> : null}
-            <Text style={[styles.email, !session?.fullName && styles.emailOnly]}>{email}</Text>
-          </View>
-        </View>
-      </RiseIn>
-
-      <RiseIn index={2}>
-        <View style={styles.group}>
-          <Text style={styles.groupLabel}>PREFERENCES</Text>
-          <View style={styles.card}>
-            <View style={styles.row}>
-              <Text style={styles.rowLabel}>Units</Text>
-              <View style={styles.unitToggle}>
-                {(["kg", "lb"] as const).map((u) => {
-                  const on = unit === u;
-                  return (
-                    <Pressable
-                      key={u}
-                      onPress={() => pickUnit(u)}
-                      style={[
-                        styles.unitCell,
-                        u === "kg" ? styles.unitCellLeft : styles.unitCellRight,
-                        on && styles.unitCellOn,
-                        u === "lb" && !on && styles.unitCellNoLeft,
-                      ]}
-                      accessibilityRole="button"
-                      accessibilityState={{ selected: on }}
-                    >
-                      <Text style={[styles.unitText, on && styles.unitTextOn]}>{u}</Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
+          <View style={styles.avatarWrap}>
+            <Animated.View style={[styles.avatarGlow, glowStyle]} />
+            <View style={styles.avatar}>
+              <Text style={styles.avatarTxt}>{initialsOf(session?.fullName ?? null, email)}</Text>
             </View>
-            <View style={styles.separator} />
-            <Pressable style={styles.row} onPress={onReminders} accessibilityRole="button" accessibilityLabel={`Reminders, ${reminders}`}>
-              <Text style={styles.rowLabel}>Reminders</Text>
-              <View style={styles.rowValueWrap}>
-                <Text style={styles.rowValue}>{reminders}</Text>
-                <Text style={styles.chevron}>›</Text>
-              </View>
-            </Pressable>
           </View>
+          {session?.fullName ? <Text style={styles.name}>{session.fullName}</Text> : null}
+          <Text style={styles.email}>{email}</Text>
         </View>
-      </RiseIn>
 
-      <RiseIn index={3}>
-        <View style={styles.group}>
-          <Text style={styles.groupLabel}>ACCOUNT</Text>
-          <View style={styles.card}>
-            <Pressable style={styles.row} onPress={() => void signOut()} accessibilityRole="button">
-              <Text style={styles.rowLabel}>Sign out</Text>
-            </Pressable>
-            <View style={styles.separator} />
-            <Pressable style={styles.row} onPress={onDeleteAccount} accessibilityRole="button">
-              <Text style={styles.rowDanger}>Delete account</Text>
-            </Pressable>
+        <Text style={styles.group}>Preferences</Text>
+        <GlassSurface style={styles.card} soft>
+          <View style={styles.row}>
+            <Text style={styles.rowLabel}>Units</Text>
+            <View style={styles.seg}>
+              {(["kg", "lb"] as const).map((u) => {
+                const on = unit === u;
+                return (
+                  <Pressable key={u} onPress={() => pickUnit(u)} style={[styles.segCell, on && styles.segOn]} accessibilityRole="button">
+                    <Text style={[styles.segTxt, on && styles.segTxtOn]}>{u}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
           </View>
-        </View>
-      </RiseIn>
+          <View style={styles.sep} />
+          <Pressable style={styles.row} onPress={onReminders} accessibilityRole="button">
+            <Text style={styles.rowLabel}>Reminders</Text>
+            <View style={styles.rowVal}>
+              <Text style={styles.rowValTxt}>{reminders}</Text>
+              <Text style={styles.chev}>›</Text>
+            </View>
+          </Pressable>
+        </GlassSurface>
 
-      <View style={styles.flex} />
-      <Text style={styles.version}>Pulse {Constants.expoConfig?.version ?? "0.1.0"}</Text>
+        <Text style={styles.group}>Account</Text>
+        <GlassSurface style={styles.card} soft>
+          <Pressable style={styles.row} onPress={() => void signOut()} accessibilityRole="button">
+            <Text style={styles.rowLabel}>Sign out</Text>
+          </Pressable>
+          <View style={styles.sep} />
+          <Pressable style={styles.row} onPress={onDeleteAccount} accessibilityRole="button">
+            <Text style={[styles.rowLabel, { color: bio.color.coral }]}>Delete account</Text>
+          </Pressable>
+        </GlassSurface>
+
+        <View style={styles.flex} />
+        <Text style={styles.version}>BIOSYNC · your body, in tune</Text>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  flex: {
-    flex: 1,
-  },
-  title: {
-    ...type.greeting,
-    color: color.text,
-  },
-  identity: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: size.chooserIconGap,
-    marginTop: size.daySectionGap,
+  root: { flex: 1, backgroundColor: bio.color.ink },
+  content: { flex: 1, paddingHorizontal: 24, paddingBottom: 120 },
+  identity: { alignItems: "center" },
+  avatarWrap: { width: 84, height: 84, alignItems: "center", justifyContent: "center" },
+  avatarGlow: {
+    position: "absolute",
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: "rgba(94,212,192,0.28)",
   },
   avatar: {
-    width: size.avatar,
-    height: size.avatar,
-    borderRadius: size.avatar / 2,
-    backgroundColor: color.inset,
+    width: 84,
+    height: 84,
+    borderRadius: 42,
+    backgroundColor: "#211E33",
     borderWidth: 1,
-    borderColor: color.hairline,
+    borderColor: "rgba(255,255,255,0.2)",
     alignItems: "center",
     justifyContent: "center",
   },
-  avatarText: {
-    ...type.avatarInitials,
-    color: color.textStrong,
-  },
-  name: {
-    ...type.identityName,
-    color: color.text,
-  },
-  email: {
-    ...type.caption,
-    color: color.textTertiary,
-    marginTop: space.xxs,
-  },
-  emailOnly: {
-    marginTop: 0,
-  },
+  avatarTxt: { fontFamily: fontFamily.bold, fontSize: 30, color: bio.color.text },
+  name: { fontFamily: fontFamily.bold, fontSize: 21, color: bio.color.text, marginTop: 14 },
+  email: { fontFamily: fontFamily.regular, fontSize: 12, color: bio.alpha(0.5), marginTop: 4 },
   group: {
-    marginTop: space.lg,
+    fontFamily: fontFamily.semibold,
+    fontSize: 11,
+    letterSpacing: 1.76,
+    color: bio.alpha(0.4),
+    textTransform: "uppercase",
+    marginTop: 30,
+    marginBottom: 10,
   },
-  groupLabel: {
-    ...type.sectionLabel,
-    color: color.textFaint,
-  },
-  card: {
-    marginTop: size.hintGap,
-    backgroundColor: color.surface,
-    borderRadius: radius.card,
-    borderWidth: 1,
-    borderColor: color.hairline,
-    overflow: "hidden",
-  },
-  row: {
-    height: size.settingsRow,
-    paddingHorizontal: space.base,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  separator: {
-    height: 1,
-    backgroundColor: color.hairline,
-    marginLeft: space.base,
-  },
-  rowLabel: {
-    ...type.settingsLabel,
-    color: color.text,
-  },
-  rowDanger: {
-    ...type.settingsLabel,
-    color: color.error,
-  },
-  rowValueWrap: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: space.sm,
-  },
-  rowValue: {
-    ...type.settingsLabel,
-    color: color.textTertiary,
-  },
-  chevron: {
-    fontSize: 18,
-    lineHeight: 18,
-    color: color.textPlaceholder,
-  },
-  unitToggle: {
-    flexDirection: "row",
-  },
-  unitCell: {
-    width: size.unitCellW,
-    height: size.unitCellH,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: color.inset,
-    borderWidth: 1,
-    borderColor: color.fieldBorder,
-  },
-  unitCellLeft: {
-    borderTopLeftRadius: radius.segment,
-    borderBottomLeftRadius: radius.segment,
-    zIndex: 1,
-  },
-  unitCellRight: {
-    borderTopRightRadius: radius.segment,
-    borderBottomRightRadius: radius.segment,
-  },
-  unitCellNoLeft: {
-    borderLeftWidth: 0,
-  },
-  unitCellOn: {
-    backgroundColor: color.emojiSelectedBg,
-    borderColor: color.emojiSelectedBorder,
-  },
-  unitText: {
-    ...type.caption,
-    color: color.textTertiary,
-  },
-  unitTextOn: {
-    color: color.text,
-  },
-  version: {
-    ...type.captionSm,
-    color: color.textGhost,
-    textAlign: "center",
-    paddingBottom: space.base,
-  },
+  card: { overflow: "hidden" },
+  row: { height: 54, paddingHorizontal: 18, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  rowLabel: { fontFamily: fontFamily.medium, fontSize: 15, color: bio.color.text },
+  rowVal: { flexDirection: "row", alignItems: "center", gap: 8 },
+  rowValTxt: { fontFamily: fontFamily.medium, fontSize: 14, color: bio.alpha(0.5) },
+  chev: { fontFamily: fontFamily.regular, fontSize: 18, color: bio.alpha(0.35) },
+  sep: { height: 1, backgroundColor: bio.color.hairline, marginLeft: 18 },
+  seg: { flexDirection: "row", backgroundColor: "rgba(255,255,255,0.05)", borderRadius: 10, padding: 3, gap: 3 },
+  segCell: { width: 38, height: 26, alignItems: "center", justifyContent: "center", borderRadius: 8 },
+  segOn: { backgroundColor: "rgba(255,255,255,0.14)" },
+  segTxt: { fontFamily: fontFamily.medium, fontSize: 13, color: bio.alpha(0.5) },
+  segTxtOn: { color: bio.color.text },
+  flex: { flex: 1 },
+  version: { fontFamily: fontFamily.regular, fontSize: 12, color: bio.alpha(0.32), textAlign: "center" },
 });

@@ -129,8 +129,10 @@ export const color = {
 // Brand gradient used by CTA fills, the FAB, slider fill, focus underlines, and
 // the strength bar. SVG strokes (ring arc, charts, checkmark) reuse the same stops.
 export const gradient = {
-  brandColors: ["#FF8C42", "#FF5E62", "#4A7DFF"] as const,
-  brandLocations: [0, 0.45, 1] as const,
+  // BIOSYNC redesign: violet → aqua → teal (retargeted so every remaining
+  // old-gradient control — sliders, dots, buttons, glow — reads on the new palette).
+  brandColors: ["#A78BFA", "#77C6D4", "#5ED4C0"] as const,
+  brandLocations: [0, 0.5, 1] as const,
 
   /** CTA / FAB / slider fill use a slight diagonal */
   ctaStart: { x: 0, y: 0 } as const,
@@ -334,10 +336,16 @@ export const size = {
 // ── Typography ──────────────────────────────────────────────────────────────────
 // Font family keys map to the loaded Space Grotesk weights (see useAppFonts()).
 export const fontFamily = {
-  regular: "SpaceGrotesk_400Regular",
-  medium: "SpaceGrotesk_500Medium",
-  semibold: "SpaceGrotesk_600SemiBold",
-  bold: "SpaceGrotesk_700Bold",
+  // BIOSYNC redesign: Onest (UI) + Doto (dotted readouts). Names kept back-compat
+  // (regular/medium/semibold/bold) so existing `type.*` tokens keep resolving.
+  light: "Onest_300Light",
+  regular: "Onest_400Regular",
+  medium: "Onest_500Medium",
+  semibold: "Onest_600SemiBold",
+  bold: "Onest_700Bold",
+  extrabold: "Onest_800ExtraBold",
+  dot: "Doto_800ExtraBold",
+  dotBold: "Doto_700Bold",
 } as const;
 
 type TypeToken = {
@@ -468,6 +476,98 @@ export const haptic = {
   toggle: "selection", // Haptics.selectionAsync() on Show/Hide, kg/lb
 } as const;
 
-export const theme = { color, gradient, space, radius, size, type, fontFamily, motion, haptic } as const;
+// ── BIOSYNC redesign tokens ──────────────────────────────────────────────────
+// New "ambient biofeedback" system: aurora radial fields, glass surfaces, Doto
+// dotted readouts. Added additively — the legacy `color/size/type` above stay
+// until the last screen is re-skinned onto `bio`, then get removed.
+export const bio = {
+  color: {
+    page: "#07070C",
+    ink: "#0B0B12",
+    ink2: "#0C0B14",
+    inkDeep: "#0A0A10",
+    surface: "#0D0C15",
+    /** light "moment" screens (check-in, reminders) */
+    lilac: "#E9E4F6",
+    rose: "#EBD7E5",
+    onLilac: "#221C33",
+    onRose: "#2A1626",
+    /** primary text on dark */
+    text: "#F4F2F8",
+    /** aurora accents — one hue per metric family */
+    violet: "#A78BFA",
+    teal: "#5ED4C0",
+    coral: "#FF7A6E",
+    blue: "#6CA8FF",
+    amber: "#F5B85C",
+    magenta: "#E86BC7",
+    purple: "#7C56FF",
+    /** lighter accent variants (glowing text + marks) */
+    tealLt: "#A5EBD9",
+    blueLt: "#9BC4FF",
+    tealLt2: "#8FE3CF",
+    magLt: "#F2A9DF",
+    coralLt: "#FFB4AC",
+    violetLt: "#C5A9FF",
+    heart: "#FFB4AC",
+    /** glass surface recipe (gradient fill + border) */
+    glassHi: "rgba(255,255,255,0.09)",
+    glassLo: "rgba(255,255,255,0.03)",
+    glassHi2: "rgba(255,255,255,0.07)",
+    glassLo2: "rgba(255,255,255,0.02)",
+    border: "rgba(255,255,255,0.14)",
+    border2: "rgba(255,255,255,0.12)",
+    hairline: "rgba(255,255,255,0.09)",
+  },
+  /** white-alpha text ramp for dark screens */
+  alpha: (a: number): string => `rgba(244,242,248,${a})`,
+  /** dark-ink alpha ramp for the light "moment" screens */
+  inkAlpha: (a: number): string => `rgba(34,28,51,${a})`,
+  /** aurora radial-gradient rgb triples (feed react-native-svg RadialGradient) */
+  aurora: {
+    violet: "167,139,250",
+    teal: "94,212,192",
+    coral: "255,122,110",
+    blue: "108,168,255",
+    amber: "245,184,92",
+    magenta: "232,107,199",
+    purple: "124,86,255",
+  },
+  radius: { screen: 44, card: 24, tile: 24, pill: 999, sm: 16, xs: 12 },
+  space: { xs: 4, sm: 8, md: 12, base: 16, lg: 18, xl: 24, xxl: 32 },
+  type: {
+    orb: { fontFamily: fontFamily.extrabold, fontSize: 92, lineHeight: 92, letterSpacing: -3.7 },
+    dotXL: { fontFamily: fontFamily.dot, fontSize: 76, letterSpacing: 4.6 },
+    dotClock: { fontFamily: fontFamily.dot, fontSize: 64, letterSpacing: 5.1 },
+    dotClockLg: { fontFamily: fontFamily.dot, fontSize: 66, letterSpacing: 6.6 },
+    metricXL: { fontFamily: fontFamily.extrabold, fontSize: 38, letterSpacing: -0.76 },
+    metricL: { fontFamily: fontFamily.extrabold, fontSize: 34, letterSpacing: -0.68 },
+    metricM: { fontFamily: fontFamily.extrabold, fontSize: 30, letterSpacing: -0.6 },
+    title: { fontFamily: fontFamily.bold, fontSize: 28, lineHeight: 34, letterSpacing: -0.28 },
+    sheetTitle: { fontFamily: fontFamily.bold, fontSize: 24, lineHeight: 30, letterSpacing: -0.24 },
+    greeting: { fontFamily: fontFamily.bold, fontSize: 22, lineHeight: 28, letterSpacing: -0.22 },
+    heading: { fontFamily: fontFamily.semibold, fontSize: 15, lineHeight: 21 },
+    body: { fontFamily: fontFamily.light, fontSize: 15, lineHeight: 22 },
+    bodySm: { fontFamily: fontFamily.light, fontSize: 13, lineHeight: 20 },
+    label: { fontFamily: fontFamily.semibold, fontSize: 11, lineHeight: 14, letterSpacing: 1.76 },
+    labelSm: { fontFamily: fontFamily.semibold, fontSize: 11, lineHeight: 14, letterSpacing: 1.1 },
+    chipVal: { fontFamily: fontFamily.bold, fontSize: 15, letterSpacing: -0.15 },
+    dotSm: { fontFamily: fontFamily.dot, fontSize: 16, letterSpacing: 0.9 },
+    tab: { fontFamily: fontFamily.semibold, fontSize: 9.5, letterSpacing: 0.4 },
+    wordmark: { fontFamily: fontFamily.bold, fontSize: 34 },
+  },
+  motion: {
+    breathe: 12000,
+    breathe2: 14000,
+    ringDraw: 1800,
+    spin: 90000,
+    press: 120,
+    pressScale: 0.96,
+    spring: { damping: 15, stiffness: 200 },
+    easeOut: motion.easeEmphasized,
+  },
+} as const;
+
+export const theme = { color, gradient, space, radius, size, type, fontFamily, motion, haptic, bio } as const;
 
 export type Theme = typeof theme;

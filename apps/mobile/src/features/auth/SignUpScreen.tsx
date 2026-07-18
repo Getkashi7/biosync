@@ -1,18 +1,19 @@
 /**
- * Sign Up — name / email / password with a live strength meter, loading CTA.
- * On success the session flips and the root layout redirects to the app.
+ * Sign Up — BIOSYNC redesign. Aurora field, glass fields, a live strength meter,
+ * and a solid CTA. On success the session flips and the root layout redirects.
  */
 import { useState } from "react";
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from "react-native";
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
+import { StatusBar } from "expo-status-bar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Screen } from "../../ui/Screen";
-import { BackButton } from "../../ui/BackButton";
-import { FloatingLabelField } from "../../ui/FloatingLabelField";
+import Svg, { Path } from "react-native-svg";
+import { AuroraField } from "../../ui/bio/AuroraField";
+import { GlassField } from "../../ui/bio/GlassField";
 import { StrengthBar } from "../../ui/StrengthBar";
-import { GradientButton } from "../../ui/GradientButton";
+import { Spinner } from "../../ui/Spinner";
 import { useKeyboardVisible } from "../../ui/useKeyboardVisible";
-import { color, size, space, type } from "../../ui/theme";
+import { bio, fontFamily } from "../../ui/theme";
 import { successHaptic } from "../../lib/haptics";
 import { scorePassword } from "./passwordStrength";
 import { useAuth } from "./AuthProvider";
@@ -39,64 +40,57 @@ export function SignUpScreen() {
     try {
       await signUp({ fullName: name, email: email.trim(), password });
       successHaptic();
-      // Session now set → root layout redirects to (app).
     } catch (e) {
       setError(e instanceof Error ? e.message : "Something went wrong. Try again.");
       setLoading(false);
     }
   };
 
-  const padBottom = keyboardVisible ? size.formPadBottomKeyboard : Math.max(insets.bottom + 14, space.lg);
+  const padBottom = keyboardVisible ? 12 : Math.max(insets.bottom + 14, 24);
 
   return (
-    <Screen>
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+    <View style={styles.root}>
+      <StatusBar style="light" />
+      <AuroraField
+        blobs={[
+          { hue: bio.aurora.teal, size: 440, left: -160, top: -160, stops: [{ o: 0, a: 0.4 }, { o: 45, a: 0.13 }, { o: 72, a: 0 }] },
+          { hue: bio.aurora.violet, size: 360, right: -140, bottom: 120, stops: [{ o: 0, a: 0.3 }, { o: 70, a: 0 }], variant: "b", delayMs: -6000 },
+        ]}
+      />
+      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : undefined}>
         <ScrollView
-          style={{ flex: 1 }}
-          contentContainerStyle={[styles.content, { paddingTop: insets.top + space.xl }]}
+          style={styles.flex}
+          contentContainerStyle={[styles.content, { paddingTop: insets.top + 24 }]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
           bounces={false}
         >
-          <BackButton onPress={() => router.back()} />
+          <Pressable style={styles.back} onPress={() => router.back()} accessibilityRole="button" accessibilityLabel="Back">
+            <Svg width={9} height={9} viewBox="0 0 9 9" fill="none">
+              <Path d="M6 1 L2 4.5 L6 8" stroke={bio.alpha(0.8)} strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" />
+            </Svg>
+          </Pressable>
           <Text style={styles.title}>Create your account</Text>
-          <Text style={styles.subtitle}>Two minutes to your first insight.</Text>
+          <Text style={styles.subtitle}>Two minutes of setup, then BIOSYNC starts listening to your patterns.</Text>
 
           <View style={styles.fields}>
-            <FloatingLabelField
-              label="Full name"
-              value={name}
-              onChangeText={setName}
-              autoCapitalize="words"
-              autoComplete="name"
-              textContentType="name"
-            />
-            <FloatingLabelField
-              label="Email"
-              value={email}
-              onChangeText={setEmail}
-              keyboardType="email-address"
-              autoComplete="email"
-              textContentType="emailAddress"
-            />
-            <FloatingLabelField
-              label="Password"
-              value={password}
-              onChangeText={setPassword}
-              secure
-              autoComplete="new-password"
-              textContentType="newPassword"
-            />
+            <GlassField label="Full name" value={name} onChangeText={setName} autoCapitalize="words" autoComplete="name" textContentType="name" />
+            <GlassField label="Email" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" autoComplete="email" textContentType="emailAddress" />
+            <GlassField label="Password" value={password} onChangeText={setPassword} secureTextEntry autoComplete="new-password" textContentType="newPassword" />
           </View>
 
-          <StrengthBar score={score} visible={password.length > 0} />
+          <View style={styles.strength}>
+            <StrengthBar score={score} visible={password.length > 0} />
+          </View>
 
           {error ? <Text style={styles.error}>{error}</Text> : null}
 
-          <View style={{ flex: 1, minHeight: space.lg }} />
+          <View style={styles.spacer} />
 
           <View style={[styles.footer, { paddingBottom: padBottom }]}>
-            <GradientButton label="Create Account" onPress={onSubmit} loading={loading} disabled={!canSubmit} />
+            <Pressable style={[styles.primary, !canSubmit && styles.primaryOff]} onPress={onSubmit} disabled={!canSubmit} accessibilityRole="button">
+              {loading ? <Spinner tint={bio.color.ink} /> : <Text style={styles.primaryTxt}>Create account</Text>}
+            </Pressable>
             <Text style={styles.switchText}>
               Already have an account?{" "}
               <Text style={styles.link} onPress={() => router.replace("/(auth)/log-in")}>
@@ -106,43 +100,34 @@ export function SignUpScreen() {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
-    </Screen>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  content: {
-    flexGrow: 1,
-    paddingHorizontal: size.screenPadX,
+  root: { flex: 1, backgroundColor: bio.color.ink, overflow: "hidden" },
+  flex: { flex: 1 },
+  content: { flexGrow: 1, paddingHorizontal: 24 },
+  back: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderWidth: 1,
+    borderColor: bio.color.border,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  title: {
-    ...type.title,
-    color: color.text,
-    marginTop: space.xs,
-  },
-  subtitle: {
-    ...type.caption,
-    color: color.textTertiary,
-    marginTop: 6,
-  },
-  fields: {
-    marginTop: 22,
-    gap: size.fieldGap,
-  },
-  error: {
-    ...type.caption,
-    color: color.error,
-    marginTop: space.md,
-  },
-  footer: {
-    gap: 14,
-  },
-  switchText: {
-    ...type.caption,
-    color: color.textTertiary,
-    textAlign: "center",
-  },
-  link: {
-    color: color.link,
-  },
+  title: { fontFamily: fontFamily.bold, fontSize: 28, letterSpacing: -0.28, color: bio.color.text, marginTop: 24 },
+  subtitle: { fontFamily: fontFamily.light, fontSize: 14, lineHeight: 21, color: bio.alpha(0.55), marginTop: 8 },
+  fields: { marginTop: 30, gap: 12 },
+  strength: { marginTop: 14 },
+  error: { fontFamily: fontFamily.regular, fontSize: 13, color: bio.color.coral, marginTop: 12 },
+  spacer: { flex: 1, minHeight: 24 },
+  footer: { gap: 14 },
+  primary: { height: 56, borderRadius: 999, backgroundColor: bio.color.text, alignItems: "center", justifyContent: "center" },
+  primaryOff: { opacity: 0.45 },
+  primaryTxt: { fontFamily: fontFamily.bold, fontSize: 16, color: bio.color.ink },
+  switchText: { fontFamily: fontFamily.regular, fontSize: 13, color: bio.alpha(0.5), textAlign: "center" },
+  link: { fontFamily: fontFamily.semibold, color: bio.color.blueLt },
 });

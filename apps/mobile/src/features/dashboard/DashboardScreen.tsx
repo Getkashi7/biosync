@@ -1,76 +1,70 @@
 /**
- * Home dashboard — readiness ring + today's numbers, built to the Pulse
- * Dashboard design and its state variants (empty / low confidence / error).
- *
- *  - Header: time-of-day greeting (+ first name when known), date line, and a
- *    🔥 streak pill that hides while the streak is 0.
- *  - Ready: ring sweeps to the score; chips show today's logged numbers; a
- *    low-confidence hint appears under the chips when the score rests on a
- *    single data source.
- *  - Empty (nothing logged): track-only ring with "—", a nudge caption, and a
- *    gradient CTA that opens Quick Log.
- *  - Error: track-only ring, caption, ghost "Try again".
- *  - Refetches whenever `refreshKey` changes (MainTabs bumps it after a logging
- *    sheet closes); stale data stays on screen during a refresh.
+ * Home — BIOSYNC redesign. Aurora field + a readiness orb hero with a warm-coach
+ * line, glass metric chips, and the "Today" cards (open check-in · a live metric).
+ * Full-bleed: owns its own safe-area padding and clears the floating tab bar.
+ * Data layer unchanged (readiness + streak + trends); presentation-only rebuild.
  */
 import { useCallback, useEffect, useState } from "react";
-import { RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
-import { RiseIn } from "../../ui/RiseIn";
-import { ReadinessRing } from "../../ui/ReadinessRing";
-import { GradientButton } from "../../ui/GradientButton";
+import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { AuroraField } from "../../ui/bio/AuroraField";
+import { GlassSurface } from "../../ui/bio/GlassSurface";
+import { ReadinessOrb } from "../../ui/bio/ReadinessOrb";
 import { Spinner } from "../../ui/Spinner";
-import { prettyToday } from "../../lib/date";
-import { color, radius, size, space, type } from "../../ui/theme";
+import { GradientButton } from "../../ui/GradientButton";
+import { ENERGY_WORDS } from "../../lib/ratings";
+import { bio, fontFamily } from "../../ui/theme";
 import { useAuth } from "../auth/AuthProvider";
-import { ENERGY_WORDS, MOOD_WORDS } from "../../lib/ratings";
 import { fetchDashboard, type DashboardData, type ReadinessToday } from "./dashboardApi";
 import { fetchTrends, type Trends } from "./trendsApi";
-import { TrendCards, hasAnyTrendData } from "./TrendCards";
-import { fetchGoals, type Goal } from "../goals/goalsApi";
-import { GoalsSection } from "../goals/GoalsSection";
 
-function greeting(now: Date = new Date()): string {
+function greeting(now = new Date()): string {
   const h = now.getHours();
-  if (h < 12) return "Good morning";
-  if (h < 18) return "Good afternoon";
-  return "Good evening";
+  return h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening";
 }
 
-/** 7.5 → "7.5", 8 → "8" */
-function formatHours(hours: number): string {
-  return String(Number(hours.toFixed(1)));
+const WD = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const MO = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+function dateLine(d = new Date()): string {
+  return `${WD[d.getDay()]} · ${MO[d.getMonth()]} ${d.getDate()}`;
+}
+
+const formatHours = (h: number): string => String(Number(h.toFixed(1)));
+
+/** Status word + accent + coaching copy from the readiness score. */
+function look(score: number | null): { status: string; accent: string; rgb: string; line: string } {
+  if (score === null)
+    return { status: "AWAITING", accent: bio.color.tealLt, rgb: bio.aurora.teal, line: "Log your sleep, energy and heart rate to unlock today’s readiness." };
+  if (score >= 80)
+    return { status: "PRIMED", accent: bio.color.tealLt, rgb: bio.aurora.teal, line: "Your body says go — today can hold a hard session. Keep water close." };
+  if (score >= 60)
+    return { status: "READY", accent: bio.color.tealLt2, rgb: bio.aurora.teal, line: "Solid baseline. Train as planned and keep an eye on how you feel." };
+  if (score >= 40)
+    return { status: "EASE IN", accent: bio.color.amber, rgb: bio.aurora.amber, line: "Take it a touch lighter today — your body’s still catching up." };
+  return { status: "REST", accent: bio.color.coral, rgb: bio.aurora.coral, line: "Low reserves. Prioritise rest, food and water today." };
 }
 
 type Props = {
-  /** open the Quick Log sheet (empty-state CTA) */
   onQuickLog: () => void;
-  /** open the New-goal sheet ("+ New goal" row) */
-  onNewGoal: () => void;
-  /** bump to refetch (after a logging sheet closes) */
+  onCheckin: () => void;
   refreshKey: number;
 };
 
-export function DashboardScreen({ onQuickLog, onNewGoal, refreshKey }: Props) {
+export function DashboardScreen({ onQuickLog, onCheckin, refreshKey }: Props) {
+  const insets = useSafeAreaInsets();
   const { session } = useAuth();
   const [data, setData] = useState<DashboardData | null>(null);
   const [trends, setTrends] = useState<Trends | null>(null);
-  const [goals, setGoals] = useState<Goal[] | null>(null);
   const [failed, setFailed] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
     setFailed(false);
     try {
-      const [dashboard, trendData, goalData] = await Promise.all([
-        fetchDashboard(),
-        fetchTrends(),
-        fetchGoals(),
-      ]);
-      setData(dashboard);
-      setTrends(trendData);
-      setGoals(goalData);
+      const [d, t] = await Promise.all([fetchDashboard(), fetchTrends()]);
+      setData(d);
+      setTrends(t);
     } catch {
-      // No health values in logs (CLAUDE.md) — the error/stale states say enough.
       setFailed(true);
     }
   }, []);
@@ -86,260 +80,197 @@ export function DashboardScreen({ onQuickLog, onNewGoal, refreshKey }: Props) {
   }, [load]);
 
   const firstName = session?.fullName?.trim().split(/\s+/)[0];
-  const streak = data?.streak ?? 0;
+  const initial = (firstName?.[0] ?? session?.email?.[0] ?? "?").toUpperCase();
   const readiness = data?.readiness ?? null;
 
   return (
-    <ScrollView
-      style={styles.flex}
-      contentContainerStyle={styles.flexGrow}
-      showsVerticalScrollIndicator={false}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} tintColor={color.text} />}
-    >
-      <RiseIn index={0}>
+    <View style={styles.root}>
+      <AuroraField
+        blobs={[
+          { hue: bio.aurora.teal, size: 460, cx: true, top: 60, stops: [{ o: 0, a: 0.32 }, { o: 48, a: 0.16 }, { o: 74, a: 0 }], variant: "a" },
+          { hue: bio.aurora.violet, size: 320, left: -120, bottom: 120, stops: [{ o: 0, a: 0.22 }, { o: 70, a: 0 }], variant: "b", delayMs: -6000 },
+        ]}
+      />
+      <ScrollView
+        style={styles.flex}
+        contentContainerStyle={[styles.content, { paddingTop: insets.top + 12, paddingBottom: 130 }]}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} tintColor={bio.color.text} />}
+      >
         <View style={styles.header}>
           <View>
             <Text style={styles.greeting}>
               {greeting()}
               {firstName ? `, ${firstName}` : ""}
             </Text>
-            <Text style={styles.date}>{prettyToday()}</Text>
+            <Text style={styles.date}>{dateLine()}</Text>
           </View>
-          {streak > 0 ? (
-            <View style={styles.streakPill}>
-              <Text style={styles.streakEmoji}>🔥</Text>
-              <Text style={styles.streakCount}>{streak}</Text>
+          <View style={styles.avatar}>
+            <Text style={styles.avatarTxt}>{initial}</Text>
+          </View>
+        </View>
+
+        {data === null && !failed ? (
+          <View style={styles.fill}>
+            <Spinner tint={bio.color.text} />
+          </View>
+        ) : data === null && failed ? (
+          <View style={styles.fill}>
+            <Text style={styles.coach}>Couldn’t load your readiness</Text>
+            <View style={styles.retry}>
+              <GradientButton label="Try again" variant="ghost" onPress={() => void load()} />
             </View>
-          ) : null}
-        </View>
-      </RiseIn>
-
-      {data !== null && failed ? (
-        <Text style={styles.staleNote}>Couldn’t refresh — showing your last numbers</Text>
-      ) : null}
-
-      {data === null && !failed ? (
-        <View style={styles.centerFill}>
-          <Spinner tint={color.text} />
-        </View>
-      ) : data === null && failed ? (
-        <ErrorState onRetry={() => void load()} />
-      ) : readiness && readiness.score === null ? (
-        <EmptyState onQuickLog={onQuickLog} />
-      ) : readiness ? (
-        <ReadyState readiness={readiness} />
-      ) : null}
-
-      {data !== null && trends && hasAnyTrendData(trends) ? (
-        <RiseIn index={3}>
-          <TrendCards trends={trends} />
-        </RiseIn>
-      ) : null}
-
-      {data !== null && goals !== null ? (
-        <RiseIn index={4}>
-          <GoalsSection goals={goals} onNewGoal={onNewGoal} />
-        </RiseIn>
-      ) : null}
-    </ScrollView>
-  );
-}
-
-function ReadyState({ readiness }: { readiness: ReadinessToday }) {
-  const { components } = readiness;
-  return (
-    <RiseIn index={1}>
-      <View style={styles.ringBlock}>
-        <ReadinessRing score={readiness.score} />
-        <View style={styles.chips}>
-          {components.sleep ? (
-            <Chip dot={color.blue} label={`Sleep ${formatHours(components.sleep.hours)}h`} />
-          ) : null}
-          {components.energyMood ? (
-            <>
-              <Chip dot={color.orange} label={`Energy ${ENERGY_WORDS[components.energyMood.energy - 1]}`} />
-              <Chip dot={color.coral} label={`Mood ${MOOD_WORDS[components.energyMood.mood - 1]}`} />
-            </>
-          ) : null}
-          {components.restingHr ? (
-            <Chip dot={color.blue2} label={`HR ${Math.round(components.restingHr.current)}`} />
-          ) : null}
-        </View>
-        {readiness.lowConfidence ? (
-          <RiseIn index={2}>
-            <View style={styles.hintRow}>
-              <View style={styles.hintDot}>
-                <View style={styles.hintDotCore} />
-              </View>
-              <Text style={styles.hintText}>Low confidence — log more data for a better score</Text>
-            </View>
-          </RiseIn>
+          </View>
+        ) : readiness ? (
+          <Ready readiness={readiness} trends={trends} onCheckin={onCheckin} onQuickLog={onQuickLog} />
         ) : null}
-      </View>
-    </RiseIn>
-  );
-}
-
-function EmptyState({ onQuickLog }: { onQuickLog: () => void }) {
-  return (
-    <>
-      <RiseIn index={1}>
-        <View style={styles.ringBlock}>
-          <ReadinessRing score={null} />
-          <Text style={styles.emptyCaption}>
-            Log your sleep, energy and heart rate to unlock your readiness score
-          </Text>
-        </View>
-      </RiseIn>
-      <RiseIn index={2} style={styles.emptyCta}>
-        <GradientButton label="Log your first metrics" onPress={onQuickLog} />
-      </RiseIn>
-    </>
-  );
-}
-
-function ErrorState({ onRetry }: { onRetry: () => void }) {
-  return (
-    <>
-      <RiseIn index={1}>
-        <View style={styles.ringBlock}>
-          <ReadinessRing score={null} />
-          <Text style={styles.emptyCaption}>Couldn’t load your readiness</Text>
-        </View>
-      </RiseIn>
-      <RiseIn index={2} style={styles.errorCta}>
-        <GradientButton label="Try again" variant="ghost" onPress={onRetry} />
-      </RiseIn>
-    </>
-  );
-}
-
-function Chip({ dot, label }: { dot: string; label: string }) {
-  return (
-    <View style={styles.chip}>
-      <View style={[styles.chipDot, { backgroundColor: dot }]} />
-      <Text style={styles.chipText}>{label}</Text>
+      </ScrollView>
     </View>
   );
 }
 
+function Ready({
+  readiness,
+  trends,
+  onCheckin,
+  onQuickLog,
+}: {
+  readiness: ReadinessToday;
+  trends: Trends | null;
+  onCheckin: () => void;
+  onQuickLog: () => void;
+}) {
+  const l = look(readiness.score);
+  const c = readiness.components;
+
+  const chips: { dot: string; v: string; u: string }[] = [];
+  if (c.sleep) chips.push({ dot: bio.color.violet, v: formatHours(c.sleep.hours), u: "h sleep" });
+  if (c.restingHr) chips.push({ dot: bio.color.coral, v: String(Math.round(c.restingHr.current)), u: "bpm" });
+  if (c.energyMood) chips.push({ dot: bio.color.amber, v: ENERGY_WORDS[c.energyMood.energy - 1] ?? "—", u: "energy" });
+
+  // Second "Today" card — the best live metric we have.
+  const hrStat = trends?.restingHr.stat ?? null;
+  const sleepStat = trends?.sleep.stat ?? null;
+  const metric =
+    c.restingHr || hrStat !== null
+      ? { dot: bio.color.coral, label: "Resting HR", val: String(Math.round((c.restingHr?.current ?? hrStat) as number)), unit: "bpm" }
+      : sleepStat !== null
+        ? { dot: bio.color.violet, label: "Sleep", val: formatHours(sleepStat), unit: "h avg" }
+        : null;
+
+  return (
+    <>
+      <View style={styles.orbBlock}>
+        <ReadinessOrb score={readiness.score} status={l.status} accent={l.accent} accentRgb={l.rgb} />
+        <Text style={styles.coach}>{l.line}</Text>
+      </View>
+
+      {chips.length > 0 ? (
+        <View style={styles.chips}>
+          {chips.map((chip, i) => (
+            <GlassSurface key={i} radius={bio.radius.pill} style={styles.chip} soft>
+              <View style={styles.chipRow}>
+                <View style={[styles.dot, { backgroundColor: chip.dot }]} />
+                <Text style={styles.chipVal}>{chip.v}</Text>
+                <Text style={styles.chipUnit}>{chip.u}</Text>
+              </View>
+            </GlassSurface>
+          ))}
+        </View>
+      ) : null}
+
+      <Text style={styles.section}>Today</Text>
+      <View style={styles.todayRow}>
+        <Pressable style={styles.checkCardWrap} onPress={onCheckin} accessibilityRole="button">
+          <GlassSurface style={styles.todayCard} padding={18}>
+            <AuroraField
+              blobs={[{ hue: bio.aurora.magenta, size: 150, right: -50, top: -50, stops: [{ o: 0, a: 0.3 }, { o: 70, a: 0 }] }]}
+            />
+            <Text style={styles.cardTitle}>Daily check-in</Text>
+            <Text style={styles.cardSub}>Sleep, energy, mood — 20 seconds.</Text>
+            <View style={styles.cardCta}>
+              <Text style={[styles.cardCtaTxt, { color: bio.color.magLt }]}>Check in</Text>
+              <Text style={[styles.arrow, { color: bio.color.magLt }]}>›</Text>
+            </View>
+          </GlassSurface>
+        </Pressable>
+
+        {metric ? (
+          <Pressable style={styles.metricCardWrap} onPress={onQuickLog} accessibilityRole="button">
+            <GlassSurface style={styles.todayCard} padding={18} soft>
+              <View style={styles.metricHead}>
+                <View style={[styles.dot, { backgroundColor: metric.dot }]} />
+                <Text style={styles.metricLabel}>{metric.label}</Text>
+              </View>
+              <View style={styles.metricValRow}>
+                <Text style={styles.metricVal}>{metric.val}</Text>
+                <Text style={styles.metricUnit}>{metric.unit}</Text>
+              </View>
+            </GlassSurface>
+          </Pressable>
+        ) : null}
+      </View>
+    </>
+  );
+}
+
 const styles = StyleSheet.create({
-  flex: {
-    flex: 1,
-  },
-  flexGrow: {
-    flexGrow: 1,
-    paddingBottom: space.lg,
-  },
-  centerFill: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  greeting: {
-    ...type.greeting,
-    color: color.text,
-  },
-  date: {
-    ...type.caption,
-    color: color.textTertiary,
-    marginTop: space.xxs,
-  },
-  streakPill: {
-    height: size.streakPill,
-    paddingHorizontal: space.md,
-    borderRadius: radius.pill,
-    backgroundColor: color.surface,
+  root: { flex: 1, backgroundColor: bio.color.ink2 },
+  flex: { flex: 1 },
+  content: { paddingHorizontal: 24, flexGrow: 1 },
+  fill: { flexGrow: 1, alignItems: "center", justifyContent: "center", paddingVertical: 80 },
+  header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  greeting: { fontFamily: fontFamily.bold, fontSize: 22, letterSpacing: -0.22, color: bio.color.text },
+  date: { fontFamily: fontFamily.semibold, fontSize: 11, letterSpacing: 1.5, color: bio.alpha(0.45), textTransform: "uppercase", marginTop: 4 },
+  avatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(255,255,255,0.08)",
     borderWidth: 1,
-    borderColor: color.hairline,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: size.chipGap,
-  },
-  streakEmoji: {
-    ...type.chipValue,
-  },
-  streakCount: {
-    ...type.chipValue,
-    color: color.text,
-  },
-  ringBlock: {
-    alignItems: "center",
-    marginTop: size.dashSectionGap,
-  },
-  chips: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "center",
-    gap: space.sm,
-    marginTop: size.chipRowGap,
-  },
-  chip: {
-    height: size.chip,
-    paddingHorizontal: space.md,
-    borderRadius: radius.pill,
-    backgroundColor: color.surface,
-    borderWidth: 1,
-    borderColor: color.hairline,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: size.chipGap,
-  },
-  chipDot: {
-    width: size.chipDot,
-    height: size.chipDot,
-    borderRadius: size.chipDot / 2,
-  },
-  chipText: {
-    ...type.captionSm,
-    color: color.textStrong,
-  },
-  hintRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: space.sm,
-    marginTop: size.hintGap,
-  },
-  hintDot: {
-    width: size.hintDot,
-    height: size.hintDot,
-    borderRadius: size.hintDot / 2,
-    backgroundColor: color.warnDotBg,
+    borderColor: "rgba(255,255,255,0.16)",
     alignItems: "center",
     justifyContent: "center",
   },
-  hintDotCore: {
-    width: size.hintDotCore,
-    height: size.hintDotCore,
-    borderRadius: size.hintDotCore / 2,
-    backgroundColor: color.orange,
-  },
-  hintText: {
-    ...type.captionSm,
-    color: color.textTertiary,
-  },
-  emptyCaption: {
-    ...type.hint,
-    color: color.textTertiary,
+  avatarTxt: { fontFamily: fontFamily.bold, fontSize: 14, color: bio.alpha(0.9) },
+  orbBlock: { alignItems: "center", marginTop: 18 },
+  coach: {
+    fontFamily: fontFamily.light,
+    fontSize: 13.5,
+    lineHeight: 21,
+    color: bio.alpha(0.65),
     textAlign: "center",
-    maxWidth: size.hintMaxW,
-    marginTop: size.chipRowGap,
+    maxWidth: 300,
+    marginTop: 14,
   },
-  emptyCta: {
-    marginTop: space.base,
+  retry: { alignSelf: "stretch", marginTop: 16 },
+  chips: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: 24, justifyContent: "center" },
+  chip: { height: 44, justifyContent: "center" },
+  chipRow: { flexDirection: "row", alignItems: "center", gap: 9, paddingHorizontal: 16 },
+  dot: { width: 8, height: 8, borderRadius: 4 },
+  chipVal: { fontFamily: fontFamily.bold, fontSize: 15, letterSpacing: -0.15, color: bio.color.text },
+  chipUnit: { fontFamily: fontFamily.regular, fontSize: 11, color: bio.alpha(0.5), marginLeft: -4 },
+  section: {
+    fontFamily: fontFamily.semibold,
+    fontSize: 11,
+    letterSpacing: 1.76,
+    color: bio.alpha(0.45),
+    textTransform: "uppercase",
+    marginTop: 26,
+    marginBottom: 10,
   },
-  errorCta: {
-    marginTop: space.md,
-  },
-  staleNote: {
-    ...type.captionSm,
-    color: color.textTertiary,
-    textAlign: "center",
-    marginTop: space.md,
-  },
+  todayRow: { flexDirection: "row", gap: 12 },
+  checkCardWrap: { flex: 1.2 },
+  metricCardWrap: { flex: 1 },
+  todayCard: { minHeight: 128, overflow: "hidden" },
+  cardTitle: { fontFamily: fontFamily.semibold, fontSize: 13, color: bio.color.text },
+  cardSub: { fontFamily: fontFamily.light, fontSize: 12, lineHeight: 18, color: bio.alpha(0.55), marginTop: 8 },
+  cardCta: { flexDirection: "row", alignItems: "center", gap: 4, marginTop: 16 },
+  cardCtaTxt: { fontFamily: fontFamily.bold, fontSize: 12 },
+  arrow: { fontFamily: fontFamily.bold, fontSize: 15, marginTop: -1 },
+  metricHead: { flexDirection: "row", alignItems: "center", gap: 7 },
+  metricLabel: { fontFamily: fontFamily.semibold, fontSize: 11, letterSpacing: 1.1, color: bio.alpha(0.55), textTransform: "uppercase" },
+  metricValRow: { flexDirection: "row", alignItems: "baseline", gap: 5, marginTop: 10 },
+  metricVal: { fontFamily: fontFamily.extrabold, fontSize: 32, letterSpacing: -0.64, color: bio.color.text },
+  metricUnit: { fontFamily: fontFamily.regular, fontSize: 12, color: bio.alpha(0.5) },
 });
