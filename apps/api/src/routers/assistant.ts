@@ -1,14 +1,14 @@
 /**
  * AI Coach — a conversational wellness guide grounded in the user's own BIOSYNC
  * data (latest readiness, most recent check-in, recent point metrics). Sends the
- * conversation to Claude (Opus 4.8) with a non-diagnostic system prompt.
+ * conversation to Groq (Llama 3.3 70B — free tier, OpenAI-compatible API) with a
+ * non-diagnostic system prompt.
  *
- * The Anthropic key is optional: without it the procedure returns a friendly
+ * The Groq key is optional: without it the procedure returns a friendly
  * "not switched on yet" reply so the chat UI works before the key is set. The
  * userId always comes from ctx.user — never the client. No health values logged.
  */
 import { z } from "zod";
-import Anthropic from "@anthropic-ai/sdk";
 import { Role } from "@prisma/client";
 import { router, requireRole } from "../trpc";
 import { prisma } from "../db";
@@ -94,38 +94,48 @@ async function buildContext(userId: string): Promise<string> {
   return lines.join("\n");
 }
 
+/** Groq's free-tier chat model (OpenAI-compatible). Override via GROQ_MODEL. */
+const GROQ_MODEL = process.env.GROQ_MODEL || "llama-3.3-70b-versatile";
+const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
+
+const ERR_REPLY = "I hit a snag reaching my brain just now. Give it a moment and try again.";
+
 const NO_KEY_REPLY =
-  "Your AI coach isn't switched on yet. Add an Anthropic API key to the server (ANTHROPIC_API_KEY) and I'll start reading your BIOSYNC data and answering your questions. Until then, keep logging check-ins and metrics so there's plenty for me to work with.";
+  "Your AI coach isn't switched on yet. Add a free Groq API key to the server (GROQ_API_KEY) — grab one at console.groq.com — and I'll start reading your BIOSYNC data and answering your questions. Until then, keep logging check-ins and metrics so there's plenty for me to work with.";
 
 export const assistantRouter = router({
   /** Send the conversation; get one grounded, non-diagnostic reply back. */
   chat: userProcedure.input(chatInput).mutation(async ({ ctx, input }) => {
-    if (!env.ANTHROPIC_API_KEY) {
+    if (!env.GROQ_API_KEY) {
       return { reply: NO_KEY_REPLY, configured: false as const };
     }
     try {
       const context = await buildContext(ctx.user.id);
-      const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY });
-      const message = await client.messages.create({
-        model: "claude-opus-4-8",
-        max_tokens: 1024,
-        system: `${SYSTEM}\n\n--- The user's current data ---\n${context}`,
-        messages: input.messages.map((m) => ({ role: m.role, content: m.content })),
+      const res = await fetch(GROQ_URL, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${env.GROQ_API_KEY}`,
+        },
+        body: JSON.stringify({
+          model: GROQ_MODEL,
+          max_tokens: 1024,
+          messages: [
+            { role: "system", content: `${SYSTEM}\n\n--- The user's current data ---\n${context}` },
+            ...input.messages.map((m) => ({ role: m.role, content: m.content })),
+          ],
+        }),
       });
-      const reply = message.content
-        .map((block) => (block.type === "text" ? block.text : ""))
-        .join("")
-        .trim();
+      if (!res.ok) return { reply: ERR_REPLY, configured: true as const };
+      const data = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
+      const reply = (data.choices?.[0]?.message?.content ?? "").trim();
       return {
         reply: reply || "I couldn't put that into words just now — try asking a different way?",
         configured: true as const,
       };
     } catch {
       // Network / rate-limit / transient API errors: keep the chat usable.
-      return {
-        reply: "I hit a snag reaching my brain just now. Give it a moment and try again.",
-        configured: true as const,
-      };
+      return { reply: ERR_REPLY, configured: true as const };
     }
   }),
 });
