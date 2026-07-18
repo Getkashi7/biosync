@@ -1,98 +1,39 @@
 /**
- * Quick Log bottom sheet — the objective point metrics the daily check-in
- * doesn't cover. Built to the "Pulse Log Sheets" design handoff.
- *
- *  - Same chrome and clock as CheckinSheet (absolute-fill overlay so scrim and
- *    sheet share one animation; header pan and scrim tap both dismiss), but
- *    content-hugging: the sheet is as tall as its content plus the design's
- *    breathing gap, so it lands where the mockup does and still adapts.
- *  - Every field is optional; Save enables as soon as one has a value, and each
- *    filled field becomes its own reading.
- *  - Save → gradient checkmark + "Saved", success haptic, auto-dismiss ~1.2s.
- *  - The numeric fields summon a keyboard, which can leave less room than the
- *    sheet wants: it is capped at the window height and the fields scroll, so
- *    Save stays reachable instead of being pushed off.
+ * Quick log — BIOSYNC redesign. A dark sheet: pick a metric (the aurora bloom
+ * re-tints to its hue), dial the value with ± steppers or the ruler, Save. One
+ * objective reading at a time. Weight is entered + stored in kg.
  */
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import {
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
-import Animated, {
-  runOnJS,
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
-  withTiming,
-} from "react-native-reanimated";
+import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { GradientButton } from "../../ui/GradientButton";
+import Svg, { Path } from "react-native-svg";
+import { AuroraField } from "../../ui/bio/AuroraField";
 import { SuccessCheck } from "../../ui/SuccessCheck";
 import { errorHaptic, selectionHaptic, successHaptic } from "../../lib/haptics";
-import { prettyToday } from "../../lib/date";
-import { getUnitPref } from "../../lib/prefs";
-import { color, motion, radius, size, space, type } from "../../ui/theme";
+import { bio, fontFamily, motion } from "../../ui/theme";
 import type { MetricEntry } from "./metricApi";
 
-const LB_PER_KG = 2.2046226218;
+type Def = { key: MetricEntry["type"]; label: string; min: number; max: number; step: number; def: number; unit: string; hue: string; rgb: string; decimals: number };
+const METRICS: Def[] = [
+  { key: "RESTING_HR", label: "Heart rate", min: 40, max: 120, step: 1, def: 60, unit: "bpm", hue: bio.color.coral, rgb: bio.aurora.coral, decimals: 0 },
+  { key: "WEIGHT", label: "Weight", min: 40, max: 150, step: 0.5, def: 70, unit: "kg", hue: bio.color.teal, rgb: bio.aurora.teal, decimals: 1 },
+  { key: "HRV", label: "HRV", min: 10, max: 150, step: 1, def: 60, unit: "ms", hue: bio.color.blue, rgb: bio.aurora.blue, decimals: 0 },
+  { key: "GLUCOSE", label: "Glucose", min: 60, max: 200, step: 1, def: 90, unit: "mg/dL", hue: bio.color.amber, rgb: bio.aurora.amber, decimals: 0 },
+];
 
-type Props = {
-  /** unmount the sheet (called after the close animation finishes) */
-  onClose: () => void;
-  /** persist the filled readings */
-  onSubmit: (entries: MetricEntry[]) => Promise<number>;
-};
-
-/** A field's text → a number, or null when blank/unparseable. */
-function parseValue(text: string): number | null {
-  const trimmed = text.trim();
-  if (!trimmed) return null;
-  const n = parseFloat(trimmed);
-  return Number.isFinite(n) && n > 0 ? n : null;
-}
+type Props = { onClose: () => void; onSubmit: (entries: MetricEntry[]) => Promise<number> };
 
 export function QuickLogSheet({ onClose, onSubmit }: Props) {
   const insets = useSafeAreaInsets();
-
-  const [hr, setHr] = useState("");
-  const [weight, setWeight] = useState("");
-  const [unit, setUnit] = useState<"kg" | "lb">("kg");
-  const [hrv, setHrv] = useState("");
-  const [glucose, setGlucose] = useState("");
+  const [idx, setIdx] = useState(0);
+  const [value, setValue] = useState(METRICS[0]!.def);
   const [status, setStatus] = useState<"idle" | "saving" | "success" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const m = METRICS[idx]!;
 
-  const buildEntries = useCallback((): MetricEntry[] => {
-    const entries: MetricEntry[] = [];
-    const hrValue = parseValue(hr);
-    if (hrValue !== null) entries.push({ type: "RESTING_HR", value: hrValue });
-
-    const weightValue = parseValue(weight);
-    if (weightValue !== null) {
-      const kg = unit === "kg" ? weightValue : weightValue / LB_PER_KG;
-      entries.push({ type: "WEIGHT", value: Math.round(kg * 10) / 10 });
-    }
-
-    const hrvValue = parseValue(hrv);
-    if (hrvValue !== null) entries.push({ type: "HRV", value: hrvValue });
-
-    const glucoseValue = parseValue(glucose);
-    if (glucoseValue !== null) entries.push({ type: "GLUCOSE", value: glucoseValue });
-
-    return entries;
-  }, [glucose, hr, hrv, unit, weight]);
-
-  const canSave = buildEntries().length > 0 && status !== "saving";
-
-  // ── open / close animation ──
-  const sheetP = useSharedValue(0); // 0 = fully below, 1 = open
+  const sheetP = useSharedValue(0);
   const scrimP = useSharedValue(0);
   const sheetH = useSharedValue(0);
   const opened = useRef(false);
@@ -100,24 +41,13 @@ export function QuickLogSheet({ onClose, onSubmit }: Props) {
 
   const close = useCallback(() => {
     scrimP.value = withTiming(0, { duration: motion.duration.sheetClose, easing: motion.easeOut });
-    sheetP.value = withTiming(
-      0,
-      { duration: motion.duration.sheetClose, easing: motion.easeOut },
-      (finished) => {
-        if (finished) runOnJS(onClose)();
-      },
-    );
+    sheetP.value = withTiming(0, { duration: motion.duration.sheetClose, easing: motion.easeOut }, (f) => {
+      if (f) runOnJS(onClose)();
+    });
   }, [onClose, scrimP, sheetP]);
 
-  useEffect(() => {
-    return () => {
-      if (doneTimer.current) clearTimeout(doneTimer.current);
-    };
-  }, []);
-
-  // Start on the user's preferred unit (Profile → Units).
-  useEffect(() => {
-    void getUnitPref().then(setUnit);
+  useEffect(() => () => {
+    if (doneTimer.current) clearTimeout(doneTimer.current);
   }, []);
 
   const onSheetLayout = (h: number) => {
@@ -128,41 +58,48 @@ export function QuickLogSheet({ onClose, onSubmit }: Props) {
       scrimP.value = withTiming(1, { duration: motion.duration.sheetScrim, easing: motion.easeOut });
     }
   };
-
-  const settleOpen = useCallback(() => {
-    sheetP.value = withSpring(1, motion.pressSpring);
-    scrimP.value = withTiming(1, { duration: 180, easing: motion.easeOut });
-  }, [scrimP, sheetP]);
-
-  // Downward pan on the header drags the sheet; past a threshold it dismisses.
-  const pan = Gesture.Pan()
-    .onUpdate((e) => {
-      const dy = Math.max(0, e.translationY);
-      const h = sheetH.value > 0 ? sheetH.value : 1;
-      const p = 1 - Math.min(dy / h, 1);
-      sheetP.value = p;
-      scrimP.value = p;
-    })
-    .onEnd((e) => {
-      const h = sheetH.value > 0 ? sheetH.value : 1;
-      if (e.translationY > h * 0.25 || e.velocityY > 800) {
-        runOnJS(close)();
-      } else {
-        runOnJS(settleOpen)();
-      }
-    });
-
-  const sheetStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: (1 - sheetP.value) * (sheetH.value || 900) }],
-  }));
+  const sheetStyle = useAnimatedStyle(() => ({ transform: [{ translateY: (1 - sheetP.value) * (sheetH.value || 800) }] }));
   const scrimStyle = useAnimatedStyle(() => ({ opacity: scrimP.value }));
 
+  const pickMetric = (i: number) => {
+    if (i === idx) return;
+    selectionHaptic();
+    setIdx(i);
+    setValue(METRICS[i]!.def);
+    lastVal.current = METRICS[i]!.def;
+  };
+
+  const clamp = (v: number): number => Math.max(m.min, Math.min(m.max, Math.round(v / m.step) * m.step));
+  const step = (dir: number) => {
+    selectionHaptic();
+    setValue((v) => clamp(v + dir * m.step));
+  };
+
+  const [rulerW, setRulerW] = useState(1);
+  const lastVal = useRef(value);
+  const setFromX = useCallback(
+    (x: number) => {
+      const pct = Math.max(0, Math.min(1, x / Math.max(1, rulerW)));
+      const v = clamp(m.min + pct * (m.max - m.min));
+      if (v !== lastVal.current) {
+        lastVal.current = v;
+        selectionHaptic();
+        setValue(v);
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [rulerW, idx],
+  );
+  const rulerPan = Gesture.Pan()
+    .onBegin((e) => runOnJS(setFromX)(e.x))
+    .onUpdate((e) => runOnJS(setFromX)(e.x));
+
   const onSave = async () => {
-    if (!canSave || status === "success") return;
+    if (status === "saving" || status === "success") return;
     setStatus("saving");
     setErrorMsg(null);
     try {
-      await onSubmit(buildEntries());
+      await onSubmit([{ type: m.key, value }]);
       setStatus("success");
       successHaptic();
       doneTimer.current = setTimeout(close, motion.duration.successHold);
@@ -173,11 +110,8 @@ export function QuickLogSheet({ onClose, onSubmit }: Props) {
     }
   };
 
-  const toggleUnit = (next: "kg" | "lb") => {
-    if (next === unit) return;
-    selectionHaptic();
-    setUnit(next);
-  };
+  const pct = ((value - m.min) / (m.max - m.min)) * 100;
+  const disp = value.toFixed(m.decimals);
 
   return (
     <View style={StyleSheet.absoluteFill}>
@@ -185,86 +119,47 @@ export function QuickLogSheet({ onClose, onSubmit }: Props) {
         <Pressable style={StyleSheet.absoluteFill} onPress={close} accessibilityLabel="Dismiss" />
       </Animated.View>
 
-      <Animated.View
-        style={[styles.sheet, { paddingBottom: insets.bottom }, sheetStyle]}
-        onLayout={(e) => onSheetLayout(e.nativeEvent.layout.height)}
-      >
-        <KeyboardAvoidingView
-          style={styles.kav}
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
-        >
-          <GestureDetector gesture={pan}>
-            <View style={styles.header}>
-              <View style={styles.grabber} />
-              <Text style={styles.title}>Quick log</Text>
-              <Text style={styles.date}>{prettyToday()}</Text>
-            </View>
-          </GestureDetector>
+      <Animated.View style={[styles.sheet, { paddingBottom: insets.bottom + 24 }, sheetStyle]} onLayout={(e) => onSheetLayout(e.nativeEvent.layout.height)}>
+        <AuroraField blobs={[{ hue: m.rgb, size: 440, cx: true, top: 120, stops: [{ o: 0, a: 0.34 }, { o: 48, a: 0.14 }, { o: 74, a: 0 }] }]} />
+        <View style={styles.grabber} />
+        <Text style={styles.title}>Quick log</Text>
 
-          <ScrollView
-            style={styles.scroll}
-            contentContainerStyle={styles.scrollContent}
-            keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={false}
-          >
-            <View style={styles.fields}>
-              <Field label="RESTING HEART RATE">
-                <ValueCell value={hr} onChange={setHr} unit="bpm" />
-              </Field>
+        <View style={styles.segRow}>
+          {METRICS.map((d, i) => {
+            const on = i === idx;
+            return (
+              <Pressable key={d.key} onPress={() => pickMetric(i)} style={[styles.seg, on && styles.segOn]} accessibilityRole="button" accessibilityState={{ selected: on }}>
+                <Text style={[styles.segTxt, on && styles.segTxtOn]}>{d.label}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
 
-              <Field label="WEIGHT">
-                <View style={styles.weightRow}>
-                  <View style={styles.weightInput}>
-                    <ValueCell value={weight} onChange={setWeight} />
-                  </View>
-                  <View style={styles.unitToggle}>
-                    {(["kg", "lb"] as const).map((u) => {
-                      const on = unit === u;
-                      return (
-                        <Pressable
-                          key={u}
-                          onPress={() => toggleUnit(u)}
-                          style={[
-                            styles.unitOption,
-                            u === "kg" ? styles.unitOptionLeft : styles.unitOptionRight,
-                            on && styles.unitOptionOn,
-                            // The cells butt up against each other: drop lb's left
-                            // border unless it's the selected (orange) one.
-                            u === "lb" && !on && styles.unitOptionNoLeft,
-                          ]}
-                          accessibilityRole="button"
-                          accessibilityState={{ selected: on }}
-                        >
-                          <Text style={[styles.unitText, on && styles.unitTextOn]}>{u}</Text>
-                        </Pressable>
-                      );
-                    })}
-                  </View>
-                </View>
-              </Field>
-
-              <Field label="HRV" optional>
-                <ValueCell value={hrv} onChange={setHrv} unit="ms" />
-              </Field>
-
-              <Field label="GLUCOSE" optional>
-                <ValueCell value={glucose} onChange={setGlucose} unit="mg/dL" />
-              </Field>
-            </View>
-
-            {errorMsg ? <Text style={styles.error}>{errorMsg}</Text> : null}
-          </ScrollView>
-
-          <View style={{ opacity: canSave ? 1 : 0.45 }}>
-            <GradientButton
-              label="Save"
-              onPress={onSave}
-              loading={status === "saving"}
-              disabled={!canSave}
-            />
+        <View style={styles.dialer}>
+          <Stepper dir={-1} onPress={() => step(-1)} />
+          <View style={styles.numWrap}>
+            <Text style={[styles.num, { textShadowColor: `rgba(${m.rgb},0.4)` }]}>{disp}</Text>
+            <Text style={styles.unit}>{m.unit}</Text>
           </View>
-          <View style={styles.divider} />
-        </KeyboardAvoidingView>
+          <Stepper dir={1} onPress={() => step(1)} />
+        </View>
+
+        <GestureDetector gesture={rulerPan}>
+          <View style={styles.ruler} onLayout={(e) => setRulerW(e.nativeEvent.layout.width)}>
+            <View style={styles.tickRow} pointerEvents="none">
+              {Array.from({ length: 25 }).map((_, i) => (
+                <View key={i} style={[styles.tick, i % 5 === 0 && styles.tickTall]} />
+              ))}
+            </View>
+            <View style={[styles.thumb, { left: `${pct}%`, backgroundColor: m.hue, shadowColor: m.hue }]} />
+          </View>
+        </GestureDetector>
+
+        {errorMsg ? <Text style={styles.error}>{errorMsg}</Text> : null}
+
+        <Pressable style={styles.save} onPress={onSave} accessibilityRole="button">
+          <Text style={styles.saveTxt}>{status === "saving" ? "Saving…" : "Save entry"}</Text>
+        </Pressable>
 
         {status === "success" ? <SuccessOverlay /> : null}
       </Animated.View>
@@ -272,52 +167,14 @@ export function QuickLogSheet({ onClose, onSubmit }: Props) {
   );
 }
 
-function Field({
-  label,
-  optional = false,
-  children,
-}: {
-  label: string;
-  optional?: boolean;
-  children: ReactNode;
-}) {
+function Stepper({ dir, onPress }: { dir: number; onPress: () => void }) {
   return (
-    <View>
-      <Text style={styles.fieldLabel}>
-        {label}
-        {optional ? <Text style={styles.fieldOptional}> (OPTIONAL)</Text> : null}
-      </Text>
-      {children}
-    </View>
-  );
-}
-
-/** A bordered numeric cell: the value on the left, an optional unit on the right. */
-function ValueCell({
-  value,
-  onChange,
-  unit,
-}: {
-  value: string;
-  onChange: (next: string) => void;
-  unit?: string;
-}) {
-  return (
-    <View style={styles.cell}>
-      <TextInput
-        style={styles.cellInput}
-        value={value}
-        // digits and a single decimal point only
-        onChangeText={(t) => onChange(t.replace(/[^0-9.]/g, "").replace(/(\..*)\./g, "$1"))}
-        keyboardType="decimal-pad"
-        placeholder="—"
-        placeholderTextColor={color.textPlaceholder}
-        selectionColor={color.caret}
-        maxLength={6}
-        returnKeyType="done"
-      />
-      {unit ? <Text style={styles.cellUnit}>{unit}</Text> : null}
-    </View>
+    <Pressable style={styles.stepper} onPress={onPress} accessibilityRole="button" accessibilityLabel={dir < 0 ? "Decrease" : "Increase"}>
+      <Svg width={16} height={16} viewBox="0 0 16 16" fill="none">
+        <Path d="M2 8 H14" stroke={bio.alpha(0.85)} strokeWidth={2.4} strokeLinecap="round" />
+        {dir > 0 ? <Path d="M8 2 V14" stroke={bio.alpha(0.85)} strokeWidth={2.4} strokeLinecap="round" /> : null}
+      </Svg>
+    </Pressable>
   );
 }
 
@@ -326,171 +183,60 @@ function SuccessOverlay() {
   useEffect(() => {
     p.value = withTiming(1, { duration: motion.duration.successOverlay, easing: motion.easeOut });
   }, [p]);
-  const animatedStyle = useAnimatedStyle(() => ({
-    opacity: p.value,
-    transform: [{ scale: 0.6 + 0.4 * p.value }],
-  }));
+  const style = useAnimatedStyle(() => ({ opacity: p.value, transform: [{ scale: 0.7 + 0.3 * p.value }] }));
   return (
-    <Animated.View style={[StyleSheet.absoluteFill, styles.success, animatedStyle]}>
-      <SuccessCheck diameter={size.successCheck} />
+    <Animated.View style={[StyleSheet.absoluteFill, styles.success, style]}>
+      <SuccessCheck diameter={88} />
       <Text style={styles.successTitle}>Saved</Text>
     </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
-  scrim: {
-    backgroundColor: color.scrim,
-  },
+  scrim: { backgroundColor: "rgba(0,0,0,0.55)" },
   sheet: {
     position: "absolute",
     left: 0,
     right: 0,
     bottom: 0,
-    // Hugs its content (so it lands where the design does), but never taller
-    // than the window — which Android shrinks when the keyboard opens, handing
-    // the shrink down to the scroll view below.
-    maxHeight: "100%",
-    backgroundColor: color.surface,
-    borderTopLeftRadius: radius.sheet,
-    borderTopRightRadius: radius.sheet,
+    backgroundColor: bio.color.ink,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
     borderTopWidth: 1,
-    borderColor: color.hairline,
-    paddingTop: size.sheetPadTop,
-    paddingHorizontal: size.screenPadX,
+    borderColor: bio.color.border,
+    paddingTop: 10,
+    paddingHorizontal: 24,
+    overflow: "hidden",
   },
-  kav: {
-    flexShrink: 1,
-  },
-  scroll: {
-    // sizes to content when there's room; shrinks and scrolls when there isn't,
-    // so Save stays reachable with the keyboard up
-    flexShrink: 1,
-  },
-  scrollContent: {
-    // the design's breathing room between the last field and the CTA — inside
-    // the scroll view so it collapses away first when space is tight
-    paddingBottom: size.quickLogSaveGap,
-  },
-  header: {
-    // full-width so the pan target spans the sheet, not just the text
-    alignSelf: "stretch",
-  },
-  grabber: {
-    width: size.grabberW,
-    height: size.grabberH,
-    borderRadius: size.grabberH,
-    backgroundColor: color.border,
-    alignSelf: "center",
-  },
-  title: {
-    ...type.sheetTitle,
-    color: color.text,
-    marginTop: size.sheetTitleGap,
-  },
-  date: {
-    ...type.caption,
-    color: color.textTertiary,
-    marginTop: space.xs,
-  },
-  fields: {
-    marginTop: size.metricFieldGap,
-    gap: size.metricFieldGap,
-  },
-  fieldLabel: {
-    ...type.sectionLabel,
-    color: color.textFaint,
-  },
-  fieldOptional: {
-    color: color.textOptional,
-  },
-  cell: {
-    marginTop: space.sm,
-    height: size.touchTarget,
-    borderRadius: radius.emoji,
-    backgroundColor: color.inset,
+  grabber: { width: 44, height: 5, borderRadius: 3, backgroundColor: bio.color.border, alignSelf: "center" },
+  title: { fontFamily: fontFamily.bold, fontSize: 24, letterSpacing: -0.24, color: bio.color.text, marginTop: 18 },
+  segRow: { flexDirection: "row", gap: 8, marginTop: 20 },
+  seg: { flex: 1, height: 38, borderRadius: 12, backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: bio.color.border2, alignItems: "center", justifyContent: "center" },
+  segOn: { backgroundColor: "rgba(255,255,255,0.14)", borderColor: bio.color.border },
+  segTxt: { fontFamily: fontFamily.semibold, fontSize: 11.5, color: bio.alpha(0.5) },
+  segTxtOn: { color: bio.color.text },
+  dialer: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 28, marginTop: 40 },
+  stepper: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: "rgba(255,255,255,0.06)",
     borderWidth: 1,
-    borderColor: color.fieldBorder,
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: size.metricCellPadX,
-  },
-  cellInput: {
-    ...type.button,
-    color: color.text,
-    flex: 1,
-    padding: 0,
-  },
-  cellUnit: {
-    ...type.caption,
-    color: color.textTertiary,
-  },
-  weightRow: {
-    flexDirection: "row",
-    alignItems: "flex-end",
-    gap: size.fieldGap,
-  },
-  weightInput: {
-    flex: 1,
-  },
-  unitToggle: {
-    flexDirection: "row",
-  },
-  unitOption: {
-    width: size.touchTarget,
-    height: size.touchTarget,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: color.inset,
-    borderWidth: 1,
-    borderColor: color.fieldBorder,
-  },
-  unitOptionLeft: {
-    borderTopLeftRadius: radius.emoji,
-    borderBottomLeftRadius: radius.emoji,
-    // keep this cell's border above its neighbour's, per the design
-    zIndex: 1,
-  },
-  unitOptionRight: {
-    borderTopRightRadius: radius.emoji,
-    borderBottomRightRadius: radius.emoji,
-  },
-  unitOptionNoLeft: {
-    borderLeftWidth: 0,
-  },
-  unitOptionOn: {
-    backgroundColor: color.emojiSelectedBg,
-    borderColor: color.emojiSelectedBorder,
-  },
-  unitText: {
-    ...type.caption,
-    color: color.textTertiary,
-  },
-  unitTextOn: {
-    color: color.text,
-  },
-  error: {
-    ...type.caption,
-    color: color.error,
-    marginTop: space.base,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: color.hairline,
-    marginTop: size.saveDividerGap,
-    marginHorizontal: -size.screenPadX,
-  },
-  success: {
-    // leave the grabber uncovered, as in the design
-    top: size.sheetPadTop + size.grabberH,
-    backgroundColor: color.surface,
+    borderColor: bio.color.border,
     alignItems: "center",
     justifyContent: "center",
   },
-  successTitle: {
-    ...type.sheetTitle,
-    color: color.text,
-    marginTop: space.lg,
-    textAlign: "center",
-  },
+  numWrap: { minWidth: 150, alignItems: "center" },
+  num: { fontFamily: fontFamily.dot, fontSize: 72, letterSpacing: 4, color: bio.color.text, textShadowRadius: 30, textShadowOffset: { width: 0, height: 0 } },
+  unit: { fontFamily: fontFamily.semibold, fontSize: 11, letterSpacing: 2, color: bio.alpha(0.5), textTransform: "uppercase", marginTop: 8 },
+  ruler: { height: 44, marginTop: 32, justifyContent: "center" },
+  tickRow: { position: "absolute", left: 0, right: 0, flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  tick: { width: 1.5, height: 12, borderRadius: 1, backgroundColor: bio.alpha(0.2) },
+  tickTall: { height: 22, backgroundColor: bio.alpha(0.32) },
+  thumb: { position: "absolute", top: 6, width: 3, height: 32, borderRadius: 2, marginLeft: -1.5, shadowRadius: 10, shadowOpacity: 0.8, shadowOffset: { width: 0, height: 0 } },
+  error: { fontFamily: fontFamily.regular, fontSize: 13, color: bio.color.coral, marginTop: 16 },
+  save: { height: 56, borderRadius: 999, backgroundColor: bio.color.text, alignItems: "center", justifyContent: "center", marginTop: 28 },
+  saveTxt: { fontFamily: fontFamily.bold, fontSize: 16, color: bio.color.ink },
+  success: { backgroundColor: bio.color.ink, alignItems: "center", justifyContent: "center", gap: 14 },
+  successTitle: { fontFamily: fontFamily.bold, fontSize: 24, color: bio.color.text },
 });
