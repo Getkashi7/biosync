@@ -14,6 +14,7 @@ import { getReminderPrefs, getUnitPref, setUnitPref, type WeightUnit } from "../
 import { formatHm } from "../../lib/reminderSchedule";
 import { bio, fontFamily } from "../../ui/theme";
 import { useAuth } from "../auth/AuthProvider";
+import { fetchDashboard } from "../dashboard/dashboardApi";
 
 function initialsOf(fullName: string | null, email: string): string {
   const words = fullName?.trim().split(/\s+/).filter(Boolean) ?? [];
@@ -29,12 +30,18 @@ export function ProfileScreen({ onDeleteAccount, onReminders, refreshKey }: Prop
   const { session, signOut } = useAuth();
   const [unit, setUnit] = useState<WeightUnit>("kg");
   const [reminders, setReminders] = useState("Off");
+  const [stats, setStats] = useState<{ streak: number; readiness: number | null } | null>(null);
 
   useEffect(() => {
     void getUnitPref().then(setUnit);
   }, []);
   useEffect(() => {
     void getReminderPrefs().then((p) => setReminders(p.enabled ? formatHm(p.time) : "Off"));
+  }, [refreshKey]);
+  useEffect(() => {
+    void fetchDashboard()
+      .then((d) => setStats({ streak: d.streak, readiness: d.readiness?.score ?? null }))
+      .catch(() => {});
   }, [refreshKey]);
 
   const glow = useSharedValue(0);
@@ -66,6 +73,18 @@ export function ProfileScreen({ onDeleteAccount, onReminders, refreshKey }: Prop
           </View>
           {session?.fullName ? <Text style={styles.name}>{session.fullName}</Text> : null}
           <Text style={styles.email}>{email}</Text>
+          {stats ? (
+            <View style={styles.pills}>
+              <View style={styles.pill}>
+                <Text style={styles.pillNum}>{stats.streak}</Text>
+                <Text style={styles.pillLabel}>day streak</Text>
+              </View>
+              <View style={styles.pill}>
+                <Text style={styles.pillNum}>{stats.readiness ?? "—"}</Text>
+                <Text style={styles.pillLabel}>readiness</Text>
+              </View>
+            </View>
+          ) : null}
         </View>
 
         <Text style={styles.group}>Preferences</Text>
@@ -136,6 +155,20 @@ const styles = StyleSheet.create({
   avatarTxt: { fontFamily: fontFamily.bold, fontSize: 30, color: bio.color.text },
   name: { fontFamily: fontFamily.bold, fontSize: 21, color: bio.color.text, marginTop: 14 },
   email: { fontFamily: fontFamily.regular, fontSize: 12, color: bio.alpha(0.5), marginTop: 4 },
+  pills: { flexDirection: "row", gap: 10, marginTop: 16 },
+  pill: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    gap: 5,
+    paddingVertical: 9,
+    paddingHorizontal: 16,
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderWidth: 1,
+    borderColor: bio.color.border2,
+  },
+  pillNum: { fontFamily: fontFamily.dot, fontSize: 15, letterSpacing: 0.5, color: bio.color.text },
+  pillLabel: { fontFamily: fontFamily.regular, fontSize: 11, color: bio.alpha(0.55) },
   group: {
     fontFamily: fontFamily.semibold,
     fontSize: 11,
