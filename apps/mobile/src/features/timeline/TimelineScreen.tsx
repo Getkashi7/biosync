@@ -4,17 +4,18 @@
  * + metrics on a dotted spine. Full-bleed; clears the floating tab bar.
  */
 import { useCallback, useEffect, useState } from "react";
-import { RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AuroraField } from "../../ui/bio/AuroraField";
 import { Spinner } from "../../ui/Spinner";
 import { GradientButton } from "../../ui/GradientButton";
 import { formatTime } from "../../lib/date";
+import { selectionHaptic } from "../../lib/haptics";
 import { ENERGY_WORDS, MOOD_WORDS } from "../../lib/ratings";
 import { METRIC_META, FALLBACK_META } from "../../lib/metricMeta";
 import { bio, fontFamily } from "../../ui/theme";
 import { fetchMetricsBento, type BentoData } from "../metrics/bentoApi";
-import { MetricsBento } from "../metrics/MetricsBento";
+import { MetricsBento, type Range } from "../metrics/MetricsBento";
 import { fetchTimeline, type TimelineDay } from "./timelineApi";
 
 const fmt = (v: number): string => String(Number(v.toFixed(1)));
@@ -54,8 +55,15 @@ export function TimelineScreen({ onLog, refreshKey }: { onLog: () => void; refre
   const insets = useSafeAreaInsets();
   const [days, setDays] = useState<TimelineDay[] | null>(null);
   const [bento, setBento] = useState<BentoData | null>(null);
+  const [range, setRange] = useState<Range>("day");
   const [failed, setFailed] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+
+  const pickRange = (r: Range) => {
+    if (r === range) return;
+    selectionHaptic();
+    setRange(r);
+  };
 
   const load = useCallback(async () => {
     setFailed(false);
@@ -93,12 +101,14 @@ export function TimelineScreen({ onLog, refreshKey }: { onLog: () => void; refre
         <View style={styles.header}>
           <Text style={styles.title}>Metrics</Text>
           <View style={styles.toggle}>
-            <View style={[styles.tog, styles.togOn]}>
-              <Text style={styles.togTxtOn}>Day</Text>
-            </View>
-            <View style={styles.tog}>
-              <Text style={styles.togTxt}>Week</Text>
-            </View>
+            {(["day", "week"] as const).map((r) => {
+              const on = range === r;
+              return (
+                <Pressable key={r} onPress={() => pickRange(r)} style={[styles.tog, on && styles.togOn]} accessibilityRole="button" accessibilityState={{ selected: on }}>
+                  <Text style={on ? styles.togTxtOn : styles.togTxt}>{r === "day" ? "Day" : "Week"}</Text>
+                </Pressable>
+              );
+            })}
           </View>
         </View>
 
@@ -124,7 +134,7 @@ export function TimelineScreen({ onLog, refreshKey }: { onLog: () => void; refre
           </View>
         ) : (
           <>
-            {bento ? <MetricsBento data={bento} /> : null}
+            {bento ? <MetricsBento data={bento} range={range} /> : null}
 
             {entries.length > 0 ? (
               <>
