@@ -10,7 +10,8 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 import Constants from "expo-constants";
 import { RiseIn } from "../../ui/RiseIn";
 import { selectionHaptic } from "../../lib/haptics";
-import { getUnitPref, setUnitPref, type WeightUnit } from "../../lib/prefs";
+import { getReminderPrefs, getUnitPref, setUnitPref, type WeightUnit } from "../../lib/prefs";
+import { formatHm } from "../../lib/reminderSchedule";
 import { color, radius, size, space, type } from "../../ui/theme";
 import { useAuth } from "../auth/AuthProvider";
 
@@ -25,15 +26,24 @@ function initialsOf(fullName: string | null, email: string): string {
 type Props = {
   /** open the delete-account confirm sheet */
   onDeleteAccount: () => void;
+  /** open the reminders settings sheet */
+  onReminders: () => void;
+  /** bump to reload prefs (after the reminders sheet closes) */
+  refreshKey: number;
 };
 
-export function ProfileScreen({ onDeleteAccount }: Props) {
+export function ProfileScreen({ onDeleteAccount, onReminders, refreshKey }: Props) {
   const { session, signOut } = useAuth();
   const [unit, setUnit] = useState<WeightUnit>("kg");
+  const [reminders, setReminders] = useState("Off");
 
   useEffect(() => {
     void getUnitPref().then(setUnit);
   }, []);
+
+  useEffect(() => {
+    void getReminderPrefs().then((p) => setReminders(p.enabled ? formatHm(p.time) : "Off"));
+  }, [refreshKey]);
 
   const pickUnit = (next: WeightUnit) => {
     if (next === unit) return;
@@ -91,13 +101,13 @@ export function ProfileScreen({ onDeleteAccount }: Props) {
               </View>
             </View>
             <View style={styles.separator} />
-            <View style={styles.row}>
+            <Pressable style={styles.row} onPress={onReminders} accessibilityRole="button" accessibilityLabel={`Reminders, ${reminders}`}>
               <Text style={styles.rowLabel}>Reminders</Text>
               <View style={styles.rowValueWrap}>
-                <Text style={styles.rowValue}>Off</Text>
+                <Text style={styles.rowValue}>{reminders}</Text>
                 <Text style={styles.chevron}>›</Text>
               </View>
-            </View>
+            </Pressable>
           </View>
         </View>
       </RiseIn>

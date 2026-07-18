@@ -5,6 +5,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { AuthProvider, useAuth } from "../src/features/auth/AuthProvider";
 import { useAppFonts } from "../src/ui/fonts";
+import { configureNotifications, syncReminders } from "../src/lib/reminders";
 import { color } from "../src/ui/theme";
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -44,6 +45,12 @@ export default function RootLayout() {
   useEffect(() => {
     if (fontsLoaded) SplashScreen.hideAsync().catch(() => {});
   }, [fontsLoaded]);
+
+  // Set the notification handler/channel once, then reconcile the scheduled
+  // reminder with the stored prefs + check-in state on launch.
+  useEffect(() => {
+    void configureNotifications().then(() => syncReminders());
+  }, []);
 
   if (!fontsLoaded) return null;
 

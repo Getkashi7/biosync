@@ -8,8 +8,8 @@
  * so the sheets stay presentation-only — MainTabs owns persistence, and bumps
  * refreshKey when a logging sheet closes so the dashboard refetches.
  */
-import { useCallback, useState } from "react";
-import { StyleSheet, View } from "react-native";
+import { useCallback, useEffect, useState } from "react";
+import { AppState, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Screen } from "../../ui/Screen";
 import { TabBar } from "../../ui/TabBar";
@@ -28,9 +28,11 @@ import { createGoal, type NewGoal } from "../goals/goalsApi";
 import { ProfileScreen } from "../profile/ProfileScreen";
 import { DeleteAccountSheet } from "../profile/DeleteAccountSheet";
 import { InsightsScreen } from "../insights/InsightsScreen";
+import { RemindersSheet } from "../reminders/RemindersSheet";
+import { syncReminders } from "../../lib/reminders";
 
 /** Which overlay is up, if any. */
-type Sheet = "none" | "chooser" | "checkin" | "quicklog" | "newgoal" | "deleteaccount";
+type Sheet = "none" | "chooser" | "checkin" | "quicklog" | "newgoal" | "deleteaccount" | "reminders";
 
 export function MainTabs() {
   const insets = useSafeAreaInsets();
@@ -42,6 +44,15 @@ export function MainTabs() {
   const closeSheet = useCallback(() => {
     setSheet("none");
     setRefreshKey((k) => k + 1);
+  }, []);
+
+  // Re-derive the scheduled reminder whenever the app returns to the foreground
+  // (a check-in may have happened elsewhere, or a day may have rolled over).
+  useEffect(() => {
+    const sub = AppState.addEventListener("change", (state) => {
+      if (state === "active") void syncReminders();
+    });
+    return () => sub.remove();
   }, []);
 
   const handleSubmit = useCallback(async (input: CheckinInput): Promise<number | null> => {
@@ -69,7 +80,11 @@ export function MainTabs() {
           ) : active === "calendar" ? (
             <TimelineScreen onLog={() => setSheet("chooser")} refreshKey={refreshKey} />
           ) : active === "profile" ? (
-            <ProfileScreen onDeleteAccount={() => setSheet("deleteaccount")} />
+            <ProfileScreen
+              onDeleteAccount={() => setSheet("deleteaccount")}
+              onReminders={() => setSheet("reminders")}
+              refreshKey={refreshKey}
+            />
           ) : active === "chat" ? (
             <InsightsScreen onLog={() => setSheet("chooser")} refreshKey={refreshKey} />
           ) : (
@@ -95,6 +110,8 @@ export function MainTabs() {
       {sheet === "newgoal" ? <NewGoalSheet onClose={closeSheet} onSubmit={handleGoal} /> : null}
 
       {sheet === "deleteaccount" ? <DeleteAccountSheet onClose={() => setSheet("none")} /> : null}
+
+      {sheet === "reminders" ? <RemindersSheet onClose={closeSheet} /> : null}
     </Screen>
   );
 }

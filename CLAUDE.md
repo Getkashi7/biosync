@@ -16,8 +16,8 @@ API. This file is the source of truth for stack and conventions — follow it.
 
 ## Versions — do not drift
 
-- **`expo` is pinned to exactly `54.0.8`**, `@expo/metro-runtime` to `6.1.2`. The only Expo Go build
-  available on the test device supports 54.0.8 — anything newer is rejected at launch.
+- **`expo` is pinned to exactly `54.0.8`**, `@expo/metro-runtime` to `6.1.2`. The device's dev build
+  is compiled against SDK 54 — drifting the JS SDK past it breaks the runtime at launch.
 - **Never** run `expo install --fix`, `expo upgrade`, or `pnpm update expo`: they silently resolve to
   the latest 54.0.x and break the device. If you must reinstall, pin exactly (`pnpm add -E`).
 - Hold the SDK-54 baseline: `expo-router ~6.0.x`, `react-native 0.81.x`, `react 19.1.0`,
@@ -25,14 +25,22 @@ API. This file is the source of truth for stack and conventions — follow it.
 
 ## Local dev & device testing (Windows)
 
-- The dev Wi-Fi router uses client isolation: **LAN/QR and `--tunnel` do not work.** Test on the
-  Android device over **USB**:
+- **Testing runs on the EAS development build** (a standalone "Pulse" app already installed on the
+  S23) — **not Expo Go** (Day 10 left the managed workflow; native modules like `expo-notifications`
+  can't run in Expo Go). The dev Wi-Fi router uses client isolation (**LAN/QR and `--tunnel` don't
+  work**), so the dev client rides **USB**:
   1. `adb reverse tcp:8081 tcp:8081` && `adb reverse tcp:4000 tcp:4000`
      (`adb` = `%USERPROFILE%\platform-tools\adb.exe`; re-run after every unplug).
   2. Start the API: `pnpm --filter @pulse/api dev` (port 4000).
   3. `$env:REACT_NATIVE_PACKAGER_HOSTNAME="localhost"; pnpm --filter mobile start -c`
-  4. Press `a`, or open `exp://localhost:8081` in Expo Go. Metro **and** the API ride the cable, so
-     `src/lib/trpc.ts` resolves the API to `localhost:4000` and writes persist.
+     (expo-dev-client makes this a dev-client server, not Expo Go).
+  4. Launch on the device: `adb shell am start -a android.intent.action.VIEW -d
+     "pulse://expo-development-client/?url=http%3A%2F%2Flocalhost%3A8081"`. Metro **and** the API ride
+     the cable, so `src/lib/trpc.ts` resolves the API to `localhost:4000` and writes persist.
+- **Rebuild the dev client only when native deps/config change** (`app.json` plugins, a new native
+  module): `cd apps/mobile && npx eas-cli build --platform android --profile development` (EAS project
+  `@kaze7777/pulse`; profiles in `eas.json`; keystore already on EAS), then `adb install -r <apk>`.
+  Pure-JS changes just hot-reload over Metro — no rebuild.
 - **Stop the API server before `pnpm install`, `prisma generate`, or `prisma migrate`** — a running
   API locks the Prisma query-engine DLL and the install dies with `EPERM`. If it must stay up, use
   `pnpm install --ignore-scripts`.

@@ -4,6 +4,8 @@
  * `logs.checkin` and returns the streak from `logs.streak`.
  */
 import { trpc } from "../../lib/trpc";
+import { setLastCheckinDate } from "../../lib/prefs";
+import { syncReminders } from "../../lib/reminders";
 
 export type CheckinInput = {
   /** device-local calendar date, YYYY-MM-DD */
@@ -35,6 +37,8 @@ export function todayLocal(now: Date = new Date()): string {
  */
 export async function submitCheckin(input: CheckinInput): Promise<number | null> {
   await trpc.logs.checkin.mutate(input);
+  // Record the check-in locally + reschedule so today's reminder is skipped.
+  void setLastCheckinDate(input.date).then(() => syncReminders());
   try {
     const { streak } = await trpc.logs.streak.query({ today: input.date });
     return streak;
