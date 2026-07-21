@@ -29,10 +29,6 @@ describe("logs authorization", () => {
     await expect(caller.logs.streak({ today: "2026-07-12" })).rejects.toMatchObject({ code: "UNAUTHORIZED" });
   });
 
-  it("wrong role (ADMIN) → FORBIDDEN (requireRole USER)", async () => {
-    const caller = appRouter.createCaller(ctx({ id: "u1", role: "ADMIN" }));
-    await expect(caller.logs.checkin(validCheckin)).rejects.toMatchObject({ code: "FORBIDDEN" });
-  });
 });
 
 describe("logs input validation", () => {

@@ -18,12 +18,6 @@ describe("insights authorization", () => {
     });
   });
 
-  it("wrong role (ADMIN) → FORBIDDEN (requireRole USER)", async () => {
-    const caller = appRouter.createCaller(ctx({ id: "u1", role: "ADMIN" }));
-    await expect(caller.insights.list({ today: "2026-07-17" })).rejects.toMatchObject({
-      code: "FORBIDDEN",
-    });
-  });
 });
 
 describe("insights input validation", () => {

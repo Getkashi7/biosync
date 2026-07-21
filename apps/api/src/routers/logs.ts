@@ -3,14 +3,14 @@
  * middleware; resolvers stay thin. Input is validated with the shared Zod
  * schema so the mobile client infers identical types end-to-end.
  */
-import { Role } from "@prisma/client";
+
 import { checkinInput, streakInput, logRangeInput, computeStreak } from "@pulse/shared";
-import { router, requireRole } from "../trpc";
+import { router, ownerProcedure } from "../trpc";
 import { prisma } from "../db";
 import { toDbDate, fromDbDate } from "../dbDate";
 import { storeReadinessSnapshot } from "../lib/readiness";
 
-const userProcedure = requireRole(Role.USER);
+const userProcedure = ownerProcedure;
 
 export const logsRouter = router({
   /** Upsert today's check-in (one row per user per calendar day). */

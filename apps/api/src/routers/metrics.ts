@@ -3,12 +3,12 @@
  * middleware; resolvers stay thin. Input is validated with the shared Zod
  * schema so the mobile client infers identical types end-to-end.
  */
-import { Role } from "@prisma/client";
+
 import { metricLogInput, metricRangeInput, metricListInput } from "@pulse/shared";
-import { router, requireRole } from "../trpc";
+import { router, ownerProcedure } from "../trpc";
 import { prisma } from "../db";
 
-const userProcedure = requireRole(Role.USER);
+const userProcedure = ownerProcedure;
 
 export const metricsRouter = router({
   /** Record one reading. The row's owner is the session user — never the input. */

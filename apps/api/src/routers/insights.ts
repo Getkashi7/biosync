@@ -9,14 +9,14 @@
  * any check-in that predates the snapshot, so the trend lights up from existing
  * data too; the upserts are idempotent and bounded to `TREND_DAYS`.
  */
-import { Role } from "@prisma/client";
+
 import { insightsInput, computeInsights, computeStreak, type CheckinPoint, type ReadinessPoint } from "@pulse/shared";
-import { router, requireRole } from "../trpc";
+import { router, ownerProcedure } from "../trpc";
 import { prisma } from "../db";
 import { toDbDate, fromDbDate } from "../dbDate";
 import { storeReadinessSnapshot } from "../lib/readiness";
 
-const userProcedure = requireRole(Role.USER);
+const userProcedure = ownerProcedure;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 /** trailing window the week-over-week + correlation cards look at */

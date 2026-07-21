@@ -32,10 +32,6 @@ describe("metrics authorization", () => {
     await expect(caller.metrics.range(validRange)).rejects.toMatchObject({ code: "UNAUTHORIZED" });
   });
 
-  it("wrong role (ADMIN) → FORBIDDEN (requireRole USER)", async () => {
-    const caller = appRouter.createCaller(ctx({ id: "u1", role: "ADMIN" }));
-    await expect(caller.metrics.log(validLog)).rejects.toMatchObject({ code: "FORBIDDEN" });
-  });
 });
 
 describe("metrics input validation", () => {

@@ -10,6 +10,11 @@ import { readinessRouter } from "./routers/readiness";
 import { goalsRouter } from "./routers/goals";
 import { insightsRouter } from "./routers/insights";
 import { assistantRouter } from "./routers/assistant";
+import { nutritionRouter } from "./routers/nutrition";
+import { supplementsRouter } from "./routers/supplements";
+import { consentRouter } from "./routers/consent";
+import { staffRouter } from "./routers/staff";
+import { trainingRouter } from "./routers/training";
 
 export const appRouter = router({
   /** Liveness check — no auth. */
@@ -40,6 +45,21 @@ export const appRouter = router({
 
   /** AI Coach — conversational wellness guide grounded in the user's data. */
   assistant: assistantRouter,
+
+  /** Nutrition — AI macro estimates, the meal log, and a day's ring totals. */
+  nutrition: nutritionRouter,
+
+  /** Supplements — the user's own stack + the day's dose strip. Informational only. */
+  supplements: supplementsRouter,
+
+  /** Consent — who sees what. Nothing is shared until the user says so. */
+  consent: consentRouter,
+
+  /** Staff (PT / practitioner) client access — gated by link AND consent. */
+  staff: staffRouter,
+
+  /** Training plans + session notes — trainer writes, client reads what's shared. */
+  training: trainingRouter,
 
   admin: router({
     /** Admin-only — throws FORBIDDEN for non-admins. */

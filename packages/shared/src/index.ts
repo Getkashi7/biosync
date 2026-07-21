@@ -27,3 +27,68 @@ export type {
   CheckinPoint,
   ReadinessPoint,
 } from "./insights";
+export { digestInput, computeDigest } from "./digest";
+export type { DigestInput, DigestData, Digest, DigestCard, DigestFamily, MetricWindow } from "./digest";
+export {
+  nutritionDayInput,
+  mealInput,
+  mealRemoveInput,
+  estimateInput,
+  parseMacroEstimate,
+  macroTargets,
+  summariseDay,
+  nutritionRead,
+  DEFAULT_TARGETS,
+} from "./nutrition";
+export type {
+  NutritionDayInput,
+  MealInput,
+  EstimateInput,
+  MacroEstimate,
+  MacroTargets,
+  MacroTotals,
+  MealPoint,
+  NutritionDay,
+  NutritionRead,
+} from "./nutrition";
+export {
+  supplementTiming,
+  supplementInput,
+  supplementIdInput,
+  supplementTakenInput,
+  supplementDayInput,
+  supplementSuggestInput,
+  buildSchedule,
+  parseSuggestions,
+  suggestionGuard,
+  TIMING_ORDER,
+  TIMING_LABEL,
+} from "./supplements";
+export {
+  consentCategory,
+  consentAudience,
+  consentSetInput,
+  mergeConsents,
+  sharedWith,
+  sharesAnything,
+  CONSENT_ORDER,
+  CONSENT_COPY,
+  AUDIENCE_LABEL,
+} from "./consent";
+export type { ConsentCategory, ConsentAudience, ConsentSetInput, ConsentRow } from "./consent";
+export { planItem, planSaveInput, planListInput, noteCreateInput, parsePlanItems, isoWeek } from "./training";
+export type { PlanItem, PlanSaveInput, NoteCreateInput } from "./training";
+export { staffVisibleCategories, staffCanSee, ROLE_CEILING, ROLE_AUDIENCE } from "./staffAccess";
+export type { StaffRole } from "./staffAccess";
+export { AUDIT, sanitiseAuditMeta } from "./audit";
+export type { AuditAction, AuditMeta, AuditEntry } from "./audit";
+export type {
+  SupplementTiming,
+  SupplementInput,
+  StackItem,
+  ScheduledDose,
+  ScheduleSlot,
+  SupplementDay,
+  TakenTick,
+  Suggestion,
+} from "./supplements";

@@ -18,12 +18,6 @@ describe("readiness authorization", () => {
     });
   });
 
-  it("wrong role (ADMIN) → FORBIDDEN (requireRole USER)", async () => {
-    const caller = appRouter.createCaller(ctx({ id: "u1", role: "ADMIN" }));
-    await expect(caller.readiness.today({ today: "2026-07-16" })).rejects.toMatchObject({
-      code: "FORBIDDEN",
-    });
-  });
 });
 
 describe("readiness input validation", () => {

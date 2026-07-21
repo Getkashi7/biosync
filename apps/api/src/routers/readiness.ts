@@ -4,12 +4,12 @@
  * `computeReadiness` in @pulse/shared — so the scoring logic stays testable
  * without a database.
  */
-import { Role } from "@prisma/client";
+
 import { readinessInput } from "@pulse/shared";
-import { router, requireRole } from "../trpc";
+import { router, ownerProcedure } from "../trpc";
 import { computeReadinessForDate } from "../lib/readiness";
 
-const userProcedure = requireRole(Role.USER);
+const userProcedure = ownerProcedure;
 
 export const readinessRouter = router({
   /** Today's 0–100 score with its component breakdown and confidence flag. */

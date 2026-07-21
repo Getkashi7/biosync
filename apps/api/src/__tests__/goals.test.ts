@@ -23,10 +23,6 @@ describe("goals authorization", () => {
     await expect(caller.goals.list()).rejects.toMatchObject({ code: "UNAUTHORIZED" });
   });
 
-  it("wrong role (ADMIN) → FORBIDDEN (requireRole USER)", async () => {
-    const caller = appRouter.createCaller(ctx({ id: "u1", role: "ADMIN" }));
-    await expect(caller.goals.set(validGoal)).rejects.toMatchObject({ code: "FORBIDDEN" });
-  });
 });
 
 describe("goals input validation", () => {

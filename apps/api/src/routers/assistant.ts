@@ -9,14 +9,23 @@
  * userId always comes from ctx.user — never the client. No health values logged.
  */
 import { z } from "zod";
-import { Role } from "@prisma/client";
-import { router, requireRole } from "../trpc";
+import { MetricType } from "@prisma/client";
+import { computeDigest, digestInput, type MetricWindow } from "@pulse/shared";
+import { router, ownerProcedure } from "../trpc";
 import { prisma } from "../db";
-import { env } from "../env";
+import { toDbDate, fromDbDate } from "../dbDate";
+import { groqChat, hasGroqKey } from "../lib/groq";
 
-const userProcedure = requireRole(Role.USER);
+const userProcedure = ownerProcedure;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** Shift a device-local YYYY-MM-DD by whole days. */
+function shiftDay(date: string, deltaDays: number): string {
+  const [y, m, d] = date.split("-").map(Number);
+  const dt = new Date(Date.UTC(y!, m! - 1, d!) + deltaDays * DAY_MS);
+  return `${dt.getUTCFullYear()}-${String(dt.getUTCMonth() + 1).padStart(2, "0")}-${String(dt.getUTCDate()).padStart(2, "0")}`;
+}
 
 const chatInput = z.object({
   /** Full conversation so far, oldest → newest; the last entry is the new turn. */
@@ -94,48 +103,159 @@ async function buildContext(userId: string): Promise<string> {
   return lines.join("\n");
 }
 
-/** Groq's free-tier chat model (OpenAI-compatible). Override via GROQ_MODEL. */
-const GROQ_MODEL = process.env.GROQ_MODEL || "llama-3.3-70b-versatile";
-const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
-
 const ERR_REPLY = "I hit a snag reaching my brain just now. Give it a moment and try again.";
 
 const NO_KEY_REPLY =
   "Your AI coach isn't switched on yet. Add a free Groq API key to the server (GROQ_API_KEY) — grab one at console.groq.com — and I'll start reading your BIOSYNC data and answering your questions. Until then, keep logging check-ins and metrics so there's plenty for me to work with.";
 
+// ── Coach plan (AI trio · pillar #1) ─────────────────────────────────────────
+const planInput = z.object({
+  /** what the plan should lean toward */
+  focus: z.enum(["training", "recovery", "balanced"]).default("balanced"),
+});
+
+/** A generated, non-diagnostic day plan; validated before it leaves the server. */
+const planBlock = z.object({
+  label: z.string().min(1).max(60),
+  detail: z.string().min(1).max(600),
+});
+const planSchema = z.object({
+  title: z.string().min(1).max(80),
+  intro: z.string().min(1).max(400),
+  blocks: z.array(planBlock).min(1).max(6),
+});
+export type Plan = z.infer<typeof planSchema>;
+
+/** Parse the model's JSON into a validated Plan, or null when it isn't usable. */
+export function parsePlan(raw: string): Plan | null {
+  let json: unknown;
+  try {
+    json = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  const result = planSchema.safeParse(json);
+  return result.success ? result.data : null;
+}
+
+const PLAN_SYSTEM = `You are the BIOSYNC Coach building a short, practical wellness plan for today, grounded in the user's own data below.
+
+Rules:
+- General wellness only. You are NOT a doctor: never diagnose, name conditions, prescribe, or give medical treatment. Keep movement/recovery/habit guidance gentle and reversible.
+- Ground the plan in the user's actual numbers (readiness, sleep, energy, resting HR, HRV). If readiness or sleep is low, lean toward recovery.
+- Reply with ONLY a JSON object, no prose around it, in exactly this shape:
+  {"title": string, "intro": string (1-2 warm sentences), "blocks": [{"label": string, "detail": string}]}
+- 3 to 5 blocks. Labels are short (e.g. "Move", "Fuel", "Recover", "Mind"). Details are 1-2 sentences, concrete and encouraging.`;
+
+const PLAN_ERROR: Plan = {
+  title: "Couldn’t build your plan",
+  intro: "I hit a snag putting today’s plan together. Give it a moment and try again.",
+  blocks: [{ label: "Try again", detail: "Tap regenerate — this is usually a brief network hiccup." }],
+};
+
+const PLAN_NO_KEY: Plan = {
+  title: "Coach plan is off",
+  intro: "Your AI coach isn’t switched on yet, so I can’t generate a plan.",
+  blocks: [
+    { label: "Switch it on", detail: "Add a free Groq API key (GROQ_API_KEY) to the server — grab one at console.groq.com." },
+    { label: "Meanwhile", detail: "Keep logging check-ins and metrics so there’s plenty for me to work with." },
+  ],
+};
+
 export const assistantRouter = router({
+  /**
+   * The morning digest: number-forward cards built from the user's real recent
+   * data (last night's sleep, HRV / glucose / resting-HR trends, readiness).
+   * Deterministic — no value is invented and nothing is sent to the LLM here; the
+   * conversational follow-up happens through `chat` when the user taps a card.
+   */
+  digest: userProcedure.input(digestInput).query(async ({ ctx, input }) => {
+    const userId = ctx.user.id;
+    const today = input.today;
+    const now = new Date();
+    const weekAgo = new Date(now.getTime() - 7 * DAY_MS);
+    const twoWeeksAgo = new Date(now.getTime() - 14 * DAY_MS);
+    const from = toDbDate(shiftDay(today, -6));
+    const to = toDbDate(today);
+
+    const [snaps, logs, metrics] = await Promise.all([
+      prisma.readinessSnapshot.findMany({
+        where: { userId, date: { gte: from, lte: to } },
+        select: { date: true, score: true },
+      }),
+      prisma.dailyLog.findMany({
+        where: { userId, date: { gte: from, lte: to } },
+        select: { date: true, sleepHours: true, sleepQuality: true, energy: true, mood: true, weightKg: true },
+      }),
+      prisma.metric.findMany({
+        where: {
+          userId,
+          type: { in: [MetricType.HRV, MetricType.GLUCOSE, MetricType.RESTING_HR] },
+          recordedAt: { gte: twoWeeksAgo, lte: now },
+        },
+        orderBy: { recordedAt: "asc" },
+        select: { type: true, value: true, recordedAt: true },
+      }),
+    ]);
+
+    // Split each metric family into the last 7 days vs the 7 before, chronological.
+    const window = (type: MetricType): MetricWindow => {
+      const recent: number[] = [];
+      const earlier: number[] = [];
+      for (const m of metrics) {
+        if (m.type !== type) continue;
+        (m.recordedAt >= weekAgo ? recent : earlier).push(m.value);
+      }
+      return { recent, earlier };
+    };
+
+    return computeDigest({
+      today,
+      readiness: snaps.map((s) => ({ date: fromDbDate(s.date), score: s.score })),
+      checkins: logs.map((r) => ({
+        date: fromDbDate(r.date),
+        sleepHours: r.sleepHours,
+        sleepQuality: r.sleepQuality,
+        energy: r.energy,
+        mood: r.mood,
+        weightKg: r.weightKg,
+      })),
+      hrv: window(MetricType.HRV),
+      glucose: window(MetricType.GLUCOSE),
+      restingHr: window(MetricType.RESTING_HR),
+    });
+  }),
+
+  /**
+   * Build a short, structured wellness plan for today, grounded in the user's
+   * data and biased by `focus`. Non-diagnostic. Returns a validated Plan; on a
+   * missing key / API error / unparseable model output it degrades to a friendly
+   * placeholder plan so the sheet always has something to show.
+   */
+  plan: userProcedure.input(planInput).mutation(async ({ ctx, input }) => {
+    if (!hasGroqKey()) return { plan: PLAN_NO_KEY, configured: false as const };
+    const context = await buildContext(ctx.user.id);
+    const content = await groqChat(
+      [
+        { role: "system", content: `${PLAN_SYSTEM}\n\n--- The user's current data ---\n${context}` },
+        { role: "user", content: `Build me a ${input.focus} plan for today.` },
+      ],
+      { json: true },
+    );
+    return { plan: (content && parsePlan(content)) || PLAN_ERROR, configured: true as const };
+  }),
+
   /** Send the conversation; get one grounded, non-diagnostic reply back. */
   chat: userProcedure.input(chatInput).mutation(async ({ ctx, input }) => {
-    if (!env.GROQ_API_KEY) {
+    if (!hasGroqKey()) {
       return { reply: NO_KEY_REPLY, configured: false as const };
     }
-    try {
-      const context = await buildContext(ctx.user.id);
-      const res = await fetch(GROQ_URL, {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          authorization: `Bearer ${env.GROQ_API_KEY}`,
-        },
-        body: JSON.stringify({
-          model: GROQ_MODEL,
-          max_tokens: 1024,
-          messages: [
-            { role: "system", content: `${SYSTEM}\n\n--- The user's current data ---\n${context}` },
-            ...input.messages.map((m) => ({ role: m.role, content: m.content })),
-          ],
-        }),
-      });
-      if (!res.ok) return { reply: ERR_REPLY, configured: true as const };
-      const data = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
-      const reply = (data.choices?.[0]?.message?.content ?? "").trim();
-      return {
-        reply: reply || "I couldn't put that into words just now — try asking a different way?",
-        configured: true as const,
-      };
-    } catch {
-      // Network / rate-limit / transient API errors: keep the chat usable.
-      return { reply: ERR_REPLY, configured: true as const };
-    }
+    const context = await buildContext(ctx.user.id);
+    const reply = await groqChat([
+      { role: "system", content: `${SYSTEM}\n\n--- The user's current data ---\n${context}` },
+      ...input.messages.map((m) => ({ role: m.role, content: m.content })),
+    ]);
+    // Network / rate-limit / transient API errors: keep the chat usable.
+    return { reply: reply ?? ERR_REPLY, configured: true as const };
   }),
 });

@@ -2,12 +2,12 @@
  * Goal procedures. Same shape as the other domain routers: authorization in
  * middleware, shared Zod at the boundary, owner always from the session.
  */
-import { Role } from "@prisma/client";
+
 import { goalInput } from "@pulse/shared";
-import { router, requireRole } from "../trpc";
+import { router, ownerProcedure } from "../trpc";
 import { prisma } from "../db";
 
-const userProcedure = requireRole(Role.USER);
+const userProcedure = ownerProcedure;
 
 export const goalsRouter = router({
   /** Create a goal. */
