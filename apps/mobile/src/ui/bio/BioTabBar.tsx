@@ -4,8 +4,17 @@
  * FAB in the centre that opens the log flow. Renders over the screen body;
  * screens pad their bottom to clear it.
  */
+import { useEffect } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import Animated, { useAnimatedStyle, useSharedValue, withSpring, withTiming } from "react-native-reanimated";
+import Animated, {
+  Easing,
+  interpolate,
+  useAnimatedStyle,
+  useSharedValue,
+  withRepeat,
+  withSpring,
+  withTiming,
+} from "react-native-reanimated";
 import { BlurView } from "expo-blur";
 import { LinearGradient } from "expo-linear-gradient";
 import Svg, { Circle, Path } from "react-native-svg";
@@ -16,7 +25,7 @@ import { bio, fontFamily, motion } from "../theme";
 const TABS: { key: TabKey; label: string }[] = [
   { key: "home", label: "Home" },
   { key: "calendar", label: "Trends" },
-  { key: "chat", label: "Insights" },
+  { key: "chat", label: "Ask" },
   { key: "profile", label: "You" },
 ];
 
@@ -71,14 +80,38 @@ export function BioTabBar({
   onSelect,
   onLog,
   bottomInset,
+  fabTone = "brand",
 }: {
   active: TabKey;
   onSelect: (t: TabKey) => void;
   onLog: () => void;
   bottomInset: number;
+  /**
+   * Recolours the ＋ to match the area you're in: "amber" in Nutrition (add a
+   * meal), "magenta" in Supplements (add to stack).
+   */
+  fabTone?: "brand" | "amber" | "magenta";
 }) {
   const scale = useSharedValue(1);
-  const fabStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+  const float = useSharedValue(0);
+
+  // the design's `floaty` — the FAB drifts gently on every screen
+  useEffect(() => {
+    float.value = withRepeat(withTiming(1, { duration: 2500, easing: Easing.inOut(Easing.sin) }), -1, true);
+  }, [float]);
+
+  const fabStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: interpolate(float.value, [0, 1], [0, -5]) }, { scale: scale.value }],
+  }));
+
+  const fabColors: readonly [string, string] =
+    fabTone === "amber"
+      ? [bio.color.amberLt, bio.color.amberDeep]
+      : fabTone === "magenta"
+        ? [bio.color.magentaLt, bio.color.magentaDeep]
+        : [bio.color.violetLt, bio.color.teal];
+  /** the ＋ is knocked out in plum on magenta, ink elsewhere */
+  const fabGlyph = fabTone === "magenta" ? bio.color.plum : bio.color.ink;
 
   return (
     <View pointerEvents="box-none" style={[styles.wrap, { bottom: Math.max(bottomInset, 12) + 8 }]}>
@@ -94,7 +127,7 @@ export function BioTabBar({
           <Tab tab="home" label="Home" active={active === "home"} onPress={() => onSelect("home")} />
           <Tab tab="calendar" label="Trends" active={active === "calendar"} onPress={() => onSelect("calendar")} />
           <View style={styles.gap} />
-          <Tab tab="chat" label="Insights" active={active === "chat"} onPress={() => onSelect("chat")} />
+          <Tab tab="chat" label="Ask" active={active === "chat"} onPress={() => onSelect("chat")} />
           <Tab tab="profile" label="You" active={active === "profile"} onPress={() => onSelect("profile")} />
         </View>
       </View>
@@ -112,9 +145,9 @@ export function BioTabBar({
           accessibilityRole="button"
           accessibilityLabel="Log"
         >
-          <LinearGradient colors={[bio.color.violetLt, bio.color.teal]} start={{ x: 0.3, y: 0.2 }} end={{ x: 1, y: 1 }} style={styles.fab}>
+          <LinearGradient colors={fabColors} start={{ x: 0.3, y: 0.2 }} end={{ x: 1, y: 1 }} style={styles.fab}>
             <Svg width={18} height={18} viewBox="0 0 18 18" fill="none">
-              <Path d="M9 2 V16 M2 9 H16" stroke={bio.color.ink} strokeWidth={2.6} strokeLinecap="round" />
+              <Path d="M9 2 V16 M2 9 H16" stroke={fabGlyph} strokeWidth={2.6} strokeLinecap="round" />
             </Svg>
           </LinearGradient>
         </Pressable>

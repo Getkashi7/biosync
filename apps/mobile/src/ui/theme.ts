@@ -487,11 +487,21 @@ export const bio = {
     ink2: "#0C0B14",
     inkDeep: "#0A0A10",
     surface: "#0D0C15",
-    /** light "moment" screens (check-in, reminders) */
+    /** light "moment" screens (check-in, reminders, add-meal) */
     lilac: "#E9E4F6",
     rose: "#EBD7E5",
+    /** peach canvas — the Add Meal moment (nutrition) */
+    peach: "#F2E4D7",
+    /** pale-rose canvas — the Add-to-stack moment (supplements) */
+    rosePale: "#EEE0EA",
     onLilac: "#221C33",
     onRose: "#2A1626",
+    /** ink on the peach canvas + the light text on its dark CTA */
+    onPeach: "#2E2113",
+    peachText: "#F7EFE4",
+    /** ink on the pale-rose canvas + the light text on its dark CTA */
+    onRosePale: "#2C1926",
+    rosePaleText: "#F6E9F2",
     /** primary text on dark */
     text: "#F4F2F8",
     /** aurora accents — one hue per metric family */
@@ -505,10 +515,41 @@ export const bio = {
     /** lighter accent variants (glowing text + marks) */
     tealLt: "#A5EBD9",
     blueLt: "#9BC4FF",
+    /** practitioner accent on the role explainer */
+    blueLt2: "#9FC2FF",
     tealLt2: "#8FE3CF",
     magLt: "#F2A9DF",
+    /** — supplements (magenta family) — */
+    /** light end of the magenta FAB / chips / evidence dots */
+    magentaLt: "#F0A6DD",
+    /** deep end of the magenta FAB + segmented fill */
+    magentaDeep: "#D65FA8",
+    /** deep end of the teal CTA / toggle track (staff surfaces) */
+    tealDeep: "#37B4A0",
+    /** ink knocked out on a teal fill */
+    onTeal: "#062018",
+    /** the sliding knob on a filled toggle track */
+    knob: "#FFFFFF",
+    /** plum the ＋ glyph is knocked out in, on the magenta FAB */
+    plum: "#160910",
+    /** — consent / trust layer (violet family) — */
+    /** deep end of the violet consent-switch fill */
+    violetDeep: "#8B6DF0",
+    /** ink knocked out on a violet fill */
+    onViolet: "#0B0714",
     coralLt: "#FFB4AC",
+    /** destructive label on glass (Delete row) */
+    coralLt2: "#FFA79E",
     violetLt: "#C5A9FF",
+    /** — nutrition (amber family) — */
+    /** section labels + the light end of the amber FAB / ring glow */
+    amberLt: "#F8CD8B",
+    /** deep end of the amber FAB gradient */
+    amberDeep: "#EC9E40",
+    /** estimate dot on the peach canvas */
+    amberInk: "#E09636",
+    /** "COACH ESTIMATE" label on the peach canvas (passes contrast on #F2E4D7) */
+    amberInkText: "#A8681F",
     heart: "#FFB4AC",
     /** glass surface recipe (gradient fill + border) */
     glassHi: "rgba(255,255,255,0.09)",
@@ -518,11 +559,27 @@ export const bio = {
     border: "rgba(255,255,255,0.14)",
     border2: "rgba(255,255,255,0.12)",
     hairline: "rgba(255,255,255,0.09)",
+    /** bottom-sheet scrim */
+    scrim: "rgba(0,0,0,0.55)",
   },
   /** white-alpha text ramp for dark screens */
   alpha: (a: number): string => `rgba(244,242,248,${a})`,
   /** dark-ink alpha ramp for the light "moment" screens */
   inkAlpha: (a: number): string => `rgba(34,28,51,${a})`,
+  /** teal-accent alpha ramp (Coach / "SYNCED" badge / assistant bubbles) */
+  tealAlpha: (a: number): string => `rgba(94,212,192,${a})`,
+  /** amber-accent alpha ramp (nutrition rings, coach-read card, amber FAB) */
+  amberAlpha: (a: number): string => `rgba(245,184,92,${a})`,
+  /** coral alpha ramp — destructive affordances only */
+  coralAlpha: (a: number): string => `rgba(255,122,110,${a})`,
+  /** magenta-accent alpha ramp (supplement rings, chips, ticks, banner) */
+  magentaAlpha: (a: number): string => `rgba(232,107,199,${a})`,
+  /** violet-accent alpha ramp (consent centre, trust layer) */
+  violetAlpha: (a: number): string => `rgba(167,139,250,${a})`,
+  /** dark-ink alpha ramp for the pale-rose "Add to stack" moment */
+  roseInkAlpha: (a: number): string => `rgba(44,25,38,${a})`,
+  /** dark-ink alpha ramp for the peach "Add meal" moment */
+  peachAlpha: (a: number): string => `rgba(46,33,19,${a})`,
   /** aurora radial-gradient rgb triples (feed react-native-svg RadialGradient) */
   aurora: {
     violet: "167,139,250",
@@ -533,7 +590,7 @@ export const bio = {
     magenta: "232,107,199",
     purple: "124,86,255",
   },
-  radius: { screen: 44, card: 24, tile: 24, pill: 999, sm: 16, xs: 12 },
+  radius: { screen: 44, card: 24, tile: 24, pill: 999, sm: 16, xs: 12, sheet: 28 },
   space: { xs: 4, sm: 8, md: 12, base: 16, lg: 18, xl: 24, xxl: 32 },
   type: {
     orb: { fontFamily: fontFamily.extrabold, fontSize: 92, lineHeight: 92, letterSpacing: -3.7 },

@@ -23,9 +23,11 @@ type Props = {
   onClose: () => void;
   onCheckin: () => void;
   onQuickLog: () => void;
+  onNutrition: () => void;
+  onSupplements: () => void;
 };
 
-export function LogChooser({ onClose, onCheckin, onQuickLog }: Props) {
+export function LogChooser({ onClose, onCheckin, onQuickLog, onNutrition, onSupplements }: Props) {
   const insets = useSafeAreaInsets();
 
   const sheetP = useSharedValue(0);
@@ -82,6 +84,8 @@ export function LogChooser({ onClose, onCheckin, onQuickLog }: Props) {
         <View style={styles.options}>
           <OptionCard icon={<CheckinIcon />} hue={bio.color.magenta} title="Daily check-in" subtitle="Sleep, quality, energy, mood" onPress={() => pick(onCheckin)} />
           <OptionCard icon={<MetricIcon />} hue={bio.color.blue} title="Log a metric" subtitle="Resting HR, weight, HRV, glucose" onPress={() => pick(onQuickLog)} />
+          <OptionCard icon={<NutritionIcon />} hue={bio.color.amber} title="Nutrition" subtitle="Describe a meal, the coach does the macros" onPress={() => pick(onNutrition)} />
+          <OptionCard icon={<SupplementIcon />} hue={bio.color.magenta} title="Supplements" subtitle="Your stack and today’s doses" onPress={() => pick(onSupplements)} />
         </View>
       </Animated.View>
     </View>
@@ -122,6 +126,28 @@ function CheckinIcon() {
       <Rect x={5} y={4} width={14} height={17} rx={3} stroke={bio.color.text} strokeWidth={2} />
       <Path d="M9 2.5 H15 V6 H9 Z" stroke={bio.color.text} strokeWidth={2} strokeLinejoin="round" />
       <Path d="M9 13.5 L11.2 15.7 L15.5 11" stroke={bio.color.text} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
+/** a capsule, for the supplements route */
+function SupplementIcon() {
+  return (
+    <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
+      <Rect x={3} y={7.5} width={18} height={9} rx={4.5} stroke={bio.color.text} strokeWidth={2} />
+      <Path d="M12 7.5 V16.5" stroke={bio.color.text} strokeWidth={2} strokeLinecap="round" />
+    </Svg>
+  );
+}
+
+/** a plate + fork, for the nutrition route */
+function NutritionIcon() {
+  return (
+    <Svg width={22} height={22} viewBox="0 0 24 24" fill="none">
+      <Path d="M15.5 3 V21" stroke={bio.color.text} strokeWidth={2} strokeLinecap="round" />
+      <Path d="M15.5 3 C18.5 3 20 5.5 20 8 C20 10 18.8 11.5 17 11.9" stroke={bio.color.text} strokeWidth={2} strokeLinecap="round" />
+      <Path d="M4 3 V8.5 C4 10 5 11 6.5 11 C8 11 9 10 9 8.5 V3" stroke={bio.color.text} strokeWidth={2} strokeLinecap="round" />
+      <Path d="M6.5 11 V21" stroke={bio.color.text} strokeWidth={2} strokeLinecap="round" />
     </Svg>
   );
 }

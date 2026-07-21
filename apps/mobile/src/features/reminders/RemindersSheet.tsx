@@ -29,7 +29,7 @@ function dateToHm(d: Date): string {
   return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 }
 
-type Field = "time" | "quietStart" | "quietEnd";
+type Field = "time" | "quietStart" | "quietEnd" | "digestTime";
 
 export function RemindersSheet({ onClose }: { onClose: () => void }) {
   const insets = useSafeAreaInsets();
@@ -83,6 +83,19 @@ export function RemindersSheet({ onClose }: { onClose: () => void }) {
     await apply({ ...prefs, enabled: next });
   };
 
+  const onToggleDigest = async (next: boolean) => {
+    selectionHaptic();
+    if (next) {
+      const granted = (await getReminderPermission()) || (await requestReminderPermission());
+      if (!granted) {
+        setDenied(true);
+        return;
+      }
+      setDenied(false);
+    }
+    await apply({ ...prefs, digestEnabled: next });
+  };
+
   const onPickerChange = (e: DateTimePickerEvent, d?: Date) => {
     const field = picker;
     setPicker(null);
@@ -130,6 +143,20 @@ export function RemindersSheet({ onClose }: { onClose: () => void }) {
           <Text style={styles.notice}>Notifications are off for BIOSYNC. Enable them in system settings, then try again.</Text>
         ) : conflict ? (
           <Text style={styles.notice}>That time is inside your quiet hours — no reminder will fire. Pick a time outside the window.</Text>
+        ) : null}
+
+        <View style={styles.digestHead}>
+          <Text style={styles.digestTitle}>Morning digest</Text>
+          <Switch
+            value={prefs.digestEnabled}
+            onValueChange={(v) => void onToggleDigest(v)}
+            trackColor={{ false: "rgba(42,22,38,0.25)", true: "#B8306E" }}
+            thumbColor="#FBEEF5"
+          />
+        </View>
+        <Text style={styles.digestCaption}>A short read on your night, delivered each morning in Ask.</Text>
+        {prefs.digestEnabled ? (
+          <Row label="Digest time" value={formatHm(prefs.digestTime)} onPress={() => setPicker("digestTime")} />
         ) : null}
       </Animated.View>
 
@@ -182,4 +209,15 @@ const styles = StyleSheet.create({
   rowLabel: { fontFamily: fontFamily.semibold, fontSize: 14, color: INK },
   rowValue: { fontFamily: fontFamily.bold, fontSize: 14, color: "#8A2359" },
   notice: { fontFamily: fontFamily.regular, fontSize: 12.5, lineHeight: 18, color: ink(0.6), marginTop: 6 },
+  digestHead: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 22,
+    paddingTop: 18,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(42,22,38,0.12)",
+  },
+  digestTitle: { fontFamily: fontFamily.semibold, fontSize: 15, color: INK },
+  digestCaption: { fontFamily: fontFamily.regular, fontSize: 12.5, lineHeight: 18, color: ink(0.55), marginTop: 4, marginBottom: 12 },
 });

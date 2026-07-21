@@ -5,13 +5,17 @@
  */
 
 export type ReminderPrefs = {
-  /** master on/off */
+  /** master on/off (the daily check-in nudge) */
   enabled: boolean;
   /** the daily nudge time, "HH:MM" 24h */
   time: string;
   /** quiet-hours window (no reminders); may wrap past midnight */
   quietStart: string;
   quietEnd: string;
+  /** morning digest on/off (a proactive read of last night, fires daily) */
+  digestEnabled: boolean;
+  /** the morning digest time, "HH:MM" 24h */
+  digestTime: string;
 };
 
 export const DEFAULT_REMINDER_PREFS: ReminderPrefs = {
@@ -19,6 +23,8 @@ export const DEFAULT_REMINDER_PREFS: ReminderPrefs = {
   time: "20:00",
   quietStart: "22:00",
   quietEnd: "07:00",
+  digestEnabled: false,
+  digestTime: "08:00",
 };
 
 /** Parse "HH:MM" → minutes since midnight, or null when malformed. */

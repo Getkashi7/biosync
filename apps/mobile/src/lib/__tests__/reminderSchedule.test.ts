@@ -63,6 +63,13 @@ describe("isInQuietHours", () => {
   });
 });
 
+describe("DEFAULT_REMINDER_PREFS", () => {
+  it("ships the morning digest off, at 08:00 by default", () => {
+    expect(DEFAULT_REMINDER_PREFS.digestEnabled).toBe(false);
+    expect(DEFAULT_REMINDER_PREFS.digestTime).toBe("08:00");
+  });
+});
+
 describe("nextReminderAt", () => {
   it("returns null when disabled", () => {
     expect(nextReminderAt(on({ enabled: false }), at(12), null)).toBeNull();

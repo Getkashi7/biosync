@@ -23,9 +23,24 @@ function initialsOf(fullName: string | null, email: string): string {
   return (email[0] ?? "?").toUpperCase();
 }
 
-type Props = { onDeleteAccount: () => void; onReminders: () => void; refreshKey: number };
+type Props = {
+  onDeleteAccount: () => void;
+  onReminders: () => void;
+  onCoachPlan: () => void;
+  onConsent: () => void;
+  /** only present for staff accounts (PT / practitioner) */
+  onTrainer?: (() => void) | undefined;
+  refreshKey: number;
+};
 
-export function ProfileScreen({ onDeleteAccount, onReminders, refreshKey }: Props) {
+export function ProfileScreen({
+  onDeleteAccount,
+  onReminders,
+  onCoachPlan,
+  onConsent,
+  onTrainer,
+  refreshKey,
+}: Props) {
   const insets = useSafeAreaInsets();
   const { session, signOut } = useAuth();
   const [unit, setUnit] = useState<WeightUnit>("kg");
@@ -87,6 +102,20 @@ export function ProfileScreen({ onDeleteAccount, onReminders, refreshKey }: Prop
           ) : null}
         </View>
 
+        <Text style={styles.group}>Coach</Text>
+        <GlassSurface style={styles.card} soft>
+          <Pressable style={styles.row} onPress={onCoachPlan} accessibilityRole="button">
+            <View style={styles.rowVal}>
+              <View style={styles.coachDot} />
+              <Text style={styles.rowLabel}>Coach plan</Text>
+            </View>
+            <View style={styles.rowVal}>
+              <Text style={styles.coachHint}>Build today’s</Text>
+              <Text style={styles.chev}>›</Text>
+            </View>
+          </Pressable>
+        </GlassSurface>
+
         <Text style={styles.group}>Preferences</Text>
         <GlassSurface style={styles.card} soft>
           <View style={styles.row}>
@@ -107,6 +136,32 @@ export function ProfileScreen({ onDeleteAccount, onReminders, refreshKey }: Prop
             <Text style={styles.rowLabel}>Reminders</Text>
             <View style={styles.rowVal}>
               <Text style={styles.rowValTxt}>{reminders}</Text>
+              <Text style={styles.chev}>›</Text>
+            </View>
+          </Pressable>
+        </GlassSurface>
+
+        {onTrainer ? (
+          <>
+            <Text style={styles.group}>Staff</Text>
+            <GlassSurface style={styles.card} soft>
+              <Pressable style={styles.row} onPress={onTrainer} accessibilityRole="button">
+                <Text style={styles.rowLabel}>Trainer</Text>
+                <View style={styles.rowVal}>
+                  <Text style={styles.rowValTxt}>Your roster</Text>
+                  <Text style={styles.chev}>›</Text>
+                </View>
+              </Pressable>
+            </GlassSurface>
+          </>
+        ) : null}
+
+        <Text style={styles.group}>Privacy</Text>
+        <GlassSurface style={styles.card} soft>
+          <Pressable style={styles.row} onPress={onConsent} accessibilityRole="button">
+            <Text style={styles.rowLabel}>Who sees what</Text>
+            <View style={styles.rowVal}>
+              <Text style={styles.rowValTxt}>Consent centre</Text>
               <Text style={styles.chev}>›</Text>
             </View>
           </Pressable>
@@ -183,6 +238,17 @@ const styles = StyleSheet.create({
   rowLabel: { fontFamily: fontFamily.medium, fontSize: 15, color: bio.color.text },
   rowVal: { flexDirection: "row", alignItems: "center", gap: 8 },
   rowValTxt: { fontFamily: fontFamily.medium, fontSize: 14, color: bio.alpha(0.5) },
+  coachDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    backgroundColor: bio.color.teal,
+    shadowColor: bio.color.teal,
+    shadowOpacity: 0.8,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 0 },
+  },
+  coachHint: { fontFamily: fontFamily.medium, fontSize: 14, color: bio.color.tealLt },
   chev: { fontFamily: fontFamily.regular, fontSize: 18, color: bio.alpha(0.35) },
   sep: { height: 1, backgroundColor: bio.color.hairline, marginLeft: 18 },
   seg: { flexDirection: "row", backgroundColor: "rgba(255,255,255,0.05)", borderRadius: 10, padding: 3, gap: 3 },
