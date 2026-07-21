@@ -32,3 +32,14 @@
 - **Weight-day bucketing** in `insights.list` counts WEIGHT metric readings by UTC day, not the
   device-local day (check-in weights are already local). Only affects the nudge's "N more
   entries" count at tz boundaries; align with the client tz if it ever matters.
+
+## From §4 Nutrition (macro targets)
+- ~~**Sanity floor on `macroTargets`**~~ — **DONE (2026-07-20).** Targets scale off the most recent
+  logged bodyweight (`30 kcal/kg`) and the function used to trust any positive number, so a weight
+  entered in lb while the unit toggle said kg (65 lb → 29.5 kg) produced a ~885 kcal daily target
+  and the app reported "over target" at a third of a normal adult day (observed on-device).
+  `macroTargets` now falls back to `DEFAULT_TARGETS` outside a plausible 35–250 kg range, so a unit
+  mix-up can no longer nudge someone to under-eat. Covered by tests.
+- **Weight unit entry**: the underlying cause is still reachable — a user can type a lb number into
+  a kg field. Worth a unit-aware weight input (or a "that looks like lb, convert?" confirm) in the
+  quick-log sheet.
