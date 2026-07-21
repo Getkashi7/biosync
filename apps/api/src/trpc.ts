@@ -46,15 +46,19 @@ export const adminProcedure = requireRole(Role.ADMIN);
  */
 export const ownerProcedure = protectedProcedure;
 
-/** The roles that can act on a client's behalf. ADMIN is not a care provider. */
-const STAFF_ROLES: Role[] = [Role.PT, Role.PRACTITIONER];
-
 /**
- * A staff member (PT or practitioner). Being staff only opens the surface —
- * every client read still needs an ACTIVE link and the client's consent.
+ * Someone with a VERIFIED staff capability (PT or practitioner).
+ *
+ * Capability, not `User.role`: a capability is granted and can be suspended,
+ * one person may hold several, and holding one must not cost them their own
+ * consumer app. ADMIN is deliberately NOT staff — running the platform is not
+ * the same as being someone's care provider.
+ *
+ * This only opens the surface. Every client read still needs an ACTIVE link
+ * (`lib/staffLink.ts`) AND the client's consent (`staffVisibleCategories`).
  */
 export const staffProcedure = protectedProcedure.use(({ ctx, next }) => {
-  if (!STAFF_ROLES.includes(ctx.user.role)) {
+  if (ctx.user.staff.length === 0) {
     throw new TRPCError({ code: "FORBIDDEN" });
   }
   return next();

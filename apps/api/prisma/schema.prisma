@@ -94,6 +94,8 @@ model User {
   plansReceived       TrainingPlan[] @relation("PlanClient")
   notesWritten        SessionNote[]  @relation("NoteTrainer")
   notesReceived       SessionNote[]  @relation("NoteClient")
+  /** capabilities granted to this account (may act as PT and/or practitioner) */
+  staffProfiles       StaffProfile[]
 
   @@map("users")
 }
@@ -220,11 +222,56 @@ model SupplementLog {
   @@map("supplement_logs")
 }
 
+// The capacity a staff member can act in. Deliberately separate from `Role`:
+// `Role` says what an ACCOUNT is on the platform (a user, an admin), whereas
+// this says what someone is licensed to DO for a client. Reusing `Role` for both
+// let a StaffLink be created with role = ADMIN, which is meaningless.
+enum StaffKind {
+  PT
+  PRACTITIONER
+}
+
+// Whether a staff capability has actually been granted. Only VERIFIED opens the
+// professional surface — an application that hasn't been checked, or one that's
+// been withdrawn, must not.
+enum StaffStatus {
+  PENDING
+  VERIFIED
+  SUSPENDED
+}
+
 // Whether a staff member is actually connected to a client.
 enum StaffLinkStatus {
   PENDING
   ACTIVE
   REVOKED
+}
+
+// A capability granted to an account: "this person may act as a trainer".
+//
+// Kept apart from `User.role` because capability is not identity. A trainer is
+// also someone with a body who uses the consumer app, one person may hold more
+// than one capacity, and a capability needs a lifecycle (applied → verified →
+// suspended) that a single enum column can't express.
+//
+// Granting is server-side only — never self-declared at signup, because a
+// verified practitioner can read another person's biometrics and diagnostics.
+model StaffProfile {
+  id     String      @id @default(uuid()) @db.Uuid
+  userId String      @map("user_id") @db.Uuid
+  kind   StaffKind
+  status StaffStatus @default(PENDING)
+  /** free text for now: registration number, insurer, etc. */
+  credential String?
+  verifiedAt DateTime? @map("verified_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, kind])
+  @@index([status])
+  @@map("staff_profiles")
 }
 
 // The link between a client and a staff member. Consent says "my trainer may see
@@ -235,8 +282,17 @@ model StaffLink {
   id        String          @id @default(uuid()) @db.Uuid
   clientId  String          @map("client_id") @db.Uuid
   staffId   String          @map("staff_id") @db.Uuid
-  /** the capacity the staff member acts in for this client */
+  /**
+   * The capacity the staff member acts in for this client.
+   *
+   * `role` is the legacy column and is being retired: it reused the `Role` enum,
+   * which allowed meaningless links (role = ADMIN). `kind` replaces it and is
+   * nullable only for the length of the backfill — reads move to `kind`, then
+   * `role` is dropped in a later migration. Never change a column's type in
+   * place; that generates a destructive migration.
+   */
   role      Role
+  kind      StaffKind?
   status    StaffLinkStatus @default(PENDING)
   createdAt DateTime        @default(now()) @map("created_at")
   updatedAt DateTime        @updatedAt @map("updated_at")

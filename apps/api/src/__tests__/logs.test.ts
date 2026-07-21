@@ -5,9 +5,8 @@
  */
 import { describe, it, expect } from "vitest";
 import { appRouter } from "../router";
-import type { Context } from "../context";
+import { ctx } from "./testContext";
 
-const ctx = (user: Context["user"]): Context => ({ user });
 
 const validCheckin = {
   date: "2026-07-12",

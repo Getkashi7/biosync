@@ -3,7 +3,7 @@
  * can be tested without a database. External input is validated with Zod.
  */
 import { z } from "zod";
-import { router, publicProcedure, protectedProcedure, adminProcedure } from "./trpc";
+import { router, publicProcedure, protectedProcedure } from "./trpc";
 import { logsRouter } from "./routers/logs";
 import { metricsRouter } from "./routers/metrics";
 import { readinessRouter } from "./routers/readiness";
@@ -15,6 +15,7 @@ import { supplementsRouter } from "./routers/supplements";
 import { consentRouter } from "./routers/consent";
 import { staffRouter } from "./routers/staff";
 import { trainingRouter } from "./routers/training";
+import { adminRouter } from "./routers/admin";
 
 export const appRouter = router({
   /** Liveness check — no auth. */
@@ -61,10 +62,8 @@ export const appRouter = router({
   /** Training plans + session notes — trainer writes, client reads what's shared. */
   training: trainingRouter,
 
-  admin: router({
-    /** Admin-only — throws FORBIDDEN for non-admins. */
-    stats: adminProcedure.query(() => ({ users: 0, generatedAt: new Date().toISOString() })),
-  }),
+  /** Platform administration — granting staff capability, and nothing else yet. */
+  admin: adminRouter,
 });
 
 export type AppRouter = typeof appRouter;

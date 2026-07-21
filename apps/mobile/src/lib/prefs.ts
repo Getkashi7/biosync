@@ -9,8 +9,35 @@ import { DEFAULT_REMINDER_PREFS, type ReminderPrefs } from "./reminderSchedule";
 const UNIT_KEY = "pulse.unitPref";
 const REMINDER_KEY = "pulse.reminderPrefs";
 const LAST_CHECKIN_KEY = "pulse.lastCheckinDate";
+const INTENT_KEY = "pulse.appIntent";
 
 export type WeightUnit = "kg" | "lb";
+
+/**
+ * Which door the person came through: their own app, or their practice.
+ *
+ * This is a UI preference only — it decides which shell to show, never what
+ * they're allowed to do. A "professional" intent without a verified capability
+ * shows an explanatory screen; it can't grant access. Authorization lives
+ * server-side, on the staff capability.
+ */
+export type AppIntent = "personal" | "professional";
+
+export async function getAppIntent(): Promise<AppIntent> {
+  try {
+    return (await AsyncStorage.getItem(INTENT_KEY)) === "professional" ? "professional" : "personal";
+  } catch {
+    return "personal";
+  }
+}
+
+export async function setAppIntent(intent: AppIntent): Promise<void> {
+  try {
+    await AsyncStorage.setItem(INTENT_KEY, intent);
+  } catch {
+    // best-effort — the session still works, it just won't persist the choice
+  }
+}
 export type { ReminderPrefs } from "./reminderSchedule";
 
 export async function getUnitPref(): Promise<WeightUnit> {

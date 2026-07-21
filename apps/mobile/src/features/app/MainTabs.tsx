@@ -45,6 +45,8 @@ import { PlanBuilderScreen } from "../trainer/PlanBuilderScreen";
 import { RemindersSheet } from "../reminders/RemindersSheet";
 import { syncReminders } from "../../lib/reminders";
 import { trpc } from "../../lib/trpc";
+import { getAppIntent, setAppIntent, type AppIntent } from "../../lib/prefs";
+import { NotProfessional } from "./NotProfessional";
 
 /** Which overlay is up, if any. */
 type Sheet =
@@ -81,10 +83,12 @@ export function MainTabs() {
   // Hide the floating tab bar while the keyboard is up (it would otherwise
   // overlap the Ask composer once the window resizes).
   const [keyboardUp, setKeyboardUp] = useState(false);
-  // Role is fetched HERE, inside the (app) area — never in the root
+  // Capability is fetched HERE, inside the (app) area — never in the root
   // AuthProvider, which pulls the API client into RN's earliest startup and
   // breaks the runtime. Null until known, so we never flash the wrong shell.
-  const [role, setRole] = useState<string | null>(null);
+  const [staff, setStaff] = useState<{ kind: string }[] | null>(null);
+  /** which door they came through; decides the shell, never the permissions */
+  const [intent, setIntent] = useState<AppIntent | null>(null);
   const [nutrition, setNutrition] = useState<NutritionView>("none");
   const [trainer, setTrainer] = useState(false);
   /** the client whose detail is open inside the trainer area */
@@ -113,13 +117,27 @@ export function MainTabs() {
   }, []);
 
   useEffect(() => {
+    void getAppIntent().then(setIntent);
+  }, []);
+
+  // Refetched whenever the app comes back to the foreground, so a capability
+  // granted (or revoked) mid-session takes effect without a restart. On failure
+  // we fall back to "no capability" — the safe direction is the consumer app.
+  useEffect(() => {
     let alive = true;
-    trpc.me
-      .query()
-      .then((u) => alive && setRole(u?.role ?? "USER"))
-      .catch(() => alive && setRole("USER"));
+    const load = () => {
+      trpc.me
+        .query()
+        .then((u) => alive && setStaff(u?.staff ?? []))
+        .catch(() => alive && setStaff([]));
+    };
+    load();
+    const sub = AppState.addEventListener("change", (s) => {
+      if (s === "active") load();
+    });
     return () => {
       alive = false;
+      sub.remove();
     };
   }, []);
 
@@ -144,11 +162,31 @@ export function MainTabs() {
     return createGoal(input);
   }, []);
 
-  // Staff keep the consumer app — they have a body too — and reach their roster
-  // from Profile. `trainer` is a pushed area, exactly like nutrition/supplements.
-  const isStaff = role === "PT" || role === "PRACTITIONER";
+  // Staff keep the consumer app — they have a body too. Capability decides what
+  // they MAY do; intent decides which shell they see.
+  const isStaff = (staff?.length ?? 0) > 0;
 
-  if (isStaff && trainer) {
+  // Wait for both before rendering, so we never flash the wrong shell.
+  if (staff === null || intent === null) return <View style={styles.page} />;
+
+  // Came through the professional door without the capability to back it up.
+  if (intent === "professional" && !isStaff) {
+    return (
+      <View style={styles.page}>
+        <StatusBar style="light" />
+        <NotProfessional
+          onUsePersonal={() => {
+            void setAppIntent("personal");
+            setIntent("personal");
+          }}
+        />
+      </View>
+    );
+  }
+
+  const professionalShell = intent === "professional" && isStaff;
+
+  if (professionalShell || (isStaff && trainer)) {
     return (
       <View style={styles.page}>
         <StatusBar style="light" />
@@ -187,8 +225,14 @@ export function MainTabs() {
           <BioTabBar
             active={active}
             onSelect={(t) => {
+              // Picking one of their own tabs means "take me back to my app".
+              // This is the way out of the professional shell, and it persists.
+              void setAppIntent("personal");
+              setIntent("personal");
               setTrainer(false);
               setClient(null);
+              setNoteFor(null);
+              setPlanFor(null);
               setActive(t);
             }}
             onLog={() => setSheet("chooser")}
@@ -255,7 +299,15 @@ export function MainTabs() {
           onReminders={() => setSheet("reminders")}
           onCoachPlan={() => setSheet("plan")}
           onConsent={() => setConsent("centre")}
-          onTrainer={isStaff ? () => setTrainer(true) : undefined}
+          onTrainer={
+            isStaff
+              ? () => {
+                  // switching shells persists, so a restart lands in the same place
+                  void setAppIntent("professional");
+                  setIntent("professional");
+                }
+              : undefined
+          }
           refreshKey={refreshKey}
         />
       ) : active === "calendar" ? (

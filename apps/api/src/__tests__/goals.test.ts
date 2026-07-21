@@ -6,9 +6,8 @@
 import { describe, it, expect } from "vitest";
 import { goalInput } from "@pulse/shared";
 import { appRouter } from "../router";
-import type { Context } from "../context";
+import { ctx } from "./testContext";
 
-const ctx = (user: Context["user"]): Context => ({ user });
 
 const validGoal = { description: "Get resting HR under 55", targetMetric: "RESTING_HR" } as const;
 

@@ -10,6 +10,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AuroraField } from "../../ui/bio/AuroraField";
 import { DottedHeart } from "../../ui/bio/DottedHeart";
 import { bio, fontFamily } from "../../ui/theme";
+import { setAppIntent } from "../../lib/prefs";
 
 export function WelcomeScreen() {
   const router = useRouter();
@@ -33,11 +34,41 @@ export function WelcomeScreen() {
       </View>
 
       <View style={[styles.actions, { paddingBottom: Math.max(insets.bottom + 14, 28) }]}>
-        <Pressable style={styles.primary} onPress={() => router.push("/(auth)/sign-up")} accessibilityRole="button">
+        <Pressable
+          style={styles.primary}
+          onPress={() => {
+            void setAppIntent("personal");
+            router.push("/(auth)/sign-up");
+          }}
+          accessibilityRole="button"
+        >
           <Text style={styles.primaryTxt}>Get started</Text>
         </Pressable>
-        <Pressable style={styles.secondary} onPress={() => router.push("/(auth)/log-in")} accessibilityRole="button">
+        <Pressable
+          style={styles.secondary}
+          onPress={() => {
+            void setAppIntent("personal");
+            router.push("/(auth)/log-in");
+          }}
+          accessibilityRole="button"
+        >
           <Text style={styles.secondaryTxt}>I have an account</Text>
+        </Pressable>
+
+        {/*
+          The professional door. Anyone may tap it — it only chooses which shell
+          to open after sign-in. Whether the account actually IS a professional
+          is decided server-side by its staff capability, never here.
+        */}
+        <Pressable
+          style={styles.tertiary}
+          onPress={() => {
+            void setAppIntent("professional");
+            router.push("/(auth)/log-in");
+          }}
+          accessibilityRole="button"
+        >
+          <Text style={styles.tertiaryTxt}>Professional sign in</Text>
         </Pressable>
       </View>
     </View>
@@ -58,6 +89,8 @@ const styles = StyleSheet.create({
   },
   tagline: { fontFamily: fontFamily.light, fontSize: 15, color: bio.alpha(0.6), marginTop: 14 },
   actions: { paddingHorizontal: 24, gap: 12 },
+  tertiary: { alignItems: "center", justifyContent: "center", paddingVertical: 12, marginTop: 2 },
+  tertiaryTxt: { fontFamily: fontFamily.semibold, fontSize: 13.5, color: bio.alpha(0.55) },
   primary: {
     height: 56,
     borderRadius: 999,

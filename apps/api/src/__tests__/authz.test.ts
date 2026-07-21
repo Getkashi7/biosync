@@ -6,9 +6,8 @@
 import { describe, it, expect } from "vitest";
 import { appRouter } from "../router";
 import { router, ownerProcedure } from "../trpc";
-import type { Context } from "../context";
+import { ctx } from "./testContext";
 
-const ctx = (user: Context["user"]): Context => ({ user });
 
 /**
  * A stand-in for any consumer procedure. Consumer features are role-agnostic —
@@ -35,7 +34,16 @@ describe("authorization", () => {
 
   it("authenticated user resolves `me`", async () => {
     const caller = appRouter.createCaller(ctx({ id: "u1", role: "USER" }));
-    await expect(caller.me()).resolves.toEqual({ id: "u1", role: "USER" });
+    await expect(caller.me()).resolves.toEqual({ id: "u1", role: "USER", staff: [] });
+  });
+
+  it("`me` reports staff capability, which is how the app picks a shell", async () => {
+    const caller = appRouter.createCaller(ctx({ id: "s1", role: "USER", staff: ["PT"] }));
+    await expect(caller.me()).resolves.toEqual({
+      id: "s1",
+      role: "USER",
+      staff: [{ kind: "PT" }],
+    });
   });
 
   it("no token → UNAUTHORIZED even for admin routes (auth checked before role)", async () => {

@@ -7,9 +7,8 @@
 import { describe, it, expect } from "vitest";
 import { parsePlan } from "../routers/assistant";
 import { appRouter } from "../router";
-import type { Context } from "../context";
+import { ctx } from "./testContext";
 
-const ctx = (user: Context["user"]): Context => ({ user });
 
 describe("parsePlan", () => {
   it("accepts a well-formed plan", () => {

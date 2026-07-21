@@ -5,9 +5,8 @@
  */
 import { describe, it, expect } from "vitest";
 import { appRouter } from "../router";
-import type { Context } from "../context";
+import { ctx } from "./testContext";
 
-const ctx = (user: Context["user"]): Context => ({ user });
 const CLIENT = "3f2504e0-4f89-11d3-9a0c-0305e82c3301";
 
 const validPlan = {
@@ -36,7 +35,7 @@ describe("training authorization", () => {
 });
 
 describe("plan validation", () => {
-  const caller = appRouter.createCaller(ctx({ id: "s1", role: "PT" }));
+  const caller = appRouter.createCaller(ctx({ id: "s1", role: "USER", staff: ["PT"] }));
 
   it("rejects a malformed week", async () => {
     await expect(caller.training.savePlan({ ...validPlan, week: "week 30" })).rejects.toMatchObject({

@@ -6,9 +6,8 @@
  */
 import { describe, it, expect } from "vitest";
 import { appRouter } from "../router";
-import type { Context } from "../context";
+import { ctx } from "./testContext";
 
-const ctx = (user: Context["user"]): Context => ({ user });
 
 describe("insights authorization", () => {
   it("no token → UNAUTHORIZED", async () => {

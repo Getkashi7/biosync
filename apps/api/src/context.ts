@@ -4,13 +4,27 @@
  * yields `user: null` (procedures decide whether that's allowed).
  */
 import type { CreateHTTPContextOptions } from "@trpc/server/adapters/standalone";
-import type { Role } from "@prisma/client";
+import { StaffStatus, type Role, type StaffKind } from "@prisma/client";
 import { createRemoteJWKSet } from "jose";
 import { prisma } from "./db";
 import { getBearerToken, verifySupabaseJwt, type JwtVerifier } from "./auth";
 import { env } from "./env";
 
-export type ContextUser = { id: string; role: Role };
+/**
+ * The staff capacities this account may act in *right now*.
+ *
+ * Only VERIFIED profiles land here — PENDING and SUSPENDED are filtered out at
+ * the query, so no downstream code can accidentally treat an unapproved or
+ * withdrawn application as permission.
+ */
+export type StaffCapability = { kind: StaffKind };
+
+export type ContextUser = {
+  id: string;
+  /** platform role: USER or ADMIN. Says nothing about staff capability. */
+  role: Role;
+  staff: StaffCapability[];
+};
 export type Context = { user: ContextUser | null };
 
 // Built once: remote JWKS for asymmetric tokens (jose caches the keys),
@@ -29,9 +43,20 @@ export async function resolveUser(token: string | undefined): Promise<ContextUse
   if (!payload) return null;
   const user = await prisma.user.findUnique({
     where: { id: payload.sub },
-    select: { id: true, role: true },
+    select: {
+      id: true,
+      role: true,
+      // Loaded with the user so capability costs no extra round-trip, and is
+      // re-read every request — a granted or revoked capability takes effect
+      // immediately, with no token refresh or sign-out.
+      staffProfiles: {
+        where: { status: StaffStatus.VERIFIED },
+        select: { kind: true },
+      },
+    },
   });
-  return user ?? null;
+  if (!user) return null;
+  return { id: user.id, role: user.role, staff: user.staffProfiles };
 }
 
 export async function createContext({ req }: CreateHTTPContextOptions): Promise<Context> {

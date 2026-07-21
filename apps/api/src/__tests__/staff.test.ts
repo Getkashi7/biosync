@@ -1,13 +1,14 @@
 /**
- * Staff authorization. A regular USER must never reach the staff surface, and an
- * unauthenticated caller never gets past the session check. These stop before
- * any DB call, so they run without a database.
+ * Staff authorization.
+ *
+ * Access is granted by a VERIFIED staff capability, NOT by `User.role` — so a
+ * role of "PT" alone must not open the surface, and only a capability does.
+ * These stop before any DB call, so they run without a database.
  */
 import { describe, it, expect } from "vitest";
 import { appRouter } from "../router";
-import type { Context } from "../context";
+import { ctx } from "./testContext";
 
-const ctx = (user: Context["user"]): Context => ({ user });
 const CLIENT = "3f2504e0-4f89-11d3-9a0c-0305e82c3301";
 
 describe("staff authorization", () => {
@@ -29,8 +30,20 @@ describe("staff authorization", () => {
     await expect(caller.staff.clients()).rejects.toMatchObject({ code: "FORBIDDEN" });
   });
 
-  it("rejects a non-uuid client id", async () => {
+  it("a PT *role* alone does not open the surface — capability does", async () => {
+    // the account is labelled PT but holds no verified staff profile
     const caller = appRouter.createCaller(ctx({ id: "s1", role: "PT" }));
+    await expect(caller.staff.clients()).rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
+
+  it("a verified capability opens the surface, whatever the platform role", async () => {
+    // gets past authz and fails later (no DB here) — not FORBIDDEN
+    const caller = appRouter.createCaller(ctx({ id: "s1", role: "USER", staff: ["PT"] }));
+    await expect(caller.staff.client({ clientId: "nope" })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+  });
+
+  it("rejects a non-uuid client id", async () => {
+    const caller = appRouter.createCaller(ctx({ id: "s1", role: "USER", staff: ["PT"] }));
     await expect(caller.staff.client({ clientId: "nope" })).rejects.toMatchObject({ code: "BAD_REQUEST" });
   });
 });

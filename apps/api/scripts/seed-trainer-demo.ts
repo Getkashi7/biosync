@@ -7,7 +7,15 @@
  * Run:  pnpm --filter @pulse/api exec tsx scripts/seed-trainer-demo.ts <email>
  * Undo: pnpm --filter @pulse/api exec tsx scripts/seed-trainer-demo.ts <email> --undo
  */
-import { PrismaClient, Role, StaffLinkStatus, ConsentCategory, ConsentAudience } from "@prisma/client";
+import {
+  PrismaClient,
+  Role,
+  StaffKind,
+  StaffLinkStatus,
+  StaffStatus,
+  ConsentCategory,
+  ConsentAudience,
+} from "@prisma/client";
 
 const prisma = new PrismaClient();
 
@@ -21,17 +29,35 @@ async function main() {
 
   if (undo) {
     await prisma.staffLink.deleteMany({ where: { staffId: user.id, clientId: user.id } });
-    await prisma.user.update({ where: { id: user.id }, data: { role: Role.USER } });
-    console.log(`reverted ${email} → USER, demo link removed`);
+    await prisma.staffProfile.deleteMany({ where: { userId: user.id } });
+    // role is left alone: it's the platform role now, and the demo never changes it
+    console.log(`reverted ${email}: staff capability and demo link removed`);
     return;
   }
 
-  await prisma.user.update({ where: { id: user.id }, data: { role: Role.PT } });
+  // Capability, not role — this mirrors what admin.grantStaff does in the app.
+  await prisma.staffProfile.upsert({
+    where: { userId_kind: { userId: user.id, kind: StaffKind.PT } },
+    create: {
+      userId: user.id,
+      kind: StaffKind.PT,
+      status: StaffStatus.VERIFIED,
+      credential: "demo seed",
+      verifiedAt: new Date(),
+    },
+    update: { status: StaffStatus.VERIFIED, verifiedAt: new Date() },
+  });
 
   await prisma.staffLink.upsert({
     where: { clientId_staffId_role: { clientId: user.id, staffId: user.id, role: Role.PT } },
-    create: { clientId: user.id, staffId: user.id, role: Role.PT, status: StaffLinkStatus.ACTIVE },
-    update: { status: StaffLinkStatus.ACTIVE },
+    create: {
+      clientId: user.id,
+      staffId: user.id,
+      role: Role.PT,
+      kind: StaffKind.PT,
+      status: StaffLinkStatus.ACTIVE,
+    },
+    update: { status: StaffLinkStatus.ACTIVE, kind: StaffKind.PT },
   });
 
   await prisma.consent.upsert({
@@ -40,7 +66,7 @@ async function main() {
     update: { audience: ConsentAudience.TRAINER },
   });
 
-  console.log(`${email} is now PT, linked to itself as a client, ACTIVITY shared with TRAINER`);
+  console.log(`${email} now holds a VERIFIED PT capability, is linked to itself as a client, and shares ACTIVITY with TRAINER`);
   console.log("undo with: --undo");
 }
 
