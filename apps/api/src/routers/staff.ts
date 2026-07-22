@@ -132,76 +132,81 @@ export const staffRouter = router({
    * whether a given user exists.
    */
   client: staffProcedure.input(z.object({ clientId: z.string().uuid() })).query(async ({ ctx, input }) => {
-    const link = await prisma.staffLink.findFirst({
-      where: {
-        staffId: ctx.user.id,
-        clientId: input.clientId,
-        role: ctx.user.role,
-        status: StaffLinkStatus.ACTIVE,
-      },
-      select: { id: true, createdAt: true, client: { select: { fullName: true, email: true } } },
-    });
+    // Wave 1: the authorization gate (the link) and the client's consent, in
+    // parallel. Neither is health data, and consent is discarded if there's no
+    // link, so fetching them together is safe — and one round-trip, not two.
+    const [link, stored] = await Promise.all([
+      prisma.staffLink.findFirst({
+        where: {
+          staffId: ctx.user.id,
+          clientId: input.clientId,
+          role: ctx.user.role,
+          status: StaffLinkStatus.ACTIVE,
+        },
+        select: { id: true, createdAt: true, client: { select: { fullName: true, email: true } } },
+      }),
+      prisma.consent.findMany({
+        where: { userId: input.clientId },
+        select: { category: true, audience: true },
+      }),
+    ]);
     if (!link) throw new TRPCError({ code: "NOT_FOUND" });
 
-    const stored = await prisma.consent.findMany({
-      where: { userId: input.clientId },
-      select: { category: true, audience: true },
-    });
     const visible = staffVisibleCategories(mergeConsents(stored as ConsentRow[]), asStaffRole(ctx.user.role));
 
-    // Only ever fetch what's permitted — the filter decides the query, so a
-    // category the client hasn't shared is never read from the database at all.
-    const activity = visible.includes("ACTIVITY")
-      ? await prisma.dailyLog.findMany({
-          where: { userId: input.clientId },
-          orderBy: { date: "desc" },
-          take: 14,
-          select: { date: true, energy: true },
-        })
-      : [];
-
-    const biometrics = visible.includes("BIOMETRICS")
-      ? await prisma.readinessSnapshot.findMany({
-          where: { userId: input.clientId },
-          orderBy: { date: "desc" },
-          take: 14,
-          select: { date: true, score: true },
-        })
-      : [];
-
-    // Training goals ride with ACTIVITY — they're what the client is training
-    // for, not a health record. Still gated: no consent, no goals.
-    const goals = visible.includes("ACTIVITY")
-      ? await prisma.goal.findMany({
-          where: { userId: input.clientId },
-          orderBy: { createdAt: "desc" },
-          take: 5,
-          select: { id: true, description: true },
-        })
-      : [];
-
-    // The trainer's own session notes about this client — their words, not the
-    // client's data, so they aren't consent-gated.
-    const sessions = await prisma.sessionNote.findMany({
-      where: { trainerId: ctx.user.id, clientId: input.clientId },
-      orderBy: { createdAt: "desc" },
-      take: 10,
-      select: { id: true, body: true, sharedWithClient: true, createdAt: true },
-    });
+    // Wave 2: everything the screen shows, in one parallel batch (previously six
+    // sequential round-trips). The consent-gated categories are still only
+    // queried when permitted — a category the client hasn't shared is never read
+    // from the database at all — and the audit write runs concurrently so it
+    // adds durability, not latency.
+    const [activity, biometrics, goals, sessions] = await Promise.all([
+      visible.includes("ACTIVITY")
+        ? prisma.dailyLog.findMany({
+            where: { userId: input.clientId },
+            orderBy: { date: "desc" },
+            take: 14,
+            select: { date: true, energy: true },
+          })
+        : Promise.resolve([]),
+      visible.includes("BIOMETRICS")
+        ? prisma.readinessSnapshot.findMany({
+            where: { userId: input.clientId },
+            orderBy: { date: "desc" },
+            take: 14,
+            select: { date: true, score: true },
+          })
+        : Promise.resolve([]),
+      // Training goals ride with ACTIVITY — what the client trains for, not a
+      // health record. Still gated: no consent, no goals.
+      visible.includes("ACTIVITY")
+        ? prisma.goal.findMany({
+            where: { userId: input.clientId },
+            orderBy: { createdAt: "desc" },
+            take: 5,
+            select: { id: true, description: true },
+          })
+        : Promise.resolve([]),
+      // The trainer's own notes about this client — their words, not gated.
+      prisma.sessionNote.findMany({
+        where: { trainerId: ctx.user.id, clientId: input.clientId },
+        orderBy: { createdAt: "desc" },
+        take: 10,
+        select: { id: true, body: true, sharedWithClient: true, createdAt: true },
+      }),
+      recordAudit({
+        actorId: ctx.user.id,
+        subjectId: input.clientId,
+        action: AUDIT.staffViewedClient,
+        entity: "client",
+        entityId: input.clientId,
+        meta: { role: ctx.user.role, categories: visible.length },
+      }),
+    ]);
 
     /** Categories this role could see, that this client hasn't shared. */
     const notShared = ROLE_CEILING[asStaffRole(ctx.user.role)]
       .filter((c) => !visible.includes(c))
       .map((c) => CONSENT_COPY[c].name);
-
-    await recordAudit({
-      actorId: ctx.user.id,
-      subjectId: input.clientId,
-      action: AUDIT.staffViewedClient,
-      entity: "client",
-      entityId: input.clientId,
-      meta: { role: ctx.user.role, categories: visible.length },
-    });
 
     return {
       name: link.client.fullName ?? link.client.email,
