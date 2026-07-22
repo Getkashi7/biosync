@@ -130,4 +130,55 @@ export const trainingRouter = router({
     });
     return { notes };
   }),
+
+  /**
+   * Everything a trainer has shared with the caller — their plans and the notes
+   * marked shared — in one round-trip, each tagged with who wrote it. This is the
+   * client's window into their coaching; an unshared note is still never here.
+   */
+  mine: userProcedure.query(async ({ ctx }) => {
+    const [plans, notes] = await Promise.all([
+      prisma.trainingPlan.findMany({
+        where: { clientId: ctx.user.id },
+        orderBy: { week: "desc" },
+        take: 8,
+        select: {
+          id: true,
+          week: true,
+          title: true,
+          items: true,
+          updatedAt: true,
+          trainer: { select: { fullName: true, email: true } },
+        },
+      }),
+      prisma.sessionNote.findMany({
+        where: { clientId: ctx.user.id, sharedWithClient: true },
+        orderBy: { createdAt: "desc" },
+        take: 50,
+        select: {
+          id: true,
+          body: true,
+          createdAt: true,
+          trainer: { select: { fullName: true, email: true } },
+        },
+      }),
+    ]);
+
+    return {
+      plans: plans.map((p) => ({
+        id: p.id,
+        week: p.week,
+        title: p.title,
+        items: parsePlanItems(p.items),
+        updatedAt: p.updatedAt,
+        from: p.trainer.fullName ?? p.trainer.email,
+      })),
+      notes: notes.map((n) => ({
+        id: n.id,
+        body: n.body,
+        createdAt: n.createdAt,
+        from: n.trainer.fullName ?? n.trainer.email,
+      })),
+    };
+  }),
 });

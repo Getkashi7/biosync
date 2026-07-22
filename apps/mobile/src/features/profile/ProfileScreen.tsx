@@ -15,6 +15,7 @@ import { formatHm } from "../../lib/reminderSchedule";
 import { bio, fontFamily } from "../../ui/theme";
 import { useAuth } from "../auth/AuthProvider";
 import { fetchDashboard } from "../dashboard/dashboardApi";
+import { fetchTrainerFeed } from "../mytrainer/myTrainerApi";
 
 function initialsOf(fullName: string | null, email: string): string {
   const words = fullName?.trim().split(/\s+/).filter(Boolean) ?? [];
@@ -30,6 +31,8 @@ type Props = {
   onConsent: () => void;
   /** only present for staff accounts (PT / practitioner) */
   onTrainer?: (() => void) | undefined;
+  /** the client's view of what a trainer shared with them */
+  onTrainerFeed: () => void;
   refreshKey: number;
 };
 
@@ -39,6 +42,7 @@ export function ProfileScreen({
   onCoachPlan,
   onConsent,
   onTrainer,
+  onTrainerFeed,
   refreshKey,
 }: Props) {
   const insets = useSafeAreaInsets();
@@ -46,6 +50,9 @@ export function ProfileScreen({
   const [unit, setUnit] = useState<WeightUnit>("kg");
   const [reminders, setReminders] = useState("Off");
   const [stats, setStats] = useState<{ streak: number; readiness: number | null } | null>(null);
+  // Whether a trainer has shared anything with this account — decides if the
+  // "From your trainer" row shows at all, so solo users never see it.
+  const [hasTrainerFeed, setHasTrainerFeed] = useState(false);
 
   useEffect(() => {
     void getUnitPref().then(setUnit);
@@ -56,6 +63,11 @@ export function ProfileScreen({
   useEffect(() => {
     void fetchDashboard()
       .then((d) => setStats({ streak: d.streak, readiness: d.readiness?.score ?? null }))
+      .catch(() => {});
+  }, [refreshKey]);
+  useEffect(() => {
+    void fetchTrainerFeed()
+      .then((f) => setHasTrainerFeed(f.plans.length > 0 || f.notes.length > 0))
       .catch(() => {});
   }, [refreshKey]);
 
@@ -144,6 +156,21 @@ export function ProfileScreen({
             </View>
           </Pressable>
         </GlassSurface>
+
+        {hasTrainerFeed ? (
+          <>
+            <Text style={styles.group}>Coaching</Text>
+            <GlassSurface style={styles.card} soft>
+              <Pressable style={styles.row} onPress={onTrainerFeed} accessibilityRole="button">
+                <Text style={styles.rowLabel}>From your trainer</Text>
+                <View style={styles.rowVal}>
+                  <Text style={styles.rowValTxt}>Plans & notes</Text>
+                  <Text style={styles.chev}>›</Text>
+                </View>
+              </Pressable>
+            </GlassSurface>
+          </>
+        ) : null}
 
         {onTrainer ? (
           <>

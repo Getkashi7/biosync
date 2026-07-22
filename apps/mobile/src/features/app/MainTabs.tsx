@@ -38,6 +38,7 @@ import { SuggestionsScreen } from "../supplements/SuggestionsScreen";
 import { AddSupplementSheet } from "../supplements/AddSupplementSheet";
 import { ConsentCentreScreen } from "../consent/ConsentCentreScreen";
 import { RolesScreen } from "../consent/RolesScreen";
+import { MyTrainerScreen } from "../mytrainer/MyTrainerScreen";
 import { TrainerRosterScreen } from "../trainer/TrainerRosterScreen";
 import { TrainerClientScreen } from "../trainer/TrainerClientScreen";
 import { SessionNoteScreen } from "../trainer/SessionNoteScreen";
@@ -74,6 +75,9 @@ type SupplementView = "none" | "stack" | "doses" | "suggestions";
 /** The trust layer, pushed from Profile. */
 type ConsentView = "none" | "centre" | "roles";
 
+/** The client's view of what a trainer shared, pushed from Profile. */
+type ProfileArea = "none" | "trainerFeed";
+
 export function MainTabs() {
   const insets = useSafeAreaInsets();
   const [active, setActive] = useState<TabKey>("home");
@@ -99,6 +103,7 @@ export function MainTabs() {
   const [planFor, setPlanFor] = useState<{ id: string; name: string } | null>(null);
   const [supplements, setSupplements] = useState<SupplementView>("none");
   const [consent, setConsent] = useState<ConsentView>("none");
+  const [profileArea, setProfileArea] = useState<ProfileArea>("none");
   /** name handed over from a suggestion — the user still writes dose + timing */
   const [seedName, setSeedName] = useState<string | null>(null);
 
@@ -252,7 +257,9 @@ export function MainTabs() {
   return (
     <View style={styles.page}>
       <StatusBar style="light" />
-      {consent === "centre" ? (
+      {profileArea === "trainerFeed" ? (
+        <MyTrainerScreen onBack={() => setProfileArea("none")} />
+      ) : consent === "centre" ? (
         <ConsentCentreScreen onBack={() => setConsent("none")} onOpenRoles={() => setConsent("roles")} />
       ) : consent === "roles" ? (
         <RolesScreen onBack={() => setConsent("centre")} />
@@ -305,6 +312,7 @@ export function MainTabs() {
           onReminders={() => setSheet("reminders")}
           onCoachPlan={() => setSheet("plan")}
           onConsent={() => setConsent("centre")}
+          onTrainerFeed={() => setProfileArea("trainerFeed")}
           onTrainer={
             isStaff
               ? () => {
@@ -329,6 +337,7 @@ export function MainTabs() {
             setNutrition("none");
             setSupplements("none");
             setConsent("none");
+            setProfileArea("none");
             setActive(t);
           }}
           onLog={() =>
