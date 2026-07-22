@@ -11,6 +11,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -110,6 +111,12 @@ export function SessionNoteScreen({
             </View>
           </View>
 
+          <ScrollView
+            style={styles.flex}
+            contentContainerStyle={styles.formContent}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
           <View style={styles.clientCard}>
             <View style={styles.avatar}>
               <Text style={styles.avatarText}>{initials(clientName)}</Text>
@@ -171,6 +178,7 @@ export function SessionNoteScreen({
           </Pressable>
 
           {error ? <Text style={styles.error}>{error}</Text> : null}
+          </ScrollView>
 
           <Pressable
             onPress={() => void save()}
@@ -197,7 +205,8 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: bio.color.ink },
   flex: { flex: 1 },
   inner: { flex: 1, paddingHorizontal: 20 },
-
+  // the header stays fixed; this holds the scrollable form above the pinned CTA
+  formContent: { paddingBottom: 12 },
 
   header: { flexDirection: "row", alignItems: "center", gap: 13 },
   closeBtn: {
@@ -251,8 +260,9 @@ const styles = StyleSheet.create({
     marginBottom: 9,
   },
   textarea: {
-    flex: 1,
-    minHeight: 160,
+    // a fixed height inside the ScrollView (flex:1 has no bounded height there);
+    // the field grows with text and the page scrolls past it
+    minHeight: 200,
     borderRadius: 18,
     backgroundColor: bio.alpha(0.05),
     borderWidth: 1,

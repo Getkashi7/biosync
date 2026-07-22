@@ -4,7 +4,7 @@
  * the floating tab bar. Preferences + sign-out/delete wiring unchanged.
  */
 import { useEffect, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AuroraField } from "../../ui/bio/AuroraField";
@@ -78,7 +78,11 @@ export function ProfileScreen({
       <AuroraField
         blobs={[{ hue: bio.aurora.teal, size: 380, cx: true, top: -140, stops: [{ o: 0, a: 0.26 }, { o: 48, a: 0.12 }, { o: 72, a: 0 }] }]}
       />
-      <View style={[styles.content, { paddingTop: insets.top + 20 }]}>
+      <ScrollView
+        style={styles.root}
+        contentContainerStyle={[styles.content, { paddingTop: insets.top + 20, paddingBottom: insets.bottom + 120 }]}
+        showsVerticalScrollIndicator={false}
+      >
         <View style={styles.identity}>
           <View style={styles.avatarWrap}>
             <Animated.View style={[styles.avatarGlow, glowStyle]} />
@@ -180,14 +184,16 @@ export function ProfileScreen({
 
         <View style={styles.flex} />
         <Text style={styles.version}>BIOSYNC · your body, in tune</Text>
-      </View>
+      </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: bio.color.ink },
-  content: { flex: 1, paddingHorizontal: 24, paddingBottom: 120 },
+  // flexGrow (not flex) so the spacer still pushes the footer down when the
+  // content is short, but the list scrolls once it's taller than the screen.
+  content: { flexGrow: 1, paddingHorizontal: 24 },
   identity: { alignItems: "center" },
   avatarWrap: { width: 84, height: 84, alignItems: "center", justifyContent: "center" },
   avatarGlow: {

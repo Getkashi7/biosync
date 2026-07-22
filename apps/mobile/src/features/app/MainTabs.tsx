@@ -221,7 +221,13 @@ export function MainTabs() {
         ) : (
           <TrainerRosterScreen trainerName="Your roster" onOpenClient={setClient} />
         )}
-        {keyboardUp ? null : (
+        {/*
+          Only on the bare roster. The pushed sub-screens (client detail, note
+          composer, plan builder) are full pages with their own back button and
+          a bottom CTA — a floating tab bar would sit on top of "Save note" /
+          "Assign plan". You leave those via Back, then the tab bar returns.
+        */}
+        {keyboardUp || client || noteFor || planFor ? null : (
           <BioTabBar
             active={active}
             onSelect={(t) => {
