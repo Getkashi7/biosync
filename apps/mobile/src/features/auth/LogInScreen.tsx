@@ -4,7 +4,7 @@
  * Editing either field clears the error.
  */
 import { useState } from "react";
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import Animated from "react-native-reanimated";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
@@ -59,7 +59,7 @@ export function LogInScreen() {
       <AuroraField
         blobs={[{ hue: bio.aurora.magenta, size: 480, cx: true, top: -220, stops: [{ o: 0, a: 0.3 }, { o: 45, a: 0.14 }, { o: 72, a: 0 }] }]}
       />
-      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+      <KeyboardAvoidingView style={styles.flex} behavior="padding">
         <ScrollView
           style={styles.flex}
           contentContainerStyle={[styles.content, { paddingTop: insets.top + 24 }]}

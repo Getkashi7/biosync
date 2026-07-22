@@ -11,7 +11,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   KeyboardAvoidingView,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -149,7 +148,7 @@ export function NewGoalSheet({ onClose, onSubmit }: Props) {
       >
         <KeyboardAvoidingView
           style={styles.kav}
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          behavior="padding"
         >
           <GestureDetector gesture={pan}>
             <View style={styles.header}>

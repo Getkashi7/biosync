@@ -3,7 +3,7 @@
  * and a solid CTA. On success the session flips and the root layout redirects.
  */
 import { useState } from "react";
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -57,7 +57,7 @@ export function SignUpScreen() {
           { hue: bio.aurora.violet, size: 360, right: -140, bottom: 120, stops: [{ o: 0, a: 0.3 }, { o: 70, a: 0 }], variant: "b", delayMs: -6000 },
         ]}
       />
-      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+      <KeyboardAvoidingView style={styles.flex} behavior="padding">
         <ScrollView
           style={styles.flex}
           contentContainerStyle={[styles.content, { paddingTop: insets.top + 24 }]}

@@ -12,7 +12,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Keyboard,
   KeyboardAvoidingView,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -191,7 +190,7 @@ export function AddMealSheet({ onClose, onSaved }: { onClose: () => void; onSave
           </View>
         ) : null}
 
-        <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined}>
+        <KeyboardAvoidingView behavior="padding">
           <View style={styles.grabber} />
 
           <View style={styles.head}>

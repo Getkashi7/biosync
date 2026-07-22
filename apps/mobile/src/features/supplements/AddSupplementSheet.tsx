@@ -10,7 +10,6 @@ import { useCallback, useRef, useState } from "react";
 import {
   Keyboard,
   KeyboardAvoidingView,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -124,7 +123,7 @@ export function AddSupplementSheet({
           ]}
         />
 
-        <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined}>
+        <KeyboardAvoidingView behavior="padding">
           <View style={styles.grabber} />
 
           <View style={styles.head}>
