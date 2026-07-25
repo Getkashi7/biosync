@@ -96,6 +96,10 @@ model User {
   notesReceived       SessionNote[]  @relation("NoteClient")
   /** capabilities granted to this account (may act as PT and/or practitioner) */
   staffProfiles       StaffProfile[]
+  /** invitations this user has issued as a staff member */
+  invitesSent         ClientInvite[] @relation("InviteStaff")
+  /** invitations this user has accepted as a client */
+  invitesAccepted     ClientInvite[] @relation("InviteClient")
 
   @@map("users")
 }
@@ -304,6 +308,46 @@ model StaffLink {
   @@index([staffId, status])
   @@index([clientId, status])
   @@map("staff_links")
+}
+
+// An invitation from a staff member for a client to connect.
+//
+// The client must accept: a trainer cannot attach themselves to someone's
+// account, because the link is what later lets them read that person's data.
+// Accepting creates the StaffLink — and grants NO consent, so a fresh link sees
+// nothing until the client shares a category themselves.
+//
+// The code is the credential, so it is stored hashed and never read back after
+// creation — a leaked database dump must not let anyone redeem outstanding
+// invitations. It is short and human-typeable because it gets read aloud or
+// sent over chat; that's safe only because it expires, is single-use, and is
+// revocable.
+model ClientInvite {
+  id      String    @id @default(uuid()) @db.Uuid
+  staffId String    @map("staff_id") @db.Uuid
+  /** the capacity the resulting link will be held in */
+  kind    StaffKind
+  /** sha-256 of the normalised code; the plaintext exists only at creation */
+  codeHash String   @map("code_hash")
+  /**
+   * Optional: when set, only this email may redeem the invite. Stored
+   * lower-cased. Null means "anyone holding the code", which is why expiry and
+   * single use matter.
+   */
+  email     String?
+  expiresAt DateTime  @map("expires_at")
+  /** set on redemption; a non-null value means the code is spent */
+  acceptedAt DateTime? @map("accepted_at")
+  acceptedBy String?   @map("accepted_by") @db.Uuid
+  revokedAt  DateTime? @map("revoked_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  staff    User  @relation("InviteStaff", fields: [staffId], references: [id], onDelete: Cascade)
+  client   User? @relation("InviteClient", fields: [acceptedBy], references: [id], onDelete: SetNull)
+
+  @@unique([codeHash])
+  @@index([staffId, createdAt])
+  @@map("client_invites")
 }
 
 // One consent decision: which category, shared with whom. A missing row means

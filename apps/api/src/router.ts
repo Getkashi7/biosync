@@ -16,6 +16,7 @@ import { consentRouter } from "./routers/consent";
 import { staffRouter } from "./routers/staff";
 import { trainingRouter } from "./routers/training";
 import { adminRouter } from "./routers/admin";
+import { invitesRouter } from "./routers/invites";
 
 export const appRouter = router({
   /** Liveness check — no auth. */
@@ -64,6 +65,9 @@ export const appRouter = router({
 
   /** Platform administration — granting staff capability, and nothing else yet. */
   admin: adminRouter,
+
+  /** Client invitations — how a client and a staff member get connected. */
+  invites: invitesRouter,
 });
 
 export type AppRouter = typeof appRouter;

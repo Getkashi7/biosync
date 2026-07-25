@@ -80,6 +80,23 @@ export { planItem, planSaveInput, planListInput, noteCreateInput, parsePlanItems
 export type { PlanItem, PlanSaveInput, NoteCreateInput } from "./training";
 export { staffVisibleCategories, staffCanSee, ROLE_CEILING, ROLE_AUDIENCE } from "./staffAccess";
 export type { StaffRole } from "./staffAccess";
+export {
+  inviteKind,
+  inviteCreateInput,
+  inviteCodeInput,
+  inviteRevokeInput,
+  normaliseInviteCode,
+  isInviteCodeShape,
+  formatInviteCode,
+  buildInviteCode,
+  inviteState,
+  isRedeemable,
+  inviteExpiry,
+  INVITE_ALPHABET,
+  INVITE_CODE_LENGTH,
+  INVITE_TTL_HOURS,
+} from "./invites";
+export type { InviteKind, InviteCreateInput, InviteCodeInput, InviteState } from "./invites";
 export { AUDIT, sanitiseAuditMeta } from "./audit";
 export type { AuditAction, AuditMeta, AuditEntry } from "./audit";
 export type {

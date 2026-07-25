@@ -10,13 +10,16 @@
 import type { Role, StaffKind } from "@prisma/client";
 import type { Context } from "../context";
 
-type TestUser = { id: string; role: Role; staff?: StaffKind[] };
+type TestUser = { id: string; role: Role; staff?: StaffKind[]; email?: string };
 
 export function ctx(user: TestUser | null): Context {
   if (!user) return { user: null };
   return {
     user: {
       id: user.id,
+      // Most tests don't care about the address, only that one exists; the
+      // invite tests pass it explicitly because the email lock turns on it.
+      email: user.email ?? `${user.id}@example.test`,
       role: user.role,
       staff: (user.staff ?? []).map((kind) => ({ kind })),
     },

@@ -26,6 +26,10 @@ export const AUDIT = {
   noteWritten: "note.written",
   roleChanged: "role.changed",
   staffViewedClient: "staff.viewed_client",
+  inviteCreated: "invite.created",
+  inviteRevoked: "invite.revoked",
+  inviteAccepted: "invite.accepted",
+  linkRevoked: "link.revoked",
 } as const;
 
 export type AuditAction = (typeof AUDIT)[keyof typeof AUDIT];

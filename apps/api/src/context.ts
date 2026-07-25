@@ -21,6 +21,13 @@ export type StaffCapability = { kind: StaffKind };
 
 export type ContextUser = {
   id: string;
+  /**
+   * The account's email, from our own users table — never from the token's
+   * claims. Invitations can be locked to an address, and that check has to run
+   * against what the database says this account is, not against a claim the
+   * caller could influence.
+   */
+  email: string;
   /** platform role: USER or ADMIN. Says nothing about staff capability. */
   role: Role;
   staff: StaffCapability[];
@@ -56,6 +63,7 @@ export async function resolveUser(token: string | undefined): Promise<ContextUse
     where: { id: payload.sub },
     select: {
       id: true,
+      email: true,
       role: true,
       // Loaded with the user so capability costs no extra round-trip, and is
       // re-read every request — a granted or revoked capability takes effect
@@ -67,7 +75,7 @@ export async function resolveUser(token: string | undefined): Promise<ContextUse
     },
   });
   if (!user) return null;
-  return { id: user.id, role: user.role, staff: user.staffProfiles };
+  return { id: user.id, email: user.email, role: user.role, staff: user.staffProfiles };
 }
 
 export async function createContext({ req }: CreateHTTPContextOptions): Promise<Context> {
