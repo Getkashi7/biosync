@@ -12,6 +12,7 @@ import { StaticBloom } from "../../ui/bio/StaticBloom";
 import { ScreenHeader } from "../../ui/bio/ScreenHeader";
 import { Spinner } from "../../ui/Spinner";
 import { LoadFailed } from "../../ui/bio/LoadFailed";
+import { classifyNetError, type NetFailure } from "../../lib/netError";
 import { bio, fontFamily } from "../../ui/theme";
 import { pressHaptic, successHaptic } from "../../lib/haptics";
 import { fetchInvites, revokeInvite, type InviteSummary } from "./invitesApi";
@@ -43,7 +44,7 @@ function ago(at: Date): string {
 export function InviteListScreen({ onBack, onCreate, refreshKey = 0 }: Props) {
   const insets = useSafeAreaInsets();
   const [invites, setInvites] = useState<InviteSummary[] | null>(null);
-  const [failed, setFailed] = useState(false);
+  const [failed, setFailed] = useState<NetFailure | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [confirmId, setConfirmId] = useState<string | null>(null);
 
@@ -51,11 +52,11 @@ export function InviteListScreen({ onBack, onCreate, refreshKey = 0 }: Props) {
     try {
       const res = await fetchInvites();
       setInvites(res.invites);
-      setFailed(false);
-    } catch {
+      setFailed(null);
+    } catch (e) {
       // A failure is NOT an empty list — saying "no invitations yet" here would
       // be a lie, and the trainer might mint a duplicate because of it.
-      setFailed(true);
+      setFailed(classifyNetError(e));
     }
   }, []);
 
@@ -76,8 +77,8 @@ export function InviteListScreen({ onBack, onCreate, refreshKey = 0 }: Props) {
         await revokeInvite(id);
         successHaptic();
         await load();
-      } catch {
-        setFailed(true);
+      } catch (e) {
+        setFailed(classifyNetError(e));
       }
     },
     [load],
@@ -134,7 +135,7 @@ export function InviteListScreen({ onBack, onCreate, refreshKey = 0 }: Props) {
           </View>
         ) : failed ? (
           <View style={styles.centre}>
-            <LoadFailed what="your invitations" onRetry={() => void load()} />
+            <LoadFailed what="your invitations" kind={failed ?? "offline"} onRetry={() => void load()} />
           </View>
         ) : invites && invites.length === 0 ? (
           <View style={styles.centre}>

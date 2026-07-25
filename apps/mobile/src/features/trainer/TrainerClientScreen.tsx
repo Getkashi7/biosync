@@ -15,6 +15,8 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Path } from "react-native-svg";
 import { Spinner } from "../../ui/Spinner";
+import { LoadFailed } from "../../ui/bio/LoadFailed";
+import { classifyNetError, type NetFailure } from "../../lib/netError";
 import { StaticBloom } from "../../ui/bio/StaticBloom";
 import { bio, fontFamily } from "../../ui/theme";
 import { pressHaptic } from "../../lib/haptics";
@@ -41,14 +43,14 @@ export function TrainerClientScreen({
 }) {
   const insets = useSafeAreaInsets();
   const [data, setData] = useState<ClientDetail | null>(null);
-  const [failed, setFailed] = useState(false);
+  const [failed, setFailed] = useState<NetFailure | null>(null);
 
   const load = useCallback(async () => {
-    setFailed(false);
+    setFailed(null);
     try {
       setData(await fetchClient(clientId));
-    } catch {
-      setFailed(true);
+    } catch (e) {
+      setFailed(classifyNetError(e));
     }
   }, [clientId]);
 
@@ -60,7 +62,13 @@ export function TrainerClientScreen({
     return (
       <View style={styles.root}>
         <View style={[styles.centre, { paddingTop: insets.top }]}>
-          {failed ? <Text style={styles.emptyTitle}>Couldn’t load this client</Text> : <Spinner tint={bio.color.text} />}
+          {/* Previously a dead end: the message had no retry, so a blip meant
+              backing out and re-entering the screen to try again. */}
+          {failed ? (
+            <LoadFailed what="this client" kind={failed} onRetry={() => void load()} />
+          ) : (
+            <Spinner tint={bio.color.text} />
+          )}
         </View>
       </View>
     );

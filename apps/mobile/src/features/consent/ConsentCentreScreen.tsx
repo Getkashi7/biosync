@@ -18,6 +18,7 @@ import { AuroraField } from "../../ui/bio/AuroraField";
 import { ScreenHeader } from "../../ui/bio/ScreenHeader";
 import { Spinner } from "../../ui/Spinner";
 import { LoadFailed } from "../../ui/bio/LoadFailed";
+import { classifyNetError, type NetFailure } from "../../lib/netError";
 import { bio, fontFamily } from "../../ui/theme";
 import { pressHaptic, selectionHaptic } from "../../lib/haptics";
 import { fetchConsents, setConsent, type ConsentAudience, type ConsentCategory, type ConsentRow } from "./consentApi";
@@ -46,18 +47,18 @@ export function ConsentCentreScreen({
 }) {
   const insets = useSafeAreaInsets();
   const [rows, setRows] = useState<ConsentRow[] | null>(null);
-  const [failed, setFailed] = useState(false);
+  const [failed, setFailed] = useState<NetFailure | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
-    setFailed(false);
+    setFailed(null);
     try {
       setRows(await fetchConsents());
-    } catch {
+    } catch (e) {
       // Leaving `rows` null used to spin forever here — on the one screen where
       // a user is checking who can see their data, that's the worst place to
       // look broken and say nothing.
-      setFailed(true);
+      setFailed(classifyNetError(e));
     }
   }, []);
 
@@ -115,7 +116,7 @@ export function ConsentCentreScreen({
         {rows === null ? (
           <View style={styles.centre}>
             {failed ? (
-              <LoadFailed what="your sharing settings" onRetry={() => void load()} />
+              <LoadFailed what="your sharing settings" kind={failed ?? "offline"} onRetry={() => void load()} />
             ) : (
               <Spinner tint={bio.color.text} />
             )}

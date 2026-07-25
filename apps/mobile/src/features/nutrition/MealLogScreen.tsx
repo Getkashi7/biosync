@@ -10,6 +10,7 @@ import { AuroraField } from "../../ui/bio/AuroraField";
 import { ScreenHeader } from "../../ui/bio/ScreenHeader";
 import { Spinner } from "../../ui/Spinner";
 import { LoadFailed } from "../../ui/bio/LoadFailed";
+import { classifyNetError, type NetFailure } from "../../lib/netError";
 import { bio, fontFamily } from "../../ui/theme";
 import { pressHaptic, successHaptic } from "../../lib/haptics";
 import { clockTime, dateLabel, groupThousands } from "../../lib/format";
@@ -28,14 +29,14 @@ export function MealLogScreen({
   const [day, setDay] = useState<NutritionDay | null>(null);
   const [open, setOpen] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
-  const [failed, setFailed] = useState(false);
+  const [failed, setFailed] = useState<NetFailure | null>(null);
 
   const load = useCallback(async () => {
-    setFailed(false);
+    setFailed(null);
     try {
       setDay(await fetchDay());
-    } catch {
-      setFailed(true);
+    } catch (e) {
+      setFailed(classifyNetError(e));
     }
   }, []);
 
@@ -82,7 +83,7 @@ export function MealLogScreen({
         {day === null ? (
           <View style={styles.centre}>
             {failed ? (
-              <LoadFailed what="today's meals" onRetry={() => void load()} />
+              <LoadFailed what="today's meals" kind={failed ?? "offline"} onRetry={() => void load()} />
             ) : (
               <Spinner tint={bio.color.text} />
             )}

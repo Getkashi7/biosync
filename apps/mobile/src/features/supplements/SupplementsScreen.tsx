@@ -18,6 +18,7 @@ import { AuroraField } from "../../ui/bio/AuroraField";
 import { DottedRing } from "../../ui/bio/DottedRing";
 import { ScreenHeader } from "../../ui/bio/ScreenHeader";
 import { LoadFailed } from "../../ui/bio/LoadFailed";
+import { classifyNetError, type NetFailure } from "../../lib/netError";
 import { bio, fontFamily } from "../../ui/theme";
 import { pressHaptic } from "../../lib/haptics";
 import { fetchDay, removeSupplement, type StackItem, type SupplementDay, type Timing } from "./supplementsApi";
@@ -37,14 +38,14 @@ export function SupplementsScreen({ onBack, onAdd, onOpenDoses, onOpenSuggestion
   const [day, setDay] = useState<SupplementDay | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
-  const [failed, setFailed] = useState(false);
+  const [failed, setFailed] = useState<NetFailure | null>(null);
 
   const load = useCallback(async () => {
-    setFailed(false);
+    setFailed(null);
     try {
       setDay(await fetchDay());
-    } catch {
-      setFailed(true);
+    } catch (e) {
+      setFailed(classifyNetError(e));
     }
   }, []);
 
@@ -124,7 +125,7 @@ export function SupplementsScreen({ onBack, onAdd, onOpenDoses, onOpenSuggestion
         <InfoBanner text="Informational only — not a prescription. You add what you already take." />
 
         {day === null ? (
-          failed ? <LoadFailed what="your stack" onRetry={() => void load()} /> : null
+          failed ? <LoadFailed what="your stack" kind={failed ?? "offline"} onRetry={() => void load()} /> : null
         ) : empty ? (
           <EmptyStack onAdd={onAdd} />
         ) : (

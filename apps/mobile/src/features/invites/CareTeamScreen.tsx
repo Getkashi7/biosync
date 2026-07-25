@@ -14,6 +14,7 @@ import { AuroraField } from "../../ui/bio/AuroraField";
 import { ScreenHeader } from "../../ui/bio/ScreenHeader";
 import { Spinner } from "../../ui/Spinner";
 import { LoadFailed } from "../../ui/bio/LoadFailed";
+import { classifyNetError, type NetFailure } from "../../lib/netError";
 import { bio, fontFamily } from "../../ui/theme";
 import { errorHaptic, pressHaptic, successHaptic } from "../../lib/haptics";
 import { dateLabel, initials } from "../../lib/format";
@@ -56,7 +57,7 @@ const BLOBS = [
 export function CareTeamScreen({ onBack, onEnterCode, refreshKey = 0 }: Props) {
   const insets = useSafeAreaInsets();
   const [team, setTeam] = useState<CareTeamMember[] | null>(null);
-  const [failed, setFailed] = useState(false);
+  const [failed, setFailed] = useState<NetFailure | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [confirm, setConfirm] = useState<CareTeamMember | null>(null);
   const [busy, setBusy] = useState(false);
@@ -65,11 +66,11 @@ export function CareTeamScreen({ onBack, onEnterCode, refreshKey = 0 }: Props) {
     try {
       const res = await fetchCareTeam();
       setTeam(res.staff);
-      setFailed(false);
-    } catch {
+      setFailed(null);
+    } catch (e) {
       // Never render a failure as "you're not connected to anyone" — that reads
       // as though a connection was lost.
-      setFailed(true);
+      setFailed(classifyNetError(e));
     }
   }, []);
 
@@ -91,9 +92,9 @@ export function CareTeamScreen({ onBack, onEnterCode, refreshKey = 0 }: Props) {
       successHaptic();
       setConfirm(null);
       await load();
-    } catch {
+    } catch (e) {
       errorHaptic();
-      setFailed(true);
+      setFailed(classifyNetError(e));
     } finally {
       setBusy(false);
     }
@@ -143,7 +144,7 @@ export function CareTeamScreen({ onBack, onEnterCode, refreshKey = 0 }: Props) {
           </View>
         ) : failed ? (
           <View style={styles.centre}>
-            <LoadFailed what="your care team" onRetry={() => void load()} />
+            <LoadFailed what="your care team" kind={failed ?? "offline"} onRetry={() => void load()} />
           </View>
         ) : team && team.length === 0 ? (
           <View style={styles.centre}>

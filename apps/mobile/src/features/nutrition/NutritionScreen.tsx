@@ -23,6 +23,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Circle, Defs, Path, RadialGradient, Stop } from "react-native-svg";
 import { AuroraField } from "../../ui/bio/AuroraField";
 import { ScreenHeader } from "../../ui/bio/ScreenHeader";
+import { LoadFailed } from "../../ui/bio/LoadFailed";
+import { classifyNetError, type NetFailure } from "../../lib/netError";
 import { bio, fontFamily, motion } from "../../ui/theme";
 import { pressHaptic } from "../../lib/haptics";
 import { dateLabel, groupThousands } from "../../lib/format";
@@ -41,15 +43,15 @@ type Props = {
 export function NutritionScreen({ onBack, onAddMeal, onOpenLog, refreshKey }: Props) {
   const insets = useSafeAreaInsets();
   const [day, setDay] = useState<NutritionDay | null>(null);
-  const [failed, setFailed] = useState(false);
+  const [failed, setFailed] = useState<NetFailure | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
-    setFailed(false);
+    setFailed(null);
     try {
       setDay(await fetchDay());
-    } catch {
-      setFailed(true);
+    } catch (e) {
+      setFailed(classifyNetError(e));
     }
   }, []);
 
@@ -94,11 +96,7 @@ export function NutritionScreen({ onBack, onAddMeal, onOpenLog, refreshKey }: Pr
         {day === null ? (
           failed ? (
             <View style={styles.centreBlock}>
-              <Text style={styles.emptyTitle}>Couldn’t load your day</Text>
-              <Pressable onPress={() => void load()} style={({ pressed }) => [styles.ctaPill, pressed && styles.pressed]}>
-                <View style={styles.ctaDot} />
-                <Text style={styles.ctaPillText}>Try again</Text>
-              </Pressable>
+              <LoadFailed what="your day" kind={failed} onRetry={() => void load()} />
             </View>
           ) : (
             <LoadingState />

@@ -11,7 +11,8 @@ import { AuroraField } from "../../ui/bio/AuroraField";
 import { GlassSurface } from "../../ui/bio/GlassSurface";
 import { ReadinessOrb } from "../../ui/bio/ReadinessOrb";
 import { Spinner } from "../../ui/Spinner";
-import { GradientButton } from "../../ui/GradientButton";
+import { LoadFailed } from "../../ui/bio/LoadFailed";
+import { classifyNetError, type NetFailure } from "../../lib/netError";
 import { ENERGY_WORDS } from "../../lib/ratings";
 import { bio, fontFamily } from "../../ui/theme";
 import { useAuth } from "../auth/AuthProvider";
@@ -55,17 +56,17 @@ export function DashboardScreen({ onQuickLog, onCheckin, refreshKey }: Props) {
   const { session } = useAuth();
   const [data, setData] = useState<DashboardData | null>(null);
   const [trends, setTrends] = useState<Trends | null>(null);
-  const [failed, setFailed] = useState(false);
+  const [failed, setFailed] = useState<NetFailure | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
-    setFailed(false);
+    setFailed(null);
     try {
       const [d, t] = await Promise.all([fetchDashboard(), fetchTrends()]);
       setData(d);
       setTrends(t);
-    } catch {
-      setFailed(true);
+    } catch (e) {
+      setFailed(classifyNetError(e));
     }
   }, []);
 
@@ -116,10 +117,7 @@ export function DashboardScreen({ onQuickLog, onCheckin, refreshKey }: Props) {
           </View>
         ) : data === null && failed ? (
           <View style={styles.fill}>
-            <Text style={styles.coach}>Couldn’t load your readiness</Text>
-            <View style={styles.retry}>
-              <GradientButton label="Try again" variant="ghost" onPress={() => void load()} />
-            </View>
+            <LoadFailed what="your readiness" kind={failed} onRetry={() => void load()} />
           </View>
         ) : readiness ? (
           <Ready readiness={readiness} trends={trends} onCheckin={onCheckin} onQuickLog={onQuickLog} />
@@ -243,7 +241,6 @@ const styles = StyleSheet.create({
     maxWidth: 300,
     marginTop: 14,
   },
-  retry: { alignSelf: "stretch", marginTop: 16 },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: 24, justifyContent: "center" },
   chip: { height: 44, justifyContent: "center" },
   chipRow: { flexDirection: "row", alignItems: "center", gap: 9, paddingHorizontal: 16 },

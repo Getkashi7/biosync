@@ -17,6 +17,7 @@ import { AuroraField } from "../../ui/bio/AuroraField";
 import { ScreenHeader } from "../../ui/bio/ScreenHeader";
 import { Spinner } from "../../ui/Spinner";
 import { LoadFailed } from "../../ui/bio/LoadFailed";
+import { classifyNetError, type NetFailure } from "../../lib/netError";
 import { bio, fontFamily, motion } from "../../ui/theme";
 import { pressHaptic, successHaptic } from "../../lib/haptics";
 import { fetchDay, setTaken, type ScheduledDose, type SupplementDay, type Timing } from "./supplementsApi";
@@ -37,15 +38,15 @@ export function DoseStripScreen({
   const [day, setDay] = useState<SupplementDay | null>(null);
   /** local overrides so a tap feels instant: "id:timing" → taken */
   const [pending, setPending] = useState<Record<string, boolean>>({});
-  const [failed, setFailed] = useState(false);
+  const [failed, setFailed] = useState<NetFailure | null>(null);
 
   const load = useCallback(async () => {
-    setFailed(false);
+    setFailed(null);
     try {
       setDay(await fetchDay());
       setPending({});
-    } catch {
-      setFailed(true);
+    } catch (e) {
+      setFailed(classifyNetError(e));
     }
   }, []);
 
@@ -110,7 +111,7 @@ export function DoseStripScreen({
         {day === null ? (
           <View style={styles.centre}>
             {failed ? (
-              <LoadFailed what="today's doses" onRetry={() => void load()} />
+              <LoadFailed what="today's doses" kind={failed ?? "offline"} onRetry={() => void load()} />
             ) : (
               <Spinner tint={bio.color.text} />
             )}

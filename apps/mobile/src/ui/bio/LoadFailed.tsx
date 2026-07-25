@@ -13,19 +13,27 @@
 import { StyleSheet, Text, View } from "react-native";
 import { GradientButton } from "../GradientButton";
 import { bio, fontFamily } from "../theme";
+import type { NetFailure } from "../../lib/netError";
 
 export function LoadFailed({
   /** what couldn't be loaded, e.g. "your care team" */
   what,
+  /** why, so the message doesn't blame the user's wi-fi for our 500 */
+  kind = "offline",
   onRetry,
 }: {
   what: string;
+  kind?: NetFailure;
   onRetry: () => void;
 }) {
   return (
     <View style={styles.wrap}>
       <Text style={styles.title}>Couldn't load {what}</Text>
-      <Text style={styles.body}>Check your connection — nothing has been lost.</Text>
+      <Text style={styles.body}>
+        {kind === "offline"
+          ? "You look offline. Check your connection — nothing has been lost."
+          : "Something went wrong on our end. Nothing has been lost."}
+      </Text>
       <View style={styles.cta}>
         <GradientButton label="Try again" variant="ghost" onPress={onRetry} />
       </View>

@@ -9,6 +9,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AuroraField } from "../../ui/bio/AuroraField";
 import { Spinner } from "../../ui/Spinner";
 import { LoadFailed } from "../../ui/bio/LoadFailed";
+import { classifyNetError, type NetFailure } from "../../lib/netError";
 import { GradientButton } from "../../ui/GradientButton";
 import { formatTime } from "../../lib/date";
 import { selectionHaptic } from "../../lib/haptics";
@@ -57,7 +58,7 @@ export function TimelineScreen({ onLog, refreshKey }: { onLog: () => void; refre
   const [days, setDays] = useState<TimelineDay[] | null>(null);
   const [bento, setBento] = useState<BentoData | null>(null);
   const [range, setRange] = useState<Range>("day");
-  const [failed, setFailed] = useState(false);
+  const [failed, setFailed] = useState<NetFailure | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
   const pickRange = (r: Range) => {
@@ -67,13 +68,13 @@ export function TimelineScreen({ onLog, refreshKey }: { onLog: () => void; refre
   };
 
   const load = useCallback(async () => {
-    setFailed(false);
+    setFailed(null);
     try {
       const [d, b] = await Promise.all([fetchTimeline(), fetchMetricsBento()]);
       setDays(d);
       setBento(b);
-    } catch {
-      setFailed(true);
+    } catch (e) {
+      setFailed(classifyNetError(e));
     }
   }, []);
 
@@ -116,7 +117,7 @@ export function TimelineScreen({ onLog, refreshKey }: { onLog: () => void; refre
         {days === null ? (
           <View style={styles.fill}>
             {failed ? (
-              <LoadFailed what="your metrics" onRetry={() => void load()} />
+              <LoadFailed what="your metrics" kind={failed ?? "offline"} onRetry={() => void load()} />
             ) : (
               <Spinner tint={bio.color.text} />
             )}

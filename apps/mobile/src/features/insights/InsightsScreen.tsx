@@ -9,6 +9,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AuroraField } from "../../ui/bio/AuroraField";
 import { GlassSurface } from "../../ui/bio/GlassSurface";
 import { Spinner } from "../../ui/Spinner";
+import { LoadFailed } from "../../ui/bio/LoadFailed";
+import { classifyNetError, type NetFailure } from "../../lib/netError";
 import { GradientButton } from "../../ui/GradientButton";
 import { bio, fontFamily } from "../../ui/theme";
 import { fetchInsights, type Insight, type InsightsResponse } from "./insightsApi";
@@ -26,15 +28,15 @@ const FAM: Record<Insight["kind"], { label: string; hue: string; rgb: string }> 
 export function InsightsScreen({ onLog, refreshKey }: { onLog: () => void; refreshKey: number }) {
   const insets = useSafeAreaInsets();
   const [data, setData] = useState<InsightsResponse | null>(null);
-  const [failed, setFailed] = useState(false);
+  const [failed, setFailed] = useState<NetFailure | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
-    setFailed(false);
+    setFailed(null);
     try {
       setData(await fetchInsights());
-    } catch {
-      setFailed(true);
+    } catch (e) {
+      setFailed(classifyNetError(e));
     }
   }, []);
 
@@ -73,10 +75,7 @@ export function InsightsScreen({ onLog, refreshKey }: { onLog: () => void; refre
           </View>
         ) : data === null && failed ? (
           <View style={styles.fill}>
-            <Text style={styles.msg}>Couldn’t load your insights</Text>
-            <View style={styles.cta}>
-              <GradientButton label="Try again" variant="ghost" onPress={() => void load()} />
-            </View>
+            <LoadFailed what="your insights" kind={failed} onRetry={() => void load()} />
           </View>
         ) : insights.length === 0 ? (
           <View style={styles.fill}>
