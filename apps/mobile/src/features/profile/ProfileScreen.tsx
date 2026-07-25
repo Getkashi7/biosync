@@ -33,6 +33,8 @@ type Props = {
   onTrainer?: (() => void) | undefined;
   /** the client's view of what a trainer shared with them */
   onTrainerFeed: () => void;
+  /** who this account is connected to, and the way to connect to someone new */
+  onCareTeam: () => void;
   refreshKey: number;
 };
 
@@ -43,6 +45,7 @@ export function ProfileScreen({
   onConsent,
   onTrainer,
   onTrainerFeed,
+  onCareTeam,
   refreshKey,
 }: Props) {
   const insets = useSafeAreaInsets();
@@ -157,10 +160,22 @@ export function ProfileScreen({
           </Pressable>
         </GlassSurface>
 
-        {hasTrainerFeed ? (
-          <>
-            <Text style={styles.group}>Coaching</Text>
-            <GlassSurface style={styles.card} soft>
+        {/* Care team is unconditional: it's the only route to connecting with a
+            trainer in the first place, so hiding it until you have one would
+            leave a new user with no way in. The feed row still waits for
+            content — there's nothing to read until something is shared. */}
+        <Text style={styles.group}>Coaching</Text>
+        <GlassSurface style={styles.card} soft>
+          <Pressable style={styles.row} onPress={onCareTeam} accessibilityRole="button">
+            <Text style={styles.rowLabel}>My care team</Text>
+            <View style={styles.rowVal}>
+              <Text style={styles.rowValTxt}>Connect or manage</Text>
+              <Text style={styles.chev}>›</Text>
+            </View>
+          </Pressable>
+          {hasTrainerFeed ? (
+            <>
+              <View style={styles.sep} />
               <Pressable style={styles.row} onPress={onTrainerFeed} accessibilityRole="button">
                 <Text style={styles.rowLabel}>From your trainer</Text>
                 <View style={styles.rowVal}>
@@ -168,9 +183,9 @@ export function ProfileScreen({
                   <Text style={styles.chev}>›</Text>
                 </View>
               </Pressable>
-            </GlassSurface>
-          </>
-        ) : null}
+            </>
+          ) : null}
+        </GlassSurface>
 
         {onTrainer ? (
           <>

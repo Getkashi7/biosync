@@ -65,6 +65,36 @@ export function weekNumber(isoWeekString: string): number {
   return Number(isoWeekString.slice(-2));
 }
 
+/**
+ * Invite-code alphabet. Mirrors `INVITE_ALPHABET` in @pulse/shared (duplicated
+ * for the same reason as `isoWeekOf` above).
+ *
+ * O, I, L, S, B, Z, 0, 1, 2, 5 and 8 are absent on purpose: codes get read
+ * aloud and retyped, and those are the pairs people confuse. The client filters
+ * typing against this set, so a mistyped look-alike is rejected as you type
+ * rather than after a round-trip.
+ */
+export const INVITE_ALPHABET = "ACDEFGHJKMNPQRTUVWXY34679";
+
+/** Characters in a code. */
+export const INVITE_CODE_LENGTH = 8;
+
+/** Strip anything that can't be in a code, upper-case, and cap the length. */
+export function normaliseInviteCode(raw: string): string {
+  return raw
+    .toUpperCase()
+    .split("")
+    .filter((ch) => INVITE_ALPHABET.includes(ch))
+    .join("")
+    .slice(0, INVITE_CODE_LENGTH);
+}
+
+/** "ACDEFGHJ" → "ACDE-FGHJ". Display only — never store or compare this form. */
+export function formatInviteCode(code: string): string {
+  const c = normaliseInviteCode(code);
+  return c.length > 4 ? `${c.slice(0, 4)}-${c.slice(4)}` : c;
+}
+
 /** An instant → device-local "18:40". */
 export function clockTime(value: string | Date): string {
   const d = typeof value === "string" ? new Date(value) : value;

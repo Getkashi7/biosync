@@ -22,6 +22,12 @@ import { submitCheckin, type CheckinInput } from "../checkin/checkinApi";
 import { QuickLogSheet } from "../metrics/QuickLogSheet";
 import { submitMetrics, type MetricEntry } from "../metrics/metricApi";
 import { DashboardScreen } from "../dashboard/DashboardScreen";
+import { InviteCreateScreen } from "../invites/InviteCreateScreen";
+import { InviteCodeScreen } from "../invites/InviteCodeScreen";
+import { InviteListScreen } from "../invites/InviteListScreen";
+import { EnterCodeScreen } from "../invites/EnterCodeScreen";
+import { CareTeamScreen } from "../invites/CareTeamScreen";
+import type { CreatedInvite, StaffKind } from "../invites/invitesApi";
 import { TimelineScreen } from "../timeline/TimelineScreen";
 import { NewGoalSheet } from "../goals/NewGoalSheet";
 import { createGoal, type NewGoal } from "../goals/goalsApi";
@@ -76,7 +82,10 @@ type SupplementView = "none" | "stack" | "doses" | "suggestions";
 type ConsentView = "none" | "centre" | "roles";
 
 /** The client's view of what a trainer shared, pushed from Profile. */
-type ProfileArea = "none" | "trainerFeed";
+type ProfileArea = "none" | "trainerFeed" | "careTeam" | "enterCode";
+
+/** Where the staff invite flow is: the list, the create form, or a fresh code. */
+type InviteView = { step: "none" } | { step: "list" } | { step: "create" } | { step: "code"; invite: CreatedInvite; lockedTo?: string | undefined };
 
 export function MainTabs() {
   const insets = useSafeAreaInsets();
@@ -104,6 +113,9 @@ export function MainTabs() {
   const [supplements, setSupplements] = useState<SupplementView>("none");
   const [consent, setConsent] = useState<ConsentView>("none");
   const [profileArea, setProfileArea] = useState<ProfileArea>("none");
+  const [invite, setInvite] = useState<InviteView>({ step: "none" });
+  /** bumped when a connection is made, so the care team refetches */
+  const [teamKey, setTeamKey] = useState(0);
   /** name handed over from a suggestion — the user still writes dose + timing */
   const [seedName, setSeedName] = useState<string | null>(null);
 
@@ -170,6 +182,10 @@ export function MainTabs() {
   // Staff keep the consumer app — they have a body too. Capability decides what
   // they MAY do; intent decides which shell they see.
   const isStaff = (staff?.length ?? 0) > 0;
+  /** The capacities this account holds — an invite can only be minted in one. */
+  const staffKinds = (staff ?? [])
+    .map((s) => s.kind)
+    .filter((k): k is StaffKind => k === "PT" || k === "PRACTITIONER");
 
   // Wait for both before rendering, so we never flash the wrong shell.
   if (staff === null || intent === null) return <View style={styles.page} />;
@@ -195,7 +211,24 @@ export function MainTabs() {
     return (
       <View style={styles.page}>
         <StatusBar style="light" />
-        {planFor ? (
+        {invite.step === "code" ? (
+          <InviteCodeScreen
+            invite={invite.invite}
+            lockedTo={invite.lockedTo}
+            onDone={() => setInvite({ step: "list" })}
+          />
+        ) : invite.step === "create" ? (
+          <InviteCreateScreen
+            capabilities={staffKinds}
+            onBack={() => setInvite({ step: "list" })}
+            onCreated={(created) => setInvite({ step: "code", invite: created })}
+          />
+        ) : invite.step === "list" ? (
+          <InviteListScreen
+            onBack={() => setInvite({ step: "none" })}
+            onCreate={() => setInvite({ step: "create" })}
+          />
+        ) : planFor ? (
           <PlanBuilderScreen
             clientId={planFor.id}
             clientName={planFor.name}
@@ -224,7 +257,11 @@ export function MainTabs() {
             refreshKey={refreshKey}
           />
         ) : (
-          <TrainerRosterScreen trainerName="Your roster" onOpenClient={setClient} />
+          <TrainerRosterScreen
+            trainerName="Your roster"
+            onOpenClient={setClient}
+            onInvite={() => setInvite({ step: "list" })}
+          />
         )}
         {/*
           Only on the bare roster. The pushed sub-screens (client detail, note
@@ -232,7 +269,7 @@ export function MainTabs() {
           a bottom CTA — a floating tab bar would sit on top of "Save note" /
           "Assign plan". You leave those via Back, then the tab bar returns.
         */}
-        {keyboardUp || client || noteFor || planFor ? null : (
+        {keyboardUp || client || noteFor || planFor || invite.step !== "none" ? null : (
           <BioTabBar
             active={active}
             onSelect={(t) => {
@@ -257,7 +294,22 @@ export function MainTabs() {
   return (
     <View style={styles.page}>
       <StatusBar style="light" />
-      {profileArea === "trainerFeed" ? (
+      {profileArea === "enterCode" ? (
+        <EnterCodeScreen
+          onBack={() => setProfileArea("careTeam")}
+          onOpenConsent={() => {
+            setProfileArea("none");
+            setConsent("centre");
+          }}
+          onConnected={() => setTeamKey((k) => k + 1)}
+        />
+      ) : profileArea === "careTeam" ? (
+        <CareTeamScreen
+          onBack={() => setProfileArea("none")}
+          onEnterCode={() => setProfileArea("enterCode")}
+          refreshKey={teamKey}
+        />
+      ) : profileArea === "trainerFeed" ? (
         <MyTrainerScreen onBack={() => setProfileArea("none")} />
       ) : consent === "centre" ? (
         <ConsentCentreScreen onBack={() => setConsent("none")} onOpenRoles={() => setConsent("roles")} />
@@ -313,6 +365,7 @@ export function MainTabs() {
           onCoachPlan={() => setSheet("plan")}
           onConsent={() => setConsent("centre")}
           onTrainerFeed={() => setProfileArea("trainerFeed")}
+          onCareTeam={() => setProfileArea("careTeam")}
           onTrainer={
             isStaff
               ? () => {

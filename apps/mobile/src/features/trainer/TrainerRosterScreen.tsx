@@ -36,9 +36,12 @@ const NEEDS_CHECKIN_DAYS = 5;
 export function TrainerRosterScreen({
   trainerName,
   onOpenClient,
+  onInvite,
 }: {
   trainerName: string;
   onOpenClient: (id: string) => void;
+  /** open the invitations surface — the only way a client can be added */
+  onInvite: () => void;
 }) {
   const insets = useSafeAreaInsets();
   const [clients, setClients] = useState<RosterClient[] | null>(null);
@@ -93,6 +96,18 @@ export function TrainerRosterScreen({
             <Text style={styles.count}>{clients?.length ?? 0}</Text>
             <Text style={styles.countLabel}>CLIENTS</Text>
           </View>
+          <Pressable
+            onPress={() => {
+              pressHaptic();
+              onInvite();
+            }}
+            style={({ pressed }) => [styles.invite, pressed && styles.pressed]}
+            accessibilityRole="button"
+            accessibilityLabel="Invitations"
+          >
+            <View style={styles.inviteV} />
+            <View style={styles.inviteH} />
+          </Pressable>
         </View>
 
         <ScopeLine />
@@ -140,7 +155,7 @@ export function TrainerRosterScreen({
             <Spinner tint={bio.color.text} />
           </View>
         ) : clients.length === 0 ? (
-          <EmptyRoster />
+          <EmptyRoster onInvite={onInvite} />
         ) : (
           <ScrollView
             style={styles.flex}
@@ -245,7 +260,7 @@ function ClientRow({ client, onPress }: { client: RosterClient; onPress: () => v
 }
 
 /** 1B — no clients yet. A flat mark, no fireworks. */
-function EmptyRoster() {
+function EmptyRoster({ onInvite }: { onInvite: () => void }) {
   return (
     <View style={styles.centre}>
       <View style={styles.emptyMark}>
@@ -255,8 +270,19 @@ function EmptyRoster() {
       </View>
       <Text style={styles.emptyTitle}>No clients yet</Text>
       <Text style={styles.emptySub}>
-        When someone connects you as their trainer and shares their activity, they'll appear here.
+        Invite someone with a code. They accept in their own app, and choose what to share with you.
       </Text>
+      <Pressable
+        onPress={() => {
+          pressHaptic();
+          onInvite();
+        }}
+        style={({ pressed }) => [styles.emptyCta, pressed && styles.pressed]}
+        accessibilityRole="button"
+        accessibilityLabel="Invite a client"
+      >
+        <Text style={styles.emptyCtaText}>Invite a client</Text>
+      </Pressable>
     </View>
   );
 }
@@ -272,6 +298,29 @@ const styles = StyleSheet.create({
   eyebrow: { fontFamily: fontFamily.semibold, fontSize: 10.5, letterSpacing: 1.68, color: bio.alpha(0.45) },
   name: { fontFamily: fontFamily.bold, fontSize: 23, letterSpacing: -0.35, color: bio.color.text, marginTop: 5 },
   countBlock: { alignItems: "flex-end" },
+  invite: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: bio.tealAlpha(0.45),
+    backgroundColor: bio.tealAlpha(0.1),
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 2,
+  },
+  inviteV: { position: "absolute", width: 1.8, height: 13, borderRadius: 2, backgroundColor: bio.color.teal },
+  inviteH: { position: "absolute", width: 13, height: 1.8, borderRadius: 2, backgroundColor: bio.color.teal },
+  emptyCta: {
+    marginTop: 20,
+    paddingVertical: 12,
+    paddingHorizontal: 22,
+    borderRadius: 13,
+    borderWidth: 1,
+    borderColor: bio.tealAlpha(0.45),
+    backgroundColor: bio.tealAlpha(0.1),
+  },
+  emptyCtaText: { fontFamily: fontFamily.bold, fontSize: 13, color: bio.color.teal },
   count: { fontFamily: fontFamily.dot, fontSize: 30, lineHeight: 32, color: bio.color.teal },
   countLabel: { fontFamily: fontFamily.semibold, fontSize: 9.5, letterSpacing: 1.33, color: bio.alpha(0.4), marginTop: 4 },
 

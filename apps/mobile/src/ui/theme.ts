@@ -591,6 +591,48 @@ export const bio = {
     purple: "124,86,255",
   },
   radius: { screen: 44, card: 24, tile: 24, pill: 999, sm: 16, xs: 12, sheet: 28 },
+  /**
+   * Client invitations (§13). The feature spans two registers: the staff
+   * screens follow the restrained trainer bundle (flat rows, one static teal
+   * bloom), the client screens the standard consumer system (glass, violet).
+   * Values that differ between the two are named for their side.
+   */
+  invite: {
+    /** the code itself, on the reveal screen */
+    code: { fontFamily: fontFamily.dot, fontSize: 40, letterSpacing: 3.2 },
+    /** the code as typed by the client */
+    codeInput: { fontFamily: fontFamily.dot, fontSize: 36, letterSpacing: 3.6 },
+    /** the dimmed code echoed back on an error screen */
+    codeEcho: { fontFamily: fontFamily.dotBold, fontSize: 17, letterSpacing: 1.36 },
+    codeBoxRadius: 18,
+    /** the dashed expiry dial on the reveal screen */
+    ring: 56,
+    ringRadius: 24,
+    ringStroke: 2,
+    /** dash / gap of the dotted expiry arc */
+    ringDash: "2.2 4.6",
+    /** initials circles: the confirm hero, the connected hero, a care-team row */
+    avatarConfirm: 68,
+    avatarConnected: 76,
+    avatarRow: 44,
+    /** the ✓ badge that overlaps the connected hero */
+    tickBadge: 26,
+    /** staff CTAs sit slightly tighter than the consumer ones */
+    ctaStaff: { height: 52, radius: 15 },
+    ctaClient: { height: 54, radius: 16 },
+    ctaSecondary: { height: 46, radius: 14 },
+    /** the lock-to-email switch */
+    track: { width: 46, height: 27, radius: 999, pad: 2.5 },
+    knob: 22,
+    knobTravel: 19,
+    /** small solid status dot — never a glowing one on staff screens */
+    dot: 6,
+    /** the bullet on the client's honest-explainer rows */
+    bullet: 5,
+    /** the hollow ring on an error screen */
+    errorRing: 64,
+    errorDot: 7,
+  },
   space: { xs: 4, sm: 8, md: 12, base: 16, lg: 18, xl: 24, xxl: 32 },
   type: {
     orb: { fontFamily: fontFamily.extrabold, fontSize: 92, lineHeight: 92, letterSpacing: -3.7 },
