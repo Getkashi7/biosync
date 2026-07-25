@@ -11,6 +11,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StaticBloom } from "../../ui/bio/StaticBloom";
 import { ScreenHeader } from "../../ui/bio/ScreenHeader";
 import { Spinner } from "../../ui/Spinner";
+import { LoadFailed } from "../../ui/bio/LoadFailed";
 import { bio, fontFamily } from "../../ui/theme";
 import { pressHaptic, successHaptic } from "../../lib/haptics";
 import { fetchInvites, revokeInvite, type InviteSummary } from "./invitesApi";
@@ -133,8 +134,7 @@ export function InviteListScreen({ onBack, onCreate, refreshKey = 0 }: Props) {
           </View>
         ) : failed ? (
           <View style={styles.centre}>
-            <Text style={styles.emptyTitle}>Couldn't load invitations</Text>
-            <Text style={styles.emptyBody}>Check your connection and pull down to try again.</Text>
+            <LoadFailed what="your invitations" onRetry={() => void load()} />
           </View>
         ) : invites && invites.length === 0 ? (
           <View style={styles.centre}>

@@ -9,6 +9,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AuroraField } from "../../ui/bio/AuroraField";
 import { ScreenHeader } from "../../ui/bio/ScreenHeader";
 import { Spinner } from "../../ui/Spinner";
+import { LoadFailed } from "../../ui/bio/LoadFailed";
 import { bio, fontFamily } from "../../ui/theme";
 import { pressHaptic, successHaptic } from "../../lib/haptics";
 import { clockTime, dateLabel, groupThousands } from "../../lib/format";
@@ -27,12 +28,14 @@ export function MealLogScreen({
   const [day, setDay] = useState<NutritionDay | null>(null);
   const [open, setOpen] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
 
   const load = useCallback(async () => {
+    setFailed(false);
     try {
       setDay(await fetchDay());
     } catch {
-      setDay(null);
+      setFailed(true);
     }
   }, []);
 
@@ -78,7 +81,11 @@ export function MealLogScreen({
 
         {day === null ? (
           <View style={styles.centre}>
-            <Spinner tint={bio.color.text} />
+            {failed ? (
+              <LoadFailed what="today's meals" onRetry={() => void load()} />
+            ) : (
+              <Spinner tint={bio.color.text} />
+            )}
           </View>
         ) : (
           <>

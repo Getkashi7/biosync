@@ -16,6 +16,7 @@ import Svg, { Path } from "react-native-svg";
 import { AuroraField } from "../../ui/bio/AuroraField";
 import { ScreenHeader } from "../../ui/bio/ScreenHeader";
 import { Spinner } from "../../ui/Spinner";
+import { LoadFailed } from "../../ui/bio/LoadFailed";
 import { bio, fontFamily, motion } from "../../ui/theme";
 import { pressHaptic, successHaptic } from "../../lib/haptics";
 import { fetchDay, setTaken, type ScheduledDose, type SupplementDay, type Timing } from "./supplementsApi";
@@ -36,13 +37,15 @@ export function DoseStripScreen({
   const [day, setDay] = useState<SupplementDay | null>(null);
   /** local overrides so a tap feels instant: "id:timing" → taken */
   const [pending, setPending] = useState<Record<string, boolean>>({});
+  const [failed, setFailed] = useState(false);
 
   const load = useCallback(async () => {
+    setFailed(false);
     try {
       setDay(await fetchDay());
       setPending({});
     } catch {
-      setDay(null);
+      setFailed(true);
     }
   }, []);
 
@@ -106,7 +109,11 @@ export function DoseStripScreen({
 
         {day === null ? (
           <View style={styles.centre}>
-            <Spinner tint={bio.color.text} />
+            {failed ? (
+              <LoadFailed what="today's doses" onRetry={() => void load()} />
+            ) : (
+              <Spinner tint={bio.color.text} />
+            )}
           </View>
         ) : slots.length === 0 ? (
           <Text style={styles.empty}>Nothing scheduled today. Add something to your stack first.</Text>

@@ -8,6 +8,7 @@ import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "r
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AuroraField } from "../../ui/bio/AuroraField";
 import { Spinner } from "../../ui/Spinner";
+import { LoadFailed } from "../../ui/bio/LoadFailed";
 import { GradientButton } from "../../ui/GradientButton";
 import { formatTime } from "../../lib/date";
 import { selectionHaptic } from "../../lib/haptics";
@@ -115,12 +116,7 @@ export function TimelineScreen({ onLog, refreshKey }: { onLog: () => void; refre
         {days === null ? (
           <View style={styles.fill}>
             {failed ? (
-              <>
-                <Text style={styles.msg}>Couldn’t load your metrics</Text>
-                <View style={styles.cta}>
-                  <GradientButton label="Try again" variant="ghost" onPress={() => void load()} />
-                </View>
-              </>
+              <LoadFailed what="your metrics" onRetry={() => void load()} />
             ) : (
               <Spinner tint={bio.color.text} />
             )}

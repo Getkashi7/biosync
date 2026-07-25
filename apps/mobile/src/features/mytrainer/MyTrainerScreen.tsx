@@ -12,6 +12,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AuroraField } from "../../ui/bio/AuroraField";
 import { ScreenHeader } from "../../ui/bio/ScreenHeader";
 import { Spinner } from "../../ui/Spinner";
+import { LoadFailed } from "../../ui/bio/LoadFailed";
 import { bio, fontFamily } from "../../ui/theme";
 import { dateLabel } from "../../lib/format";
 import { fetchTrainerFeed, type SharedNote, type SharedPlan, type TrainerFeed } from "./myTrainerApi";
@@ -24,13 +25,17 @@ function weekLabel(iso: string): string {
 export function MyTrainerScreen({ onBack }: { onBack: () => void }) {
   const insets = useSafeAreaInsets();
   const [feed, setFeed] = useState<TrainerFeed | null>(null);
+  const [failed, setFailed] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
   const load = useCallback(async () => {
+    setFailed(false);
     try {
       setFeed(await fetchTrainerFeed());
     } catch {
-      setFeed({ plans: [], notes: [] });
+      // Emptying the feed here told the client their trainer had written them
+      // nothing, which is a claim about another person — and the wrong one.
+      setFailed(true);
     }
   }, []);
 
@@ -69,7 +74,11 @@ export function MyTrainerScreen({ onBack }: { onBack: () => void }) {
 
         {feed === null ? (
           <View style={styles.centre}>
-            <Spinner tint={bio.color.text} />
+            {failed ? (
+              <LoadFailed what="what your trainer shared" onRetry={() => void load()} />
+            ) : (
+              <Spinner tint={bio.color.text} />
+            )}
           </View>
         ) : empty ? (
           <View style={styles.centre}>

@@ -13,6 +13,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AuroraField } from "../../ui/bio/AuroraField";
 import { ScreenHeader } from "../../ui/bio/ScreenHeader";
 import { Spinner } from "../../ui/Spinner";
+import { LoadFailed } from "../../ui/bio/LoadFailed";
 import { bio, fontFamily } from "../../ui/theme";
 import { errorHaptic, pressHaptic, successHaptic } from "../../lib/haptics";
 import { dateLabel, initials } from "../../lib/format";
@@ -142,8 +143,7 @@ export function CareTeamScreen({ onBack, onEnterCode, refreshKey = 0 }: Props) {
           </View>
         ) : failed ? (
           <View style={styles.centre}>
-            <Text style={styles.emptyTitle}>Couldn't load your care team</Text>
-            <Text style={styles.emptyBody}>Check your connection and pull down to try again.</Text>
+            <LoadFailed what="your care team" onRetry={() => void load()} />
           </View>
         ) : team && team.length === 0 ? (
           <View style={styles.centre}>

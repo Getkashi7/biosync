@@ -17,6 +17,7 @@ import Svg, { Circle, Path } from "react-native-svg";
 import { AuroraField } from "../../ui/bio/AuroraField";
 import { DottedRing } from "../../ui/bio/DottedRing";
 import { ScreenHeader } from "../../ui/bio/ScreenHeader";
+import { LoadFailed } from "../../ui/bio/LoadFailed";
 import { bio, fontFamily } from "../../ui/theme";
 import { pressHaptic } from "../../lib/haptics";
 import { fetchDay, removeSupplement, type StackItem, type SupplementDay, type Timing } from "./supplementsApi";
@@ -36,12 +37,14 @@ export function SupplementsScreen({ onBack, onAdd, onOpenDoses, onOpenSuggestion
   const [day, setDay] = useState<SupplementDay | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
 
   const load = useCallback(async () => {
+    setFailed(false);
     try {
       setDay(await fetchDay());
     } catch {
-      setDay(null);
+      setFailed(true);
     }
   }, []);
 
@@ -120,7 +123,9 @@ export function SupplementsScreen({ onBack, onAdd, onOpenDoses, onOpenSuggestion
 
         <InfoBanner text="Informational only — not a prescription. You add what you already take." />
 
-        {day === null ? null : empty ? (
+        {day === null ? (
+          failed ? <LoadFailed what="your stack" onRetry={() => void load()} /> : null
+        ) : empty ? (
           <EmptyStack onAdd={onAdd} />
         ) : (
           <>
