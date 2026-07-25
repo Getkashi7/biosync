@@ -1,0 +1,47 @@
+# Fly.io config for the BIOSYNC API.
+#
+# London (lhr) deliberately: the Supabase project is eu-west-2, and keeping the
+# app next to its database is what turns a chatty screen from slow into fast.
+# It also keeps personal health data in the UK, which is what the privacy copy
+# promises users.
+#
+# First deploy (from the repo root):
+#   fly launch --no-deploy --copy-config --config apps/api/fly.toml
+#   fly secrets set DATABASE_URL=... SUPABASE_URL=... SUPABASE_JWT_SECRET=... GROQ_API_KEY=...
+#   fly deploy --config apps/api/fly.toml --dockerfile apps/api/Dockerfile .
+
+app = "biosync-api"
+primary_region = "lhr"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[deploy]
+  # Runs once per release, before the new machines take traffic. Uses the safe
+  # migrate path from CLAUDE.md (deploy, never dev — no shadow database).
+  release_command = "pnpm --filter @pulse/api migrate:deploy"
+
+[env]
+  NODE_ENV = "production"
+  PORT = "4000"
+  HOST = "0.0.0.0"
+
+[http_service]
+  internal_port = 4000
+  force_https = true
+  auto_stop_machines = "suspend"
+  auto_start_machines = true
+  # Never scale to zero: a cold start on the first request of the morning is
+  # exactly when someone is logging their check-in.
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    grace_period = "10s"
+    interval = "30s"
+    method = "GET"
+    timeout = "5s"
+    path = "/health"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

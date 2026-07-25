@@ -1,0 +1,27 @@
+# Keep the build context small and keep secrets out of the image.
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+
+node_modules
+**/node_modules
+.git
+.github
+.turbo
+**/.turbo
+
+# Mobile app — never part of the API image.
+apps/mobile
+
+# Local build output / scratch
+dist
+**/dist
+*.apk
+*.aab
+*.log
+.claude
+.vscode
+.idea

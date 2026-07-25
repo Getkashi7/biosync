@@ -14,17 +14,28 @@ const API_PORT = 4000;
 /**
  * Resolve the API base URL.
  *
- * In dev the app runs in Expo Go / a dev client, and this machine's LAN IP shifts
- * whenever DHCP reassigns its lease — so rather than hard-code an IP we reuse the
- * same host Metro served the bundle from (`Constants.expoConfig.hostUri`, e.g.
- * "192.168.1.9:8081") and point it at the API port. Web dev resolves to
- * "localhost". A production build has no Metro host, so it falls back to an
- * explicit EXPO_PUBLIC_API_URL.
+ * Release builds (preview/production) must talk to the deployed API, so an
+ * explicit EXPO_PUBLIC_API_URL wins outright there — a shipped app has no Metro
+ * host and must never quietly fall back to localhost, which would look like
+ * "the app is broken" rather than "the URL is missing".
+ *
+ * In dev the app runs in a dev client and this machine's LAN IP shifts whenever
+ * DHCP reassigns its lease — so rather than hard-code an IP we reuse the host
+ * Metro served the bundle from (`Constants.expoConfig.hostUri`, e.g.
+ * "192.168.1.9:8081", or "localhost" over the USB reverse tunnel) and point it
+ * at the API port.
  */
 function resolveBaseUrl(): string {
+  const explicit = process.env.EXPO_PUBLIC_API_URL;
+  if (!__DEV__) {
+    if (explicit) return explicit;
+    // Misconfigured release build: say so loudly rather than fail as a hang.
+    console.error("EXPO_PUBLIC_API_URL is not set — this build cannot reach the API.");
+  }
+
   const host = Constants.expoConfig?.hostUri?.split(":")[0];
   if (host) return `http://${host}:${API_PORT}`;
-  return process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:4000";
+  return explicit ?? `http://localhost:${API_PORT}`;
 }
 
 const baseUrl = resolveBaseUrl();

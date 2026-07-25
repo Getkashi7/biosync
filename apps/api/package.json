@@ -18,19 +18,21 @@
     "test": "vitest run",
     "postinstall": "prisma generate",
     "prisma:generate": "prisma generate",
-    "migrate": "prisma migrate dev"
+    "migrate": "prisma migrate dev",
+    "migrate:deploy": "prisma migrate deploy",
+    "release": "prisma migrate deploy"
   },
   "dependencies": {
     "@prisma/client": "^6.1.0",
     "@pulse/shared": "workspace:*",
     "@trpc/server": "^11.0.0",
     "jose": "^5.9.6",
+    "tsx": "^4.19.2",
     "zod": "^3.23.8"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
     "prisma": "^6.1.0",
-    "tsx": "^4.19.2",
     "typescript": "^5.6.3",
     "vitest": "^2.1.8"
   }
