@@ -27,6 +27,17 @@ export type ContextUser = {
 };
 export type Context = { user: ContextUser | null };
 
+/**
+ * The bare capability kinds, for matching against `StaffLink.kind`.
+ *
+ * Staff surfaces filter links by the capacity the caller actually holds, so
+ * this shows up at every one of those query sites — worth a name rather than a
+ * `.map` repeated six times, each of which would be a place to get it wrong.
+ */
+export function staffKinds(user: ContextUser): StaffKind[] {
+  return user.staff.map((s) => s.kind);
+}
+
 // Built once: remote JWKS for asymmetric tokens (jose caches the keys),
 // legacy secret for HS256 tokens.
 const verifier: JwtVerifier = {

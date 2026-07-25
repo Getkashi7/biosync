@@ -24,6 +24,7 @@ import { router, ownerProcedure, staffProcedure } from "../trpc";
 import { prisma } from "../db";
 import { recordAudit } from "../lib/audit";
 import { assertLinked } from "../lib/staffLink";
+import { staffKinds } from "../context";
 
 const userProcedure = ownerProcedure;
 
@@ -32,7 +33,7 @@ const userProcedure = ownerProcedure;
 export const trainingRouter = router({
   /** Plans this trainer has written for one client, newest week first. */
   plans: staffProcedure.input(planListInput).query(async ({ ctx, input }) => {
-    await assertLinked(ctx.user.id, ctx.user.role, input.clientId);
+    await assertLinked(ctx.user.id, staffKinds(ctx.user), input.clientId);
     const rows = await prisma.trainingPlan.findMany({
       where: { trainerId: ctx.user.id, clientId: input.clientId },
       orderBy: { week: "desc" },
@@ -43,7 +44,7 @@ export const trainingRouter = router({
 
   /** Create or replace the plan for a client's week. */
   savePlan: staffProcedure.input(planSaveInput).mutation(async ({ ctx, input }) => {
-    await assertLinked(ctx.user.id, ctx.user.role, input.clientId);
+    await assertLinked(ctx.user.id, staffKinds(ctx.user), input.clientId);
     const plan = await prisma.trainingPlan.upsert({
       where: {
         trainerId_clientId_week: { trainerId: ctx.user.id, clientId: input.clientId, week: input.week },
@@ -71,7 +72,7 @@ export const trainingRouter = router({
 
   /** Notes this trainer wrote about one client — including their private ones. */
   notes: staffProcedure.input(planListInput).query(async ({ ctx, input }) => {
-    await assertLinked(ctx.user.id, ctx.user.role, input.clientId);
+    await assertLinked(ctx.user.id, staffKinds(ctx.user), input.clientId);
     const notes = await prisma.sessionNote.findMany({
       where: { trainerId: ctx.user.id, clientId: input.clientId },
       orderBy: { createdAt: "desc" },
@@ -83,7 +84,7 @@ export const trainingRouter = router({
 
   /** Write a session note. `sharedWithClient` decides if the client can read it. */
   addNote: staffProcedure.input(noteCreateInput).mutation(async ({ ctx, input }) => {
-    await assertLinked(ctx.user.id, ctx.user.role, input.clientId);
+    await assertLinked(ctx.user.id, staffKinds(ctx.user), input.clientId);
     const note = await prisma.sessionNote.create({
       data: {
         trainerId: ctx.user.id,

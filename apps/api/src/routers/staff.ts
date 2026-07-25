@@ -14,7 +14,7 @@
  * which staff member looked at whose record — and, per `sanitiseAuditMeta`,
  * that record never contains the health values themselves.
  */
-import { Role, StaffLinkStatus } from "@prisma/client";
+import { StaffKind, StaffLinkStatus } from "@prisma/client";
 import { z } from "zod";
 import {
   AUDIT,
@@ -26,14 +26,15 @@ import {
   type StaffRole,
 } from "@pulse/shared";
 import { router, staffProcedure } from "../trpc";
+import { staffKinds } from "../context";
 import { prisma } from "../db";
 import { recordAudit } from "../lib/audit";
 import { TRPCError } from "@trpc/server";
 
 
-/** Prisma's Role → the narrower staff role the access rules speak in. */
-function asStaffRole(role: Role): StaffRole {
-  return role === Role.PT ? "PT" : "PRACTITIONER";
+/** Prisma's StaffKind → the staff role the access rules speak in. */
+function asStaffRole(kind: StaffKind): StaffRole {
+  return kind === StaffKind.PT ? "PT" : "PRACTITIONER";
 }
 
 export const staffRouter = router({
@@ -49,14 +50,22 @@ export const staffRouter = router({
    */
   clients: staffProcedure.query(async ({ ctx }) => {
     const links = await prisma.staffLink.findMany({
-      where: { staffId: ctx.user.id, status: StaffLinkStatus.ACTIVE, role: ctx.user.role },
+      where: {
+        staffId: ctx.user.id,
+        status: StaffLinkStatus.ACTIVE,
+        kind: { in: staffKinds(ctx.user) },
+      },
       orderBy: { createdAt: "asc" },
-      select: { clientId: true, createdAt: true, client: { select: { fullName: true, email: true } } },
+      select: {
+        clientId: true,
+        createdAt: true,
+        kind: true,
+        client: { select: { fullName: true, email: true } },
+      },
     });
     if (links.length === 0) return { clients: [] };
 
     const clientIds = links.map((l) => l.clientId);
-    const staffRole = asStaffRole(ctx.user.role);
 
     // Which of these clients let this role see their activity at all.
     const consents = await prisma.consent.findMany({
@@ -69,10 +78,20 @@ export const staffRouter = router({
       rows.push({ category: c.category, audience: c.audience });
       byClient.set(c.userId, rows);
     }
+    // Evaluated per LINK, not once for the caller: someone who holds both
+    // capacities sees each client through the capacity that link was formed in,
+    // so a PT link never inherits the practitioner's wider ceiling.
     const sharesActivity = new Set(
-      clientIds.filter((id) =>
-        staffVisibleCategories(mergeConsents(byClient.get(id) ?? []), staffRole).includes("ACTIVITY"),
-      ),
+      links
+        .filter((l) =>
+          l.kind
+            ? staffVisibleCategories(
+                mergeConsents(byClient.get(l.clientId) ?? []),
+                asStaffRole(l.kind),
+              ).includes("ACTIVITY")
+            : false,
+        )
+        .map((l) => l.clientId),
     );
 
     // Check-in DATES only, for the clients who shared — no values are selected.
@@ -140,19 +159,28 @@ export const staffRouter = router({
         where: {
           staffId: ctx.user.id,
           clientId: input.clientId,
-          role: ctx.user.role,
+          kind: { in: staffKinds(ctx.user) },
           status: StaffLinkStatus.ACTIVE,
         },
-        select: { id: true, createdAt: true, client: { select: { fullName: true, email: true } } },
+        select: {
+          id: true,
+          createdAt: true,
+          kind: true,
+          client: { select: { fullName: true, email: true } },
+        },
       }),
       prisma.consent.findMany({
         where: { userId: input.clientId },
         select: { category: true, audience: true },
       }),
     ]);
-    if (!link) throw new TRPCError({ code: "NOT_FOUND" });
+    if (!link?.kind) throw new TRPCError({ code: "NOT_FOUND" });
 
-    const visible = staffVisibleCategories(mergeConsents(stored as ConsentRow[]), asStaffRole(ctx.user.role));
+    // The capacity comes from the LINK, not from whatever else the caller may
+    // hold, so a dual-capacity staff member can't read a PT client's health
+    // record by virtue of also being a practitioner elsewhere.
+    const staffRole = asStaffRole(link.kind);
+    const visible = staffVisibleCategories(mergeConsents(stored as ConsentRow[]), staffRole);
 
     // Wave 2: everything the screen shows, in one parallel batch (previously six
     // sequential round-trips). The consent-gated categories are still only
@@ -199,12 +227,12 @@ export const staffRouter = router({
         action: AUDIT.staffViewedClient,
         entity: "client",
         entityId: input.clientId,
-        meta: { role: ctx.user.role, categories: visible.length },
+        meta: { kind: link.kind, categories: visible.length },
       }),
     ]);
 
     /** Categories this role could see, that this client hasn't shared. */
-    const notShared = ROLE_CEILING[asStaffRole(ctx.user.role)]
+    const notShared = ROLE_CEILING[staffRole]
       .filter((c) => !visible.includes(c))
       .map((c) => CONSENT_COPY[c].name);
 
