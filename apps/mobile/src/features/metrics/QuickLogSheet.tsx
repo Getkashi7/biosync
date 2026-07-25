@@ -1,7 +1,16 @@
 /**
  * Quick log — BIOSYNC redesign. A dark sheet: pick a metric (the aurora bloom
- * re-tints to its hue), dial the value with ± steppers or the ruler, Save. One
- * objective reading at a time. Weight is entered + stored in kg.
+ * re-tints to its hue), dial the value with ± steppers or the ruler, Save.
+ * Weight is entered + stored in kg.
+ *
+ * Dialled values persist across metric switches, so you can set heart rate,
+ * flick to weight, set that too, and save everything in one tap — they're
+ * stamped with a single `recordedAt`, so one save reads as one moment.
+ *
+ * Only metrics you actually touched are submitted. That's a data-integrity
+ * rule, not a nicety: every metric opens on a plausible default, so saving
+ * untouched ones would write readings the user never took, and those numbers
+ * would then feed readiness and the trends.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
@@ -28,10 +37,16 @@ type Props = { onClose: () => void; onSubmit: (entries: MetricEntry[]) => Promis
 export function QuickLogSheet({ onClose, onSubmit }: Props) {
   const insets = useSafeAreaInsets();
   const [idx, setIdx] = useState(0);
-  const [value, setValue] = useState(METRICS[0]!.def);
+  /** Every metric's dialled value, kept while you move between them. */
+  const [values, setValues] = useState<Record<string, number>>(() =>
+    Object.fromEntries(METRICS.map((d) => [d.key, d.def])),
+  );
+  /** Only these get saved — see the note above about untouched defaults. */
+  const [touched, setTouched] = useState<Set<string>>(() => new Set());
   const [status, setStatus] = useState<"idle" | "saving" | "success" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const m = METRICS[idx]!;
+  const value = values[m.key] ?? m.def;
 
   const sheetP = useSharedValue(0);
   const scrimP = useSharedValue(0);
@@ -64,15 +79,23 @@ export function QuickLogSheet({ onClose, onSubmit }: Props) {
   const pickMetric = (i: number) => {
     if (i === idx) return;
     selectionHaptic();
+    const next = METRICS[i]!;
     setIdx(i);
-    setValue(METRICS[i]!.def);
-    lastVal.current = METRICS[i]!.def;
+    // Whatever was dialled here before is restored, not reset — that's what
+    // makes filling several in one visit possible.
+    lastVal.current = values[next.key] ?? next.def;
   };
+
+  /** Record a value and mark the metric as one the user actually set. */
+  const commit = useCallback((key: string, v: number) => {
+    setValues((prev) => ({ ...prev, [key]: v }));
+    setTouched((prev) => (prev.has(key) ? prev : new Set(prev).add(key)));
+  }, []);
 
   const clamp = (v: number): number => Math.max(m.min, Math.min(m.max, Math.round(v / m.step) * m.step));
   const step = (dir: number) => {
     selectionHaptic();
-    setValue((v) => clamp(v + dir * m.step));
+    commit(m.key, clamp(value + dir * m.step));
   };
 
   const [rulerW, setRulerW] = useState(1);
@@ -84,22 +107,28 @@ export function QuickLogSheet({ onClose, onSubmit }: Props) {
       if (v !== lastVal.current) {
         lastVal.current = v;
         selectionHaptic();
-        setValue(v);
+        commit(m.key, v);
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [rulerW, idx],
+    [rulerW, idx, commit],
   );
   const rulerPan = Gesture.Pan()
     .onBegin((e) => runOnJS(setFromX)(e.x))
     .onUpdate((e) => runOnJS(setFromX)(e.x));
 
+  /** In the order they're shown, so the confirmation matches what you dialled. */
+  const pending: MetricEntry[] = METRICS.filter((d) => touched.has(d.key)).map((d) => ({
+    type: d.key,
+    value: values[d.key] ?? d.def,
+  }));
+
   const onSave = async () => {
-    if (status === "saving" || status === "success") return;
+    if (status === "saving" || status === "success" || pending.length === 0) return;
     setStatus("saving");
     setErrorMsg(null);
     try {
-      await onSubmit([{ type: m.key, value }]);
+      await onSubmit(pending);
       setStatus("success");
       successHaptic();
       doneTimer.current = setTimeout(close, motion.duration.successHold);
@@ -109,6 +138,13 @@ export function QuickLogSheet({ onClose, onSubmit }: Props) {
       errorHaptic();
     }
   };
+
+  const saveLabel =
+    status === "saving"
+      ? "Saving…"
+      : pending.length > 1
+        ? `Save ${pending.length} entries`
+        : "Save entry";
 
   const pct = ((value - m.min) / (m.max - m.min)) * 100;
   const disp = value.toFixed(m.decimals);
@@ -127,9 +163,19 @@ export function QuickLogSheet({ onClose, onSubmit }: Props) {
         <View style={styles.segRow}>
           {METRICS.map((d, i) => {
             const on = i === idx;
+            const set = touched.has(d.key);
             return (
-              <Pressable key={d.key} onPress={() => pickMetric(i)} style={[styles.seg, on && styles.segOn]} accessibilityRole="button" accessibilityState={{ selected: on }}>
+              <Pressable
+                key={d.key}
+                onPress={() => pickMetric(i)}
+                style={[styles.seg, on && styles.segOn]}
+                accessibilityRole="button"
+                accessibilityState={{ selected: on }}
+                accessibilityLabel={set ? `${d.label}, set to ${values[d.key]} ${d.unit}` : d.label}
+              >
                 <Text style={[styles.segTxt, on && styles.segTxtOn]}>{d.label}</Text>
+                {/* A dot in the metric's own hue: which ones are queued to save. */}
+                {set ? <View style={[styles.segDot, { backgroundColor: d.hue }]} /> : null}
               </Pressable>
             );
           })}
@@ -157,11 +203,26 @@ export function QuickLogSheet({ onClose, onSubmit }: Props) {
 
         {errorMsg ? <Text style={styles.error}>{errorMsg}</Text> : null}
 
-        <Pressable style={styles.save} onPress={onSave} accessibilityRole="button">
-          <Text style={styles.saveTxt}>{status === "saving" ? "Saving…" : "Save entry"}</Text>
+        <Pressable
+          style={[styles.save, pending.length === 0 && styles.saveOff]}
+          onPress={onSave}
+          disabled={pending.length === 0}
+          accessibilityRole="button"
+          accessibilityState={{ disabled: pending.length === 0 }}
+          accessibilityLabel={
+            pending.length === 0 ? "Save entry, nothing dialled yet" : saveLabel
+          }
+        >
+          <Text style={styles.saveTxt}>{saveLabel}</Text>
         </Pressable>
 
-        {status === "success" ? <SuccessOverlay /> : null}
+        <Text style={styles.hint}>
+          {pending.length === 0
+            ? "Dial a value to log it."
+            : "Set as many as you like, then save them together."}
+        </Text>
+
+        {status === "success" ? <SuccessOverlay count={pending.length} /> : null}
       </Animated.View>
     </View>
   );
@@ -178,7 +239,7 @@ function Stepper({ dir, onPress }: { dir: number; onPress: () => void }) {
   );
 }
 
-function SuccessOverlay() {
+function SuccessOverlay({ count }: { count: number }) {
   const p = useSharedValue(0);
   useEffect(() => {
     p.value = withTiming(1, { duration: motion.duration.successOverlay, easing: motion.easeOut });
@@ -187,7 +248,7 @@ function SuccessOverlay() {
   return (
     <Animated.View style={[StyleSheet.absoluteFill, styles.success, style]}>
       <SuccessCheck diameter={88} />
-      <Text style={styles.successTitle}>Saved</Text>
+      <Text style={styles.successTitle}>{count > 1 ? `Saved ${count}` : "Saved"}</Text>
     </Animated.View>
   );
 }
@@ -212,6 +273,7 @@ const styles = StyleSheet.create({
   title: { fontFamily: fontFamily.bold, fontSize: 24, letterSpacing: -0.24, color: bio.color.text, marginTop: 18 },
   segRow: { flexDirection: "row", gap: 8, marginTop: 20 },
   seg: { flex: 1, height: 38, borderRadius: 12, backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: bio.color.border2, alignItems: "center", justifyContent: "center" },
+  segDot: { position: "absolute", top: 5, right: 5, width: 5, height: 5, borderRadius: 5 },
   segOn: { backgroundColor: "rgba(255,255,255,0.14)", borderColor: bio.color.border },
   segTxt: { fontFamily: fontFamily.semibold, fontSize: 11.5, color: bio.alpha(0.5) },
   segTxtOn: { color: bio.color.text },
@@ -236,7 +298,15 @@ const styles = StyleSheet.create({
   thumb: { position: "absolute", top: 6, width: 3, height: 32, borderRadius: 2, marginLeft: -1.5, shadowRadius: 10, shadowOpacity: 0.8, shadowOffset: { width: 0, height: 0 } },
   error: { fontFamily: fontFamily.regular, fontSize: 13, color: bio.color.coral, marginTop: 16 },
   save: { height: 56, borderRadius: 999, backgroundColor: bio.color.text, alignItems: "center", justifyContent: "center", marginTop: 28 },
+  saveOff: { opacity: 0.35 },
   saveTxt: { fontFamily: fontFamily.bold, fontSize: 16, color: bio.color.ink },
+  hint: {
+    fontFamily: fontFamily.light,
+    fontSize: 11.5,
+    color: bio.alpha(0.45),
+    textAlign: "center",
+    marginTop: 12,
+  },
   success: { backgroundColor: bio.color.ink, alignItems: "center", justifyContent: "center", gap: 14 },
   successTitle: { fontFamily: fontFamily.bold, fontSize: 24, color: bio.color.text },
 });
