@@ -35,6 +35,8 @@ type Props = {
   onTrainerFeed: () => void;
   /** who this account is connected to, and the way to connect to someone new */
   onCareTeam: () => void;
+  /** only present for ADMIN accounts — platform administration, not care */
+  onAdmin?: (() => void) | undefined;
   refreshKey: number;
 };
 
@@ -46,6 +48,7 @@ export function ProfileScreen({
   onTrainer,
   onTrainerFeed,
   onCareTeam,
+  onAdmin,
   refreshKey,
 }: Props) {
   const insets = useSafeAreaInsets();
@@ -195,6 +198,21 @@ export function ProfileScreen({
                 <Text style={styles.rowLabel}>Trainer</Text>
                 <View style={styles.rowVal}>
                   <Text style={styles.rowValTxt}>Your roster</Text>
+                  <Text style={styles.chev}>›</Text>
+                </View>
+              </Pressable>
+            </GlassSurface>
+          </>
+        ) : null}
+
+        {onAdmin ? (
+          <>
+            <Text style={styles.group}>Platform</Text>
+            <GlassSurface style={styles.card} soft>
+              <Pressable style={styles.row} onPress={onAdmin} accessibilityRole="button">
+                <Text style={styles.rowLabel}>Admin</Text>
+                <View style={styles.rowVal}>
+                  <Text style={styles.rowValTxt}>Staff access</Text>
                   <Text style={styles.chev}>›</Text>
                 </View>
               </Pressable>

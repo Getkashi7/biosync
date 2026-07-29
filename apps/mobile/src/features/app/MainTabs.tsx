@@ -27,6 +27,7 @@ import { InviteCodeScreen } from "../invites/InviteCodeScreen";
 import { InviteListScreen } from "../invites/InviteListScreen";
 import { EnterCodeScreen } from "../invites/EnterCodeScreen";
 import { CareTeamScreen } from "../invites/CareTeamScreen";
+import { AdminScreen } from "../admin/AdminScreen";
 import type { CreatedInvite, StaffKind } from "../invites/invitesApi";
 import { TimelineScreen } from "../timeline/TimelineScreen";
 import { NewGoalSheet } from "../goals/NewGoalSheet";
@@ -82,7 +83,7 @@ type SupplementView = "none" | "stack" | "doses" | "suggestions";
 type ConsentView = "none" | "centre" | "roles";
 
 /** The client's view of what a trainer shared, pushed from Profile. */
-type ProfileArea = "none" | "trainerFeed" | "careTeam" | "enterCode";
+type ProfileArea = "none" | "trainerFeed" | "careTeam" | "enterCode" | "admin";
 
 /** Where the staff invite flow is: the list, the create form, or a fresh code. */
 type InviteView = { step: "none" } | { step: "list" } | { step: "create" } | { step: "code"; invite: CreatedInvite; lockedTo?: string | undefined };
@@ -100,6 +101,8 @@ export function MainTabs() {
   // AuthProvider, which pulls the API client into RN's earliest startup and
   // breaks the runtime. Null until known, so we never flash the wrong shell.
   const [staff, setStaff] = useState<{ kind: string }[] | null>(null);
+  /** platform role — only ADMIN unlocks the admin surface. Never a capability. */
+  const [role, setRole] = useState<string | null>(null);
   /** which door they came through; decides the shell, never the permissions */
   const [intent, setIntent] = useState<AppIntent | null>(null);
   const [nutrition, setNutrition] = useState<NutritionView>("none");
@@ -145,8 +148,16 @@ export function MainTabs() {
     const load = () => {
       trpc.me
         .query()
-        .then((u) => alive && setStaff(u?.staff ?? []))
-        .catch(() => alive && setStaff([]));
+        .then((u) => {
+          if (!alive) return;
+          setStaff(u?.staff ?? []);
+          setRole(u?.role ?? null);
+        })
+        .catch(() => {
+          if (!alive) return;
+          setStaff([]);
+          setRole(null);
+        });
     };
     load();
     const sub = AppState.addEventListener("change", (s) => {
@@ -294,7 +305,9 @@ export function MainTabs() {
   return (
     <View style={styles.page}>
       <StatusBar style="light" />
-      {profileArea === "enterCode" ? (
+      {profileArea === "admin" ? (
+        <AdminScreen onBack={() => setProfileArea("none")} />
+      ) : profileArea === "enterCode" ? (
         <EnterCodeScreen
           onBack={() => setProfileArea("careTeam")}
           onOpenConsent={() => {
@@ -366,6 +379,7 @@ export function MainTabs() {
           onConsent={() => setConsent("centre")}
           onTrainerFeed={() => setProfileArea("trainerFeed")}
           onCareTeam={() => setProfileArea("careTeam")}
+          onAdmin={role === "ADMIN" ? () => setProfileArea("admin") : undefined}
           onTrainer={
             isStaff
               ? () => {
