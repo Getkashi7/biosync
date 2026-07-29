@@ -149,6 +149,9 @@ export function PlanSheet({ onClose }: { onClose: () => void }) {
           }}
           disabled={loading}
           style={({ pressed }) => [styles.regen, loading && styles.regenIdle, pressed && styles.pressed]}
+          accessibilityRole="button"
+          accessibilityLabel="Regenerate plan"
+          accessibilityState={{ disabled: loading, busy: loading }}
         >
           <Text style={styles.regenText}>Regenerate</Text>
         </Pressable>

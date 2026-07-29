@@ -161,7 +161,7 @@ export function CheckinSheet({ onClose, onSubmit }: Props) {
           {ENERGY_WORDS.map((w, i) => {
             const on = energy === i;
             return (
-              <Pressable key={i} onPress={() => pick(setEnergy, i)} style={[styles.seg, on && styles.segOn]} accessibilityRole="button" accessibilityState={{ selected: on }}>
+              <Pressable key={i} onPress={() => pick(setEnergy, i)} style={[styles.seg, on && styles.segOn]} accessibilityRole="radio" accessibilityState={{ selected: on }}>
                 <Text style={[styles.segTxt, on && styles.segTxtOn]}>{w}</Text>
               </Pressable>
             );
@@ -173,7 +173,7 @@ export function CheckinSheet({ onClose, onSubmit }: Props) {
           {MOOD_WORDS.map((w, i) => {
             const on = mood === i;
             return (
-              <Pressable key={i} onPress={() => pick(setMood, i)} style={styles.moodCol} accessibilityRole="button" accessibilityState={{ selected: on }}>
+              <Pressable key={i} onPress={() => pick(setMood, i)} style={styles.moodCol} accessibilityRole="radio" accessibilityLabel={w} accessibilityState={{ selected: on }}>
                 <View style={[styles.orb, { backgroundColor: MOOD_HUES[i], shadowColor: MOOD_HUES[i] }, on ? styles.orbOn : styles.orbOff]} />
                 <Text style={[styles.moodTxt, on && styles.moodTxtOn]}>{w}</Text>
               </Pressable>
@@ -183,7 +183,15 @@ export function CheckinSheet({ onClose, onSubmit }: Props) {
 
         {errorMsg ? <Text style={styles.error}>{errorMsg}</Text> : null}
 
-        <Pressable style={[styles.save, !canSave && styles.saveOff]} onPress={onSave} disabled={!canSave} accessibilityRole="button">
+        <Pressable
+          style={[styles.save, !canSave && styles.saveOff]}
+          onPress={onSave}
+          disabled={!canSave}
+          accessibilityRole="button"
+          accessibilityLabel="Save check-in"
+          // Without this the button is announced as actionable while it is not.
+          accessibilityState={{ disabled: !canSave, busy: status === "saving" }}
+        >
           <Text style={styles.saveTxt}>{status === "saving" ? "Saving…" : "Save check-in"}</Text>
         </Pressable>
         <Pressable onPress={close} style={styles.skip} accessibilityRole="button">

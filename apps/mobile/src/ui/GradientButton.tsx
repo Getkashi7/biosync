@@ -62,6 +62,10 @@ export function GradientButton({ label, onPress, variant = "gradient", loading =
         onPressIn={onPressIn}
         onPressOut={onPressOut}
         accessibilityRole="button"
+        // Named explicitly because the label Text is swapped for a spinner
+        // while loading — without this the button goes anonymous at exactly
+        // the moment someone is waiting to hear what it's doing.
+        accessibilityLabel={label}
         accessibilityState={{ disabled: inactive, busy: loading }}
       >
         {isGradient ? (

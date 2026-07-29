@@ -63,7 +63,16 @@ function Dot({ index, value, onPress }: { index: number; value: number | null; o
   }));
 
   return (
-    <Pressable onPress={onPress} style={styles.dotPress} accessibilityRole="button">
+    // The dot carries all the meaning visually, so without a name it announces
+    // as one of five identical buttons. "radio" is the honest semantic: one
+    // choice out of a set, and the state says which one is taken.
+    <Pressable
+      onPress={onPress}
+      style={styles.dotPress}
+      accessibilityRole="radio"
+      accessibilityLabel={ENERGY_WORDS[index]}
+      accessibilityState={{ selected: isSelected }}
+    >
       <Animated.View style={[styles.dot, dotStyle]}>
         <Animated.View style={[StyleSheet.absoluteFill, styles.dotFill, { backgroundColor: DOT_COLORS[index] }, fillStyle]} />
       </Animated.View>
@@ -80,7 +89,7 @@ export function EnergyDots({ value, onChange }: Props) {
   return (
     <View>
       <Text style={styles.word}>{value === null ? "—" : ENERGY_WORDS[value]}</Text>
-      <View style={styles.row}>
+      <View style={styles.row} accessibilityRole="radiogroup" accessibilityLabel="Energy">
         {Array.from({ length: N }, (_, i) => (
           <Dot
             key={i}

@@ -111,7 +111,7 @@ export function LogInScreen() {
           <View style={styles.spacer} />
 
           <View style={[styles.footer, { paddingBottom: padBottom }]}>
-            <Pressable style={[styles.primary, !canSubmit && styles.primaryOff]} onPress={onSubmit} disabled={!canSubmit} accessibilityRole="button">
+            <Pressable style={[styles.primary, !canSubmit && styles.primaryOff]} onPress={onSubmit} disabled={!canSubmit} accessibilityRole="button" accessibilityState={{ disabled: !canSubmit }}>
               {loading ? <Spinner tint={bio.color.ink} /> : <Text style={styles.primaryTxt}>Log in</Text>}
             </Pressable>
             <Text style={styles.switchText}>

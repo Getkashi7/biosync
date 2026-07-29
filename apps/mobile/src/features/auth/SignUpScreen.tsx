@@ -88,7 +88,7 @@ export function SignUpScreen() {
           <View style={styles.spacer} />
 
           <View style={[styles.footer, { paddingBottom: padBottom }]}>
-            <Pressable style={[styles.primary, !canSubmit && styles.primaryOff]} onPress={onSubmit} disabled={!canSubmit} accessibilityRole="button">
+            <Pressable style={[styles.primary, !canSubmit && styles.primaryOff]} onPress={onSubmit} disabled={!canSubmit} accessibilityRole="button" accessibilityState={{ disabled: !canSubmit }}>
               {loading ? <Spinner tint={bio.color.ink} /> : <Text style={styles.primaryTxt}>Create account</Text>}
             </Pressable>
             <Text style={styles.switchText}>

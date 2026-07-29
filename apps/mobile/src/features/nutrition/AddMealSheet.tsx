@@ -293,6 +293,7 @@ export function AddMealSheet({ onClose, onSaved }: { onClose: () => void; onSave
             disabled={ctaDisabled}
             style={({ pressed }) => [styles.cta, ctaDisabled && styles.ctaDim, pressed && styles.pressed]}
             accessibilityRole="button"
+            accessibilityState={{ disabled: ctaDisabled }}
           >
             {isEstimating ? (
               <View style={styles.dots}>

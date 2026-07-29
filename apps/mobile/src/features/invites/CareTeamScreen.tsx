@@ -233,6 +233,7 @@ export function CareTeamScreen({ onBack, onEnterCode, refreshKey = 0 }: Props) {
               style={styles.destructive}
               accessibilityRole="button"
               accessibilityLabel="Confirm disconnect"
+              accessibilityState={{ disabled: busy }}
             >
               <Text style={styles.destructiveText}>{busy ? "Disconnecting…" : "Disconnect"}</Text>
             </Pressable>

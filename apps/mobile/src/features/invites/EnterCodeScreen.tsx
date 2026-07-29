@@ -224,6 +224,7 @@ export function EnterCodeScreen({ onBack, onOpenConsent, onConnected }: Props) {
                 disabled={!valid || busy}
                 accessibilityRole="button"
                 accessibilityLabel="Continue"
+                accessibilityState={{ disabled: !valid || busy }}
               >
                 {valid ? (
                   <LinearGradient
@@ -267,6 +268,7 @@ export function EnterCodeScreen({ onBack, onOpenConsent, onConnected }: Props) {
                 disabled={busy}
                 accessibilityRole="button"
                 accessibilityLabel="Connect"
+                accessibilityState={{ disabled: busy }}
               >
                 <LinearGradient
                   colors={[bio.color.violet, bio.color.violetDeep]}

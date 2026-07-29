@@ -177,6 +177,7 @@ export function AdminScreen({ onBack }: { onBack: () => void }) {
               style={[styles.searchBtn, (!email.trim() || searching) && styles.searchBtnOff]}
               accessibilityRole="button"
               accessibilityLabel="Find account"
+              accessibilityState={{ disabled: !email.trim() || searching }}
             >
               <Text style={styles.searchBtnText}>{searching ? "…" : "Find"}</Text>
             </Pressable>
@@ -248,6 +249,7 @@ export function AdminScreen({ onBack }: { onBack: () => void }) {
                             style={styles.confirmGo}
                             accessibilityRole="button"
                             accessibilityLabel={confirm.action === "grant" ? "Confirm grant" : "Confirm withdraw"}
+                            accessibilityState={{ disabled: busy }}
                           >
                             <Text style={styles.confirmGoText}>
                               {busy ? "Working…" : confirm.action === "grant" ? "Grant" : "Withdraw"}

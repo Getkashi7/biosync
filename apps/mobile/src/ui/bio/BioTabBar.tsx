@@ -61,7 +61,9 @@ function Glyph({ tab, active }: { tab: TabKey; active: boolean }) {
 
 function Tab({ tab, label, active, onPress }: { tab: TabKey; label: string; active: boolean; onPress: () => void }) {
   return (
-    <Pressable style={styles.tab} onPress={onPress} accessibilityRole="button" accessibilityState={{ selected: active }}>
+    // "tab" rather than "button": a screen reader then announces it as one of a
+    // set ("Home, tab, 1 of 4, selected") instead of four unrelated buttons.
+    <Pressable style={styles.tab} onPress={onPress} accessibilityRole="tab" accessibilityState={{ selected: active }}>
       <Glyph tab={tab} active={active} />
       <Text style={[styles.label, { color: active ? bio.color.text : bio.alpha(0.45) }]}>{label}</Text>
     </Pressable>
@@ -116,7 +118,7 @@ export function BioTabBar({
           end={{ x: 1, y: 1 }}
           style={StyleSheet.absoluteFill}
         />
-        <View style={styles.row}>
+        <View style={styles.row} accessibilityRole="tablist">
           <Tab tab="home" label="Home" active={active === "home"} onPress={() => onSelect("home")} />
           <Tab tab="calendar" label="Trends" active={active === "calendar"} onPress={() => onSelect("calendar")} />
           <View style={styles.gap} />

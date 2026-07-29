@@ -190,6 +190,7 @@ export function InviteCreateScreen({ capabilities, onBack, onCreated }: Props) {
             style={!ready ? styles.ctaDisabled : undefined}
             accessibilityRole="button"
             accessibilityLabel="Create invite"
+            accessibilityState={{ disabled: !ready }}
           >
             <LinearGradient
               colors={[bio.color.teal, bio.color.tealDeep]}

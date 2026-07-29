@@ -142,11 +142,21 @@ export function ProfileScreen({
         <GlassSurface style={styles.card} soft>
           <View style={styles.row}>
             <Text style={styles.rowLabel}>Units</Text>
-            <View style={styles.seg}>
+            {/* Selected state matters more than the label here: both cells are
+                already named by their text, but without it neither announces
+                which unit is actually in use. */}
+            <View style={styles.seg} accessibilityRole="radiogroup" accessibilityLabel="Weight units">
               {(["kg", "lb"] as const).map((u) => {
                 const on = unit === u;
                 return (
-                  <Pressable key={u} onPress={() => pickUnit(u)} style={[styles.segCell, on && styles.segOn]} accessibilityRole="button">
+                  <Pressable
+                    key={u}
+                    onPress={() => pickUnit(u)}
+                    style={[styles.segCell, on && styles.segOn]}
+                    accessibilityRole="radio"
+                    accessibilityLabel={u === "kg" ? "Kilograms" : "Pounds"}
+                    accessibilityState={{ selected: on }}
+                  >
                     <Text style={[styles.segTxt, on && styles.segTxtOn]}>{u}</Text>
                   </Pressable>
                 );

@@ -227,6 +227,7 @@ export function CoachScreen() {
             style={({ pressed }) => [pressed && styles.pressed, (sending || !input.trim()) && styles.sendIdle]}
             accessibilityRole="button"
             accessibilityLabel="Send"
+            accessibilityState={{ disabled: sending || !input.trim() }}
           >
             <LinearGradient colors={[bio.color.tealLt, bio.color.teal]} start={{ x: 0.3, y: 0.2 }} end={{ x: 1, y: 1 }} style={styles.send}>
               <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">

@@ -159,7 +159,14 @@ function MealRow({
 
       {open ? (
         <View style={styles.actions}>
-          <Pressable onPress={onDelete} disabled={busy} style={({ pressed }) => [styles.deleteBtn, pressed && styles.pressed]}>
+          <Pressable
+            onPress={onDelete}
+            disabled={busy}
+            style={({ pressed }) => [styles.deleteBtn, pressed && styles.pressed]}
+            accessibilityRole="button"
+            accessibilityLabel="Delete meal"
+            accessibilityState={{ disabled: busy, busy }}
+          >
             <Text style={styles.deleteText}>{busy ? "Removing…" : "Delete"}</Text>
           </Pressable>
         </View>

@@ -225,6 +225,7 @@ export function PlanBuilderScreen({
                       style={({ pressed }) => [styles.moveBtn, i === 0 && styles.moveDim, pressed && styles.pressed]}
                       accessibilityRole="button"
                       accessibilityLabel="Move up"
+                      accessibilityState={{ disabled: i === 0 }}
                     >
                       <Svg width={11} height={7} viewBox="0 0 11 7" fill="none">
                         <Path d="M1 6 L5.5 1.5 L10 6" stroke={bio.alpha(0.45)} strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" />
@@ -240,6 +241,7 @@ export function PlanBuilderScreen({
                       ]}
                       accessibilityRole="button"
                       accessibilityLabel="Move down"
+                      accessibilityState={{ disabled: i === rows.length - 1 }}
                     >
                       <Svg width={11} height={7} viewBox="0 0 11 7" fill="none">
                         <Path d="M1 1.5 L5.5 6 L10 1.5" stroke={bio.alpha(0.45)} strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" />
