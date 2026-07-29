@@ -22,13 +22,6 @@ import type { TabKey } from "../TabBarIcons";
 import { pressHaptic } from "../../lib/haptics";
 import { bio, fontFamily, motion } from "../theme";
 
-const TABS: { key: TabKey; label: string }[] = [
-  { key: "home", label: "Home" },
-  { key: "calendar", label: "Trends" },
-  { key: "chat", label: "Ask" },
-  { key: "profile", label: "You" },
-];
-
 function Glyph({ tab, active }: { tab: TabKey; active: boolean }) {
   const c = active ? bio.color.text : bio.alpha(0.4);
   const sw = 1.9;

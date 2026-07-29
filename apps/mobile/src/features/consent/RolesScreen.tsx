@@ -8,7 +8,7 @@
  * sees health records even if the user shares everything — so it must stay in
  * step with what the API actually enforces when staff access lands.
  */
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Path } from "react-native-svg";
 import { AuroraField } from "../../ui/bio/AuroraField";

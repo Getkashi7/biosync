@@ -20,12 +20,12 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import Svg, { Circle, Defs, Path, RadialGradient, Stop } from "react-native-svg";
+import Svg, { Circle, Defs, RadialGradient, Stop } from "react-native-svg";
 import { AuroraField } from "../../ui/bio/AuroraField";
 import { ScreenHeader } from "../../ui/bio/ScreenHeader";
 import { LoadFailed } from "../../ui/bio/LoadFailed";
 import { classifyNetError, type NetFailure } from "../../lib/netError";
-import { bio, fontFamily, motion } from "../../ui/theme";
+import { bio, fontFamily } from "../../ui/theme";
 import { pressHaptic } from "../../lib/haptics";
 import { dateLabel, groupThousands } from "../../lib/format";
 import { MacroRing } from "./MacroRing";

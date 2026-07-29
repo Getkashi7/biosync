@@ -12,7 +12,6 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  View,
   type KeyboardTypeOptions,
   type TextInputProps,
 } from "react-native";

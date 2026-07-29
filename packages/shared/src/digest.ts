@@ -84,7 +84,6 @@ const MAX_CARDS = 3;
 const mean = (xs: number[]): number => xs.reduce((s, x) => s + x, 0) / xs.length;
 const round1 = (x: number): string => String(Math.round(x * 10) / 10);
 const clampConfidence = (n: number): number => Math.max(1, Math.min(4, n));
-const plural = (n: number, one: string, many: string): string => (n === 1 ? one : many);
 
 // ── Individual cards ─────────────────────────────────────────────────────────
 function sleepCard(checkins: CheckinPoint[], today: string): DigestCard | null {

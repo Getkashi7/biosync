@@ -20,7 +20,8 @@
     "prisma:generate": "prisma generate",
     "migrate": "prisma migrate dev",
     "migrate:deploy": "prisma migrate deploy",
-    "release": "prisma migrate deploy"
+    "release": "prisma migrate deploy",
+    "lint": "eslint src --max-warnings=0"
   },
   "dependencies": {
     "@prisma/client": "^6.1.0",

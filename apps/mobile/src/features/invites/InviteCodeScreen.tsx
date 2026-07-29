@@ -33,15 +33,20 @@ function hoursUntil(at: Date): number {
 export function InviteCodeScreen({ invite, lockedTo, onDone }: Props) {
   const insets = useSafeAreaInsets();
   const [copied, setCopied] = useState(false);
-  const expiresAt = new Date(invite.expiresAt);
-  const [hours, setHours] = useState(() => hoursUntil(expiresAt));
+  // Depend on the raw value, not a Date built during render: a fresh object
+  // every render made the effect below tear down and re-arm its interval on
+  // every render, which is invisible but pointless work.
+  const expiresIso = invite.expiresAt;
+  const [hours, setHours] = useState(() => hoursUntil(new Date(expiresIso)));
 
   // The countdown is coarse (hours), so a minute tick is plenty and costs
   // nothing; it keeps the dial honest if the screen is left open.
   useEffect(() => {
-    const t = setInterval(() => setHours(hoursUntil(expiresAt)), 60_000);
+    const tick = () => setHours(hoursUntil(new Date(expiresIso)));
+    tick();
+    const t = setInterval(tick, 60_000);
     return () => clearInterval(t);
-  }, [expiresAt]);
+  }, [expiresIso]);
 
   useEffect(() => {
     if (!copied) return;

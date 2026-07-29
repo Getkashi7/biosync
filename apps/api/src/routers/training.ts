@@ -11,8 +11,6 @@
  * they sit outside the consent categories — but writing them still requires the
  * link, so a trainer can't author against someone who isn't their client.
  */
-import { Role, StaffLinkStatus } from "@prisma/client";
-import { TRPCError } from "@trpc/server";
 import {
   AUDIT,
   noteCreateInput,
