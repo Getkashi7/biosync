@@ -18,7 +18,7 @@ import { METRIC_META, FALLBACK_META } from "../../lib/metricMeta";
 import { bio, fontFamily } from "../../ui/theme";
 import { fetchMetricsBento, type BentoData } from "../metrics/bentoApi";
 import { MetricsBento, type Range } from "../metrics/MetricsBento";
-import { fetchTimeline, type TimelineDay } from "./timelineApi";
+import { fetchTimelinePage, type TimelineDay } from "./timelineApi";
 
 const fmt = (v: number): string => String(Number(v.toFixed(1)));
 
@@ -32,9 +32,18 @@ const METRIC_HUE: Record<string, string> = {
 const hueFor = (t: string): string => METRIC_HUE[t] ?? bio.color.blue;
 
 type JEntry = { key: string; dot: string; text: string; time: string; tags: string[] };
+/**
+ * Flatten day groups into journal entries.
+ *
+ * This used to take only the first 4 days and the first 8 entries, which meant
+ * the screen threw away almost everything it had just fetched — the journal
+ * quietly stopped a few days back regardless of how long someone had been
+ * logging. It renders the whole loaded range now, and older ranges are fetched
+ * on demand.
+ */
 function journal(days: TimelineDay[]): JEntry[] {
   const out: JEntry[] = [];
-  for (const day of days.slice(0, 4)) {
+  for (const day of days) {
     if (day.checkin) {
       const c = day.checkin;
       out.push({
@@ -50,7 +59,7 @@ function journal(days: TimelineDay[]): JEntry[] {
       out.push({ key: `m-${day.date}-${i}`, dot: hueFor(m.type), text: `${meta.name} · ${fmt(m.value)} ${meta.unit}`.trim(), time: formatTime(m.recordedAt), tags: [] });
     });
   }
-  return out.slice(0, 8);
+  return out;
 }
 
 export function TimelineScreen({ onLog, refreshKey }: { onLog: () => void; refreshKey: number }) {
@@ -60,6 +69,9 @@ export function TimelineScreen({ onLog, refreshKey }: { onLog: () => void; refre
   const [range, setRange] = useState<Range>("day");
   const [failed, setFailed] = useState<NetFailure | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  /** where the next older window starts; null once history is exhausted */
+  const [older, setOlder] = useState<Date | null>(null);
+  const [loadingOlder, setLoadingOlder] = useState(false);
 
   const pickRange = (r: Range) => {
     if (r === range) return;
@@ -70,13 +82,30 @@ export function TimelineScreen({ onLog, refreshKey }: { onLog: () => void; refre
   const load = useCallback(async () => {
     setFailed(null);
     try {
-      const [d, b] = await Promise.all([fetchTimeline(), fetchMetricsBento()]);
-      setDays(d);
+      const [page, b] = await Promise.all([fetchTimelinePage(), fetchMetricsBento()]);
+      setDays(page.days);
+      setOlder(page.olderCursor);
       setBento(b);
     } catch (e) {
       setFailed(classifyNetError(e));
     }
   }, []);
+
+  /** Append the next window back. Appends rather than replaces, so scroll
+   *  position and everything already read stay put. */
+  const loadOlder = useCallback(async () => {
+    if (!older || loadingOlder) return;
+    setLoadingOlder(true);
+    try {
+      const page = await fetchTimelinePage(older);
+      setDays((prev) => [...(prev ?? []), ...page.days]);
+      setOlder(page.olderCursor);
+    } catch {
+      // Keep what's already on screen; the button stays for another attempt.
+    } finally {
+      setLoadingOlder(false);
+    }
+  }, [loadingOlder, older]);
 
   useEffect(() => {
     void load();
@@ -159,6 +188,23 @@ export function TimelineScreen({ onLog, refreshKey }: { onLog: () => void; refre
                     </View>
                   ))}
                 </View>
+
+                {older ? (
+                  <Pressable
+                    onPress={() => void loadOlder()}
+                    disabled={loadingOlder}
+                    style={({ pressed }) => [styles.older, pressed && styles.olderPressed]}
+                    accessibilityRole="button"
+                    accessibilityLabel="Show earlier entries"
+                    accessibilityState={{ disabled: loadingOlder, busy: loadingOlder }}
+                  >
+                    <Text style={styles.olderTxt}>
+                      {loadingOlder ? "Loading…" : "Show earlier"}
+                    </Text>
+                  </Pressable>
+                ) : (
+                  <Text style={styles.olderEnd}>That's the start of your journal.</Text>
+                )}
               </>
             ) : null}
           </>
@@ -173,6 +219,25 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   content: { paddingHorizontal: 24, flexGrow: 1 },
   fill: { flexGrow: 1, alignItems: "center", justifyContent: "center", paddingVertical: 80 },
+  older: {
+    alignSelf: "center",
+    marginTop: 18,
+    paddingVertical: 11,
+    paddingHorizontal: 22,
+    borderRadius: bio.radius.pill,
+    borderWidth: 1,
+    borderColor: bio.color.border2,
+    backgroundColor: bio.color.glassLo,
+  },
+  olderPressed: { opacity: 0.6 },
+  olderTxt: { fontFamily: fontFamily.semibold, fontSize: 13, color: bio.alpha(0.75) },
+  olderEnd: {
+    fontFamily: fontFamily.light,
+    fontSize: 11.5,
+    color: bio.alpha(0.35),
+    textAlign: "center",
+    marginTop: 18,
+  },
   header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 18 },
   title: { fontFamily: fontFamily.bold, fontSize: 24, letterSpacing: -0.24, color: bio.color.text },
   toggle: { flexDirection: "row", padding: 4, borderRadius: 999, backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: bio.color.border2, gap: 6 },

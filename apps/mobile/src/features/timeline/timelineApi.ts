@@ -32,16 +32,33 @@ function dayLabel(date: string, today: string, yesterday: string): string {
   return prettyToday(new Date(`${date}T12:00:00`)).toUpperCase();
 }
 
-export async function fetchTimeline(): Promise<TimelineDay[]> {
-  const now = new Date();
+export type TimelinePage = {
+  days: TimelineDay[];
+  /**
+   * The day immediately before this page — pass it back as `endingAt` to fetch
+   * the next window. Null once the page came back empty, which is how the UI
+   * knows to stop offering "show earlier".
+   */
+  olderCursor: Date | null;
+};
+
+/**
+ * One 30-day window of journal, ending at `endingAt` (default: today).
+ *
+ * The window used to be fixed at the trailing 30 days with no way past it, so a
+ * long-term user's history simply stopped existing in the app. Paging backwards
+ * keeps each request the same small size while making everything reachable.
+ */
+export async function fetchTimelinePage(endingAt: Date = new Date()): Promise<TimelinePage> {
+  const now = endingAt;
   const from = new Date(now);
   from.setDate(from.getDate() - (WINDOW_DAYS - 1));
 
   const [checkins, metrics] = await Promise.all([
     trpc.logs.range.query({ from: todayLocal(from), to: todayLocal(now) }),
     trpc.metrics.list.query({
-      from: new Date(now.getTime() - WINDOW_DAYS * 24 * 60 * 60 * 1000).toISOString(),
-      to: now.toISOString(),
+      from: new Date(new Date(from).setHours(0, 0, 0, 0)).toISOString(),
+      to: new Date(new Date(now).setHours(23, 59, 59, 999)).toISOString(),
     }),
   ]);
 
@@ -68,5 +85,16 @@ export async function fetchTimeline(): Promise<TimelineDay[]> {
     dayFor(todayLocal(new Date(metric.recordedAt))).metrics.push(metric);
   }
 
-  return [...byDay.values()].sort((a, b) => (a.date < b.date ? 1 : -1));
+  const days = [...byDay.values()].sort((a, b) => (a.date < b.date ? 1 : -1));
+
+  // An empty window means we've paged past the start of their history. Anything
+  // else keeps the door open — a quiet month is not the end of the record.
+  const older = new Date(from);
+  older.setDate(older.getDate() - 1);
+  return { days, olderCursor: days.length === 0 ? null : older };
+}
+
+/** The most recent window. Kept for callers that only ever want "recent". */
+export async function fetchTimeline(): Promise<TimelineDay[]> {
+  return (await fetchTimelinePage()).days;
 }
