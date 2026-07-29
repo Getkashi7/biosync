@@ -53,7 +53,9 @@ import { PlanBuilderScreen } from "../trainer/PlanBuilderScreen";
 import { RemindersSheet } from "../reminders/RemindersSheet";
 import { syncReminders } from "../../lib/reminders";
 import { trpc } from "../../lib/trpc";
-import { getAppIntent, setAppIntent, type AppIntent } from "../../lib/prefs";
+import { getAppIntent, hasBeenWelcomed, markWelcomed, setAppIntent, type AppIntent } from "../../lib/prefs";
+import { WelcomeFirstRun } from "./WelcomeFirstRun";
+import { useAuth } from "../auth/AuthProvider";
 import { NotProfessional } from "./NotProfessional";
 
 /** Which overlay is up, if any. */
@@ -119,6 +121,9 @@ export function MainTabs() {
   const [invite, setInvite] = useState<InviteView>({ step: "none" });
   /** bumped when a connection is made, so the care team refetches */
   const [teamKey, setTeamKey] = useState(0);
+  /** null until we've read the flag, so the welcome never flashes on a relaunch */
+  const [welcomed, setWelcomed] = useState<boolean | null>(null);
+  const { session } = useAuth();
   /** name handed over from a suggestion — the user still writes dose + timing */
   const [seedName, setSeedName] = useState<string | null>(null);
 
@@ -138,6 +143,14 @@ export function MainTabs() {
 
   useEffect(() => {
     void getAppIntent().then(setIntent);
+    void hasBeenWelcomed().then(setWelcomed);
+  }, []);
+
+  /** Dismiss the welcome, remembering it, and optionally open the check-in. */
+  const finishWelcome = useCallback((thenCheckin: boolean) => {
+    void markWelcomed();
+    setWelcomed(true);
+    if (thenCheckin) setSheet("checkin");
   }, []);
 
   // Refetched whenever the app comes back to the foreground, so a capability
@@ -198,8 +211,25 @@ export function MainTabs() {
     .map((s) => s.kind)
     .filter((k): k is StaffKind => k === "PT" || k === "PRACTITIONER");
 
-  // Wait for both before rendering, so we never flash the wrong shell.
-  if (staff === null || intent === null) return <View style={styles.page} />;
+  // Wait for all three before rendering, so we never flash the wrong shell —
+  // or the welcome at someone who dismissed it on a previous launch.
+  if (staff === null || intent === null || welcomed === null) return <View style={styles.page} />;
+
+  // First run on the consumer side. Staff coming through their own door skip it:
+  // they're being onboarded by a person, not by an app, and the copy is about
+  // the daily habit rather than the roster.
+  if (!welcomed && intent === "personal") {
+    return (
+      <View style={styles.page}>
+        <StatusBar style="light" />
+        <WelcomeFirstRun
+          name={session?.fullName?.trim().split(/\s+/)[0]}
+          onStartCheckin={() => finishWelcome(true)}
+          onExplore={() => finishWelcome(false)}
+        />
+      </View>
+    );
+  }
 
   // Came through the professional door without the capability to back it up.
   if (intent === "professional" && !isStaff) {

@@ -10,6 +10,7 @@ const UNIT_KEY = "pulse.unitPref";
 const REMINDER_KEY = "pulse.reminderPrefs";
 const LAST_CHECKIN_KEY = "pulse.lastCheckinDate";
 const INTENT_KEY = "pulse.appIntent";
+const WELCOMED_KEY = "pulse.welcomed";
 
 export type WeightUnit = "kg" | "lb";
 
@@ -38,6 +39,29 @@ export async function setAppIntent(intent: AppIntent): Promise<void> {
     // best-effort — the session still works, it just won't persist the choice
   }
 }
+/**
+ * Whether this person has seen the welcome.
+ *
+ * Local rather than server-side on purpose: it's a UI detail, and a failed read
+ * defaults to "already welcomed" so a storage hiccup can never trap someone in
+ * an onboarding screen they've already dismissed.
+ */
+export async function hasBeenWelcomed(): Promise<boolean> {
+  try {
+    return (await AsyncStorage.getItem(WELCOMED_KEY)) === "1";
+  } catch {
+    return true;
+  }
+}
+
+export async function markWelcomed(): Promise<void> {
+  try {
+    await AsyncStorage.setItem(WELCOMED_KEY, "1");
+  } catch {
+    // best-effort — worst case they see the welcome once more
+  }
+}
+
 export type { ReminderPrefs } from "./reminderSchedule";
 
 export async function getUnitPref(): Promise<WeightUnit> {
