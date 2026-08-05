@@ -1,0 +1,69 @@
+# Render blueprint for the BIOSYNC API.
+#
+# Free tier, chosen deliberately while the app is pre-launch: no card, no
+# monthly cost, and the one real trade — the instance sleeps after ~15 minutes
+# idle and takes about a minute to wake — only ever hurts the first request
+# after a quiet spell. That's acceptable for building and closed testing, and
+# it is NOT acceptable once real people are checking in every morning. Moving
+# to a paid always-on instance is a one-line change (`plan: starter`) with no
+# other edits, so this is a deferral, not a dead end.
+#
+# The database is NOT declared here. It lives in Supabase (eu-west-2), which
+# also owns auth — Render's own free Postgres expires after 30 days and would
+# be actively harmful to point at.
+#
+# First deploy:
+#   1. Push this branch to GitHub.
+#   2. Render dashboard → New → Blueprint → pick the repo.
+#   3. Fill the four secrets it prompts for (they're marked sync:false below,
+#      so Render asks rather than reading them from this file).
+#
+# Migrations are NOT run automatically. `prisma migrate deploy` needs the
+# direct (5432) connection, and running it from a container that may be asleep
+# is a bad place to discover a migration problem. Run it from your machine,
+# against the same database, before deploying a schema change:
+#   pnpm --filter @pulse/api exec prisma migrate deploy
+
+services:
+  - type: web
+    name: biosync-api
+    runtime: docker
+    plan: free
+    # Frankfurt is Render's EU region — the closest to the Supabase project in
+    # eu-west-2 (London), so the API isn't reaching across an ocean for every
+    # query. Note it is EU, not UK: if the privacy copy promises UK-only
+    # processing, that claim needs revisiting before launch.
+    region: frankfurt
+    dockerfilePath: ./apps/api/Dockerfile
+    # The build context is the repo root, not apps/api — the image needs the
+    # pnpm workspace because @pulse/shared is consumed as raw TypeScript.
+    dockerContext: .
+    # Cheap, and deliberately does not touch the database: a probe that queried
+    # Postgres would turn a slow database into a restart loop.
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: HOST
+        value: 0.0.0.0
+      # Render injects PORT and expects the service to bind it. env.ts already
+      # reads process.env.PORT, so this only pins it for clarity.
+      - key: PORT
+        value: 4000
+      # Prompted for on first deploy and stored by Render — never in this file,
+      # which is committed.
+      - key: DATABASE_URL
+        sync: false
+      - key: DIRECT_URL
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_JWT_SECRET
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      # Browser origins allowed to call the API. Native clients send no Origin
+      # and are unaffected. Empty is fine until the legal/marketing site exists.
+      - key: ALLOWED_ORIGINS
+        sync: false

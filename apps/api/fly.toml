@@ -1,5 +1,10 @@
 # Fly.io config for the BIOSYNC API.
 #
+# NOT the current deployment target — see render.yaml at the repo root. Kept
+# because Fly's always-on machine is the natural upgrade from Render's free
+# (sleeping) instance, and the Dockerfile is shared, so switching back is a
+# matter of running the commands below rather than rewriting anything.
+#
 # London (lhr) deliberately: the Supabase project is eu-west-2, and keeping the
 # app next to its database is what turns a chatty screen from slow into fast.
 # It also keeps personal health data in the UK, which is what the privacy copy
