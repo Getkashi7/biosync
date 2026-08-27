@@ -15,8 +15,10 @@ import Animated, {
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { GradientButton } from "../../ui/GradientButton";
-import { errorHaptic, pressHaptic } from "../../lib/haptics";
+import { errorHaptic, pressHaptic, successHaptic } from "../../lib/haptics";
 import { color, motion, radius, size, space, type } from "../../ui/theme";
+import { trpc } from "../../lib/trpc";
+import { useAuth } from "../auth/AuthProvider";
 
 type Props = {
   /** unmount the sheet (called after the close animation finishes) */
@@ -25,7 +27,9 @@ type Props = {
 
 export function DeleteAccountSheet({ onClose }: Props) {
   const insets = useSafeAreaInsets();
-  const [notice, setNotice] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const { signOut } = useAuth();
 
   const sheetP = useSharedValue(0);
   const scrimP = useSharedValue(0);
@@ -57,9 +61,20 @@ export function DeleteAccountSheet({ onClose }: Props) {
   }));
   const scrimStyle = useAnimatedStyle(() => ({ opacity: scrimP.value }));
 
-  const onDelete = () => {
-    errorHaptic();
-    setNotice(true);
+  const onDelete = async () => {
+    if (loading) return;
+    setError(null);
+    setLoading(true);
+    try {
+      await trpc.account.deleteAccount.mutate();
+      successHaptic();
+      await signOut();
+      runOnJS(onClose)();
+    } catch (err) {
+      errorHaptic();
+      setError(err instanceof Error ? err.message : "Something went wrong. Please try again.");
+      setLoading(false);
+    }
   };
 
   return (
@@ -78,12 +93,8 @@ export function DeleteAccountSheet({ onClose }: Props) {
           This permanently removes your account and all your health data. This can’t be undone.
         </Text>
 
-        <DestructiveButton label="Delete account" onPress={onDelete} />
-        {notice ? (
-          <Text style={styles.notice}>
-            Account deletion is coming in an update before launch. Nothing was deleted.
-          </Text>
-        ) : null}
+        <DestructiveButton label={loading ? "Deleting..." : "Delete account"} onPress={onDelete} disabled={loading} />
+        {error ? <Text style={styles.notice}>{error}</Text> : null}
         <View style={styles.cancel}>
           <GradientButton label="Cancel" variant="ghost" onPress={close} />
         </View>
@@ -93,15 +104,16 @@ export function DeleteAccountSheet({ onClose }: Props) {
 }
 
 /** Error-tinted CTA (frame 2's destructive button) with the standard press feel. */
-function DestructiveButton({ label, onPress }: { label: string; onPress: () => void }) {
+function DestructiveButton({ label, onPress, disabled }: { label: string; onPress: () => void; disabled?: boolean }) {
   const scale = useSharedValue(1);
   const animatedStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
   return (
     <Animated.View style={animatedStyle}>
       <Pressable
-        style={styles.destructive}
+        style={[styles.destructive, disabled && styles.destructiveDisabled]}
         onPress={onPress}
         onPressIn={() => {
+          if (disabled) return;
           scale.value = withTiming(motion.pressScale, {
             duration: motion.duration.press,
             easing: motion.easeOut,
@@ -109,11 +121,13 @@ function DestructiveButton({ label, onPress }: { label: string; onPress: () => v
           pressHaptic();
         }}
         onPressOut={() => {
+          if (disabled) return;
           scale.value = withSpring(1, motion.pressSpring);
         }}
+        disabled={disabled}
         accessibilityRole="button"
       >
-        <Text style={styles.destructiveText}>{label}</Text>
+        <Text style={[styles.destructiveText, disabled && styles.destructiveTextDisabled]}>{label}</Text>
       </Pressable>
     </Animated.View>
   );
@@ -163,9 +177,15 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  destructiveDisabled: {
+    opacity: 0.5,
+  },
   destructiveText: {
     ...type.button,
     color: color.error,
+  },
+  destructiveTextDisabled: {
+    color: color.textTertiary,
   },
   notice: {
     ...type.caption,

@@ -1,7 +1,7 @@
 /**
- * Daily-log procedures. Authorization is enforced by `requireRole(USER)` in
- * middleware; resolvers stay thin. Input is validated with the shared Zod
- * schema so the mobile client infers identical types end-to-end.
+ * Daily-log procedures. Authorization is enforced by `ownerProcedure` (any
+ * authenticated user); resolvers stay thin. Input is validated with the shared
+ * Zod schema so the mobile client infers identical types end-to-end.
  */
 
 import { checkinInput, streakInput, logRangeInput, computeStreak } from "@pulse/shared";

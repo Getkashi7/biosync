@@ -53,7 +53,10 @@ export const staffRouter = router({
       where: {
         staffId: ctx.user.id,
         status: StaffLinkStatus.ACTIVE,
-        kind: { in: staffKinds(ctx.user) },
+        AND: [
+          { kind: { not: null } },
+          { kind: { in: staffKinds(ctx.user) } },
+        ],
       },
       orderBy: { createdAt: "asc" },
       select: {
@@ -159,8 +162,11 @@ export const staffRouter = router({
         where: {
           staffId: ctx.user.id,
           clientId: input.clientId,
-          kind: { in: staffKinds(ctx.user) },
           status: StaffLinkStatus.ACTIVE,
+          AND: [
+            { kind: { not: null } },
+            { kind: { in: staffKinds(ctx.user) } },
+          ],
         },
         select: {
           id: true,

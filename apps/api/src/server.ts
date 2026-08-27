@@ -13,6 +13,7 @@ import { appRouter } from "./router";
 import { createContext } from "./context";
 import { assertServerEnv, allowedOrigins, env, isProduction } from "./env";
 import { RateLimiter, clientKey } from "./lib/rateLimit";
+import { servePrivacy } from "./lib/privacy";
 
 assertServerEnv();
 
@@ -98,6 +99,8 @@ const server = http.createServer((req, res) => {
     send(res, 200, JSON.stringify({ ok: true }));
     return;
   }
+
+  if (servePrivacy(req, res)) return;
 
   const { allowed, retryAfterSec } = limiter.check(
     clientKey(req.headers["x-forwarded-for"], req.socket.remoteAddress),

@@ -16,6 +16,8 @@ web-build/
 .env
 .env.local
 .env.*.local
+apps/mobile/.env
+apps/api/.env
 
 # prisma
 apps/api/prisma/*.db
@@ -23,3 +25,5 @@ apps/api/prisma/*.db
 # os / editor
 .DS_Store
 Thumbs.db
+
+/generated/prisma

@@ -96,13 +96,19 @@ export const insightsRouter = router({
     // snapshot feature, so the trend works from existing data.
     const snapByDate = new Map(snapRows.map((s) => [fromDbDate(s.date), s.score] as const));
     const checkinDates = new Set(checkins.map((c) => c.date));
+    const backfillPromises: Promise<boolean>[] = [];
     for (let i = 0; i < TREND_DAYS; i++) {
       const day = shiftDay(today, -i);
       if (!checkinDates.has(day) || snapByDate.has(day)) continue;
       const ref = i === 0 ? now : new Date(toDbDate(day).getTime() + DAY_MS);
-      const score = await storeReadinessSnapshot(userId, day, ref);
-      if (score !== null) snapByDate.set(day, score);
+      backfillPromises.push(
+        storeReadinessSnapshot(userId, day, ref).then((score) => {
+          if (score !== null) snapByDate.set(day, score);
+          return score !== null;
+        }),
+      );
     }
+    await Promise.all(backfillPromises);
     const readiness: ReadinessPoint[] = [...snapByDate].map(([date, score]) => ({ date, score }));
 
     const insights = computeInsights({

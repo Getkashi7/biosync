@@ -7,6 +7,17 @@ import { AuthProvider, useAuth } from "../src/features/auth/AuthProvider";
 import { useAppFonts } from "../src/ui/fonts";
 import { configureNotifications, syncReminders } from "../src/lib/reminders";
 import { color } from "../src/ui/theme";
+import * as Sentry from "@sentry/react-native";
+
+const sentryDsn = process.env.EXPO_PUBLIC_SENTRY_DSN;
+if (sentryDsn) {
+  Sentry.init({
+    dsn: sentryDsn,
+    tracesSampleRate: 1.0,
+    enableAutoSessionTracking: true,
+    sessionTrackingIntervalMillis: 30000,
+  });
+}
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -55,12 +66,14 @@ export default function RootLayout() {
   if (!fontsLoaded) return null;
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <SafeAreaProvider>
-        <AuthProvider>
-          <RootNavigator />
-        </AuthProvider>
-      </SafeAreaProvider>
-    </GestureHandlerRootView>
+    <Sentry.ErrorBoundary>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <SafeAreaProvider>
+          <AuthProvider>
+            <RootNavigator />
+          </AuthProvider>
+        </SafeAreaProvider>
+      </GestureHandlerRootView>
+    </Sentry.ErrorBoundary>
   );
 }

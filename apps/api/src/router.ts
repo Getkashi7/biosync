@@ -17,6 +17,7 @@ import { staffRouter } from "./routers/staff";
 import { trainingRouter } from "./routers/training";
 import { adminRouter } from "./routers/admin";
 import { invitesRouter } from "./routers/invites";
+import { accountRouter } from "./routers/account";
 
 export const appRouter = router({
   /** Liveness check — no auth. */
@@ -68,6 +69,9 @@ export const appRouter = router({
 
   /** Client invitations — how a client and a staff member get connected. */
   invites: invitesRouter,
+
+  /** Account actions — currently only `deleteAccount`. */
+  account: accountRouter,
 });
 
 export type AppRouter = typeof appRouter;

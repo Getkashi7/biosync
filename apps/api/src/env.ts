@@ -14,10 +14,12 @@ export const env = {
   SUPABASE_URL: process.env.SUPABASE_URL ?? "",
   /** Legacy HS256 JWT secret — used only for HS256-signed tokens. */
   SUPABASE_JWT_SECRET: process.env.SUPABASE_JWT_SECRET ?? "",
+  /** Service role key for admin operations (account deletion, etc.). */
+  SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY ?? "",
   /** Groq API key for the AI Coach (free tier). Optional — the chat degrades
    *  gracefully to a "not configured yet" reply when absent, so the app runs without it. */
   GROQ_API_KEY: process.env.GROQ_API_KEY ?? "",
-  PORT: Number(process.env.PORT ?? 4000),
+  PORT: Number(process.env.PORT) || 4000,
   /** Bind address. Containers must listen on 0.0.0.0, not loopback, to be reachable. */
   HOST: process.env.HOST ?? "0.0.0.0",
   /** "production" tightens CORS and quiets error detail. */
@@ -32,8 +34,8 @@ export const env = {
 
 /** Parsed allowlist; empty array means "no restriction". */
 export const allowedOrigins: string[] = env.ALLOWED_ORIGINS.split(",")
-  .map((o) => o.trim())
-  .filter((o) => o.length > 0);
+  .map((o: string) => o.trim())
+  .filter((o: string) => o.length > 0);
 
 export const isProduction = env.NODE_ENV === "production";
 

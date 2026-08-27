@@ -65,7 +65,7 @@ export function SignUpScreen() {
           showsVerticalScrollIndicator={false}
           bounces={false}
         >
-          <Pressable style={styles.back} onPress={() => router.back()} accessibilityRole="button" accessibilityLabel="Back">
+          <Pressable style={styles.back} onPress={() => { if (router.canGoBack()) router.back(); }} accessibilityRole="button" accessibilityLabel="Back">
             <Svg width={9} height={9} viewBox="0 0 9 9" fill="none">
               <Path d="M6 1 L2 4.5 L6 8" stroke={bio.alpha(0.8)} strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" />
             </Svg>

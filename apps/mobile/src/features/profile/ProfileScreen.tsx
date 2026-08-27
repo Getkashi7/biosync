@@ -5,6 +5,7 @@
  */
 import { useEffect, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Linking } from "react-native";
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AuroraField } from "../../ui/bio/AuroraField";
@@ -236,6 +237,18 @@ export function ProfileScreen({
             <Text style={styles.rowLabel}>Who sees what</Text>
             <View style={styles.rowVal}>
               <Text style={styles.rowValTxt}>Consent centre</Text>
+              <Text style={styles.chev}>›</Text>
+            </View>
+          </Pressable>
+          <View style={styles.sep} />
+          <Pressable
+            style={styles.row}
+            onPress={() => Linking.openURL("https://biosync-api.onrender.com/privacy")}
+            accessibilityRole="button"
+          >
+            <Text style={styles.rowLabel}>Privacy policy</Text>
+            <View style={styles.rowVal}>
+              <Text style={styles.rowValTxt}>Read more</Text>
               <Text style={styles.chev}>›</Text>
             </View>
           </Pressable>

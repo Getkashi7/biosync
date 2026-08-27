@@ -1,6 +1,3 @@
-// Pulse API data model. `User` mirrors Supabase auth.users by id (uuid); a
-// handle_new_user trigger (see migrations) seeds a row on signup with role USER.
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -11,101 +8,33 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
-// PT and PRACTITIONER already exist as values in the live database (added by the
-// rolled-back staff-roles slice). They are re-declared here so the schema matches
-// the database — nothing reads them yet; the staff-role gating lands in a later
-// slice. Without this the migration diff would try to remove them.
-enum Role {
-  USER
-  ADMIN
-  PT
-  PRACTITIONER
-}
-
-// What a Metric measures. Objective point measurements live here; the subjective
-// daily check-in stays in DailyLog.
-enum MetricType {
-  SLEEP_HOURS
-  SLEEP_QUALITY
-  RESTING_HR
-  HRV
-  GLUCOSE
-  WEIGHT
-  HYDRATION
-  ENERGY
-  MOOD
-}
-
-// A kind of data the user can choose to share.
-enum ConsentCategory {
-  BIOMETRICS
-  JOURNAL
-  DIAGNOSTICS
-  PHOTOS
-  ACTIVITY
-}
-
-// Who a category is shared with. NONE is the default everywhere — nothing is
-// ever pre-consented.
-enum ConsentAudience {
-  NONE
-  TRAINER
-  PRACTITIONER
-}
-
-// When a supplement dose is taken. A supplement can carry several.
-enum SupplementTiming {
-  AM
-  PRE
-  PM
-}
-
-// Where a Metric came from. Only MANUAL is written today; the rest are the
-// device integrations a later slice will sync from.
-enum MetricSource {
-  MANUAL
-  HEALTH_CONNECT
-  APPLE_HEALTH
-  OURA
-  WHOOP
-  LIBRE
-}
-
 model User {
-  id        String   @id @db.Uuid
-  email     String   @unique
-  fullName  String?  @map("full_name")
-  role      Role     @default(USER)
-  createdAt DateTime @default(now()) @map("created_at")
-
-  dailyLogs           DailyLog[]
-  metrics             Metric[]
-  goals               Goal[]
-  readinessSnapshots  ReadinessSnapshot[]
-  meals               Meal[]
-  supplements         Supplement[]
-  supplementLogs      SupplementLog[]
-  consents            Consent[]
-  /** links where this user is the client */
-  careTeam            StaffLink[] @relation("StaffLinkClient")
-  /** links where this user is the staff member */
-  clients             StaffLink[] @relation("StaffLinkStaff")
-  plansWritten        TrainingPlan[] @relation("PlanTrainer")
-  plansReceived       TrainingPlan[] @relation("PlanClient")
-  notesWritten        SessionNote[]  @relation("NoteTrainer")
-  notesReceived       SessionNote[]  @relation("NoteClient")
-  /** capabilities granted to this account (may act as PT and/or practitioner) */
-  staffProfiles       StaffProfile[]
-  /** invitations this user has issued as a staff member */
-  invitesSent         ClientInvite[] @relation("InviteStaff")
-  /** invitations this user has accepted as a client */
-  invitesAccepted     ClientInvite[] @relation("InviteClient")
+  id                 String              @id @db.Uuid
+  email              String              @unique
+  fullName           String?             @map("full_name")
+  role               Role                @default(USER)
+  createdAt          DateTime            @default(now()) @map("created_at")
+  invitesAccepted    ClientInvite[]      @relation("InviteClient")
+  invitesSent        ClientInvite[]      @relation("InviteStaff")
+  consents           Consent[]
+  dailyLogs          DailyLog[]
+  goals              Goal[]
+  meals              Meal[]
+  metrics            Metric[]
+  readinessSnapshots ReadinessSnapshot[]
+  notesReceived      SessionNote[]       @relation("NoteClient")
+  notesWritten       SessionNote[]       @relation("NoteTrainer")
+  careTeam           StaffLink[]         @relation("StaffLinkClient")
+  clients            StaffLink[]         @relation("StaffLinkStaff")
+  staffProfiles      StaffProfile[]
+  supplementLogs     SupplementLog[]
+  supplements        Supplement[]
+  plansReceived      TrainingPlan[]      @relation("PlanClient")
+  plansWritten       TrainingPlan[]      @relation("PlanTrainer")
 
   @@map("users")
 }
 
-// One check-in per user per calendar day (upsert on the composite unique).
-// `date` is the user's device-local day stored as a bare DATE.
 model DailyLog {
   id           String   @id @default(uuid()) @db.Uuid
   userId       String   @map("user_id") @db.Uuid
@@ -116,17 +45,13 @@ model DailyLog {
   mood         Int
   weightKg     Float?   @map("weight_kg")
   createdAt    DateTime @default(now()) @map("created_at")
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, date])
   @@index([userId])
   @@map("daily_logs")
 }
 
-// A single point measurement at an instant — unlike DailyLog there is one row per
-// reading, so a type can be logged many times a day (and later synced from a
-// device). The index serves the range query: one user, one type, ordered by time.
 model Metric {
   id         String       @id @default(uuid()) @db.Uuid
   userId     String       @map("user_id") @db.Uuid
@@ -135,18 +60,12 @@ model Metric {
   source     MetricSource @default(MANUAL)
   recordedAt DateTime     @default(now()) @map("recorded_at")
   createdAt  DateTime     @default(now()) @map("created_at")
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, type, recordedAt])
   @@map("metrics")
 }
 
-// A stored daily readiness score — the source of truth for the Insights trend.
-// Written (upserted) whenever the day's readiness inputs change: on each check-in,
-// and lazily backfilled for recent days by `insights.list`. `score` is the same
-// 0–100 `computeReadiness` produces; a day that scores null (nothing logged) is
-// simply never written. One row per user per device-local day.
 model ReadinessSnapshot {
   id        String   @id @default(uuid()) @db.Uuid
   userId    String   @map("user_id") @db.Uuid
@@ -154,19 +73,13 @@ model ReadinessSnapshot {
   score     Int
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, date])
   @@index([userId])
   @@map("readiness_snapshots")
 }
 
-// One logged meal. Macros are stored in grams, energy in kcal. `date` is the
-// user's device-local day (a bare DATE) so a day's totals bucket correctly
-// regardless of timezone, while `loggedAt` keeps the ordering within that day.
-// `estimated` records whether the macros came from the AI estimate untouched or
-// were adjusted by the user — the UI surfaces that distinction.
 model Meal {
   id          String   @id @default(uuid()) @db.Uuid
   userId      String   @map("user_id") @db.Uuid
@@ -180,36 +93,29 @@ model Meal {
   estimated   Boolean  @default(true)
   loggedAt    DateTime @default(now()) @map("logged_at")
   createdAt   DateTime @default(now()) @map("created_at")
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, date])
   @@map("meals")
 }
 
-// One entry in the user's own supplement stack. Everything here is USER-entered:
-// the app never prescribes. `dose` is free text ("2000 IU", "5 g") so any unit
-// works, and `timings` says when in the day it's taken. Informational only.
 model Supplement {
   id        String             @id @default(uuid()) @db.Uuid
   userId    String             @map("user_id") @db.Uuid
   name      String
   dose      String
   timings   SupplementTiming[]
-  /** the user's own note on why they take it */
+  /// * the user's own note on why they take it
   note      String?
   active    Boolean            @default(true)
   createdAt DateTime           @default(now()) @map("created_at")
-
-  user User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  logs SupplementLog[]
+  logs      SupplementLog[]
+  user      User               @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@map("supplements")
 }
 
-// A single taken-dose tick. One row per supplement per device-local day per
-// timing, so the day's strip can show take-off checkmarks idempotently.
 model SupplementLog {
   id           String           @id @default(uuid()) @db.Uuid
   userId       String           @map("user_id") @db.Uuid
@@ -217,92 +123,50 @@ model SupplementLog {
   date         DateTime         @db.Date
   timing       SupplementTiming
   createdAt    DateTime         @default(now()) @map("created_at")
-
-  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  supplement Supplement @relation(fields: [supplementId], references: [id], onDelete: Cascade)
+  supplement   Supplement       @relation(fields: [supplementId], references: [id], onDelete: Cascade)
+  user         User             @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([supplementId, date, timing])
   @@index([userId, date])
   @@map("supplement_logs")
 }
 
-// The capacity a staff member can act in. Deliberately separate from `Role`:
-// `Role` says what an ACCOUNT is on the platform (a user, an admin), whereas
-// this says what someone is licensed to DO for a client. Reusing `Role` for both
-// let a StaffLink be created with role = ADMIN, which is meaningless.
-enum StaffKind {
-  PT
-  PRACTITIONER
-}
-
-// Whether a staff capability has actually been granted. Only VERIFIED opens the
-// professional surface — an application that hasn't been checked, or one that's
-// been withdrawn, must not.
-enum StaffStatus {
-  PENDING
-  VERIFIED
-  SUSPENDED
-}
-
-// Whether a staff member is actually connected to a client.
-enum StaffLinkStatus {
-  PENDING
-  ACTIVE
-  REVOKED
-}
-
-// A capability granted to an account: "this person may act as a trainer".
-//
-// Kept apart from `User.role` because capability is not identity. A trainer is
-// also someone with a body who uses the consumer app, one person may hold more
-// than one capacity, and a capability needs a lifecycle (applied → verified →
-// suspended) that a single enum column can't express.
-//
-// Granting is server-side only — never self-declared at signup, because a
-// verified practitioner can read another person's biometrics and diagnostics.
 model StaffProfile {
-  id     String      @id @default(uuid()) @db.Uuid
-  userId String      @map("user_id") @db.Uuid
-  kind   StaffKind
-  status StaffStatus @default(PENDING)
-  /** free text for now: registration number, insurer, etc. */
+  id         String      @id @default(uuid()) @db.Uuid
+  userId     String      @map("user_id") @db.Uuid
+  kind       StaffKind
+  status     StaffStatus @default(PENDING)
+  /// * free text for now: registration number, insurer, etc.
   credential String?
-  verifiedAt DateTime? @map("verified_at")
-  createdAt  DateTime  @default(now()) @map("created_at")
-  updatedAt  DateTime  @updatedAt @map("updated_at")
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  verifiedAt DateTime?   @map("verified_at")
+  createdAt  DateTime    @default(now()) @map("created_at")
+  updatedAt  DateTime    @updatedAt @map("updated_at")
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, kind])
   @@index([status])
   @@map("staff_profiles")
 }
 
-// The link between a client and a staff member. Consent says "my trainer may see
-// my activity"; this says WHO that trainer is. Both are required before any
-// staff member can read a client's data — consent alone grants nothing, and a
-// link alone grants nothing.
 model StaffLink {
   id        String          @id @default(uuid()) @db.Uuid
   clientId  String          @map("client_id") @db.Uuid
   staffId   String          @map("staff_id") @db.Uuid
-  /**
-   * The capacity the staff member acts in for this client.
-   *
-   * `role` is the legacy column and is being retired: it reused the `Role` enum,
-   * which allowed meaningless links (role = ADMIN). `kind` replaces it and is
-   * nullable only for the length of the backfill — reads move to `kind`, then
-   * `role` is dropped in a later migration. Never change a column's type in
-   * place; that generates a destructive migration.
-   */
+  /// *
+  ///    * The capacity the staff member acts in for this client.
+  ///    *
+  ///    * `role` is the legacy column and is being retired: it reused the `Role` enum,
+  ///    * which allowed meaningless links (role = ADMIN). `kind` replaces it and is
+  ///    * nullable only for the length of the backfill — reads move to `kind`, then
+  ///    * `role` is dropped in a later migration. Never change a column's type in
+  ///    * place; that generates a destructive migration.
   role      Role
-  kind      StaffKind?
   status    StaffLinkStatus @default(PENDING)
   createdAt DateTime        @default(now()) @map("created_at")
   updatedAt DateTime        @updatedAt @map("updated_at")
-
-  client User @relation("StaffLinkClient", fields: [clientId], references: [id], onDelete: Cascade)
-  staff  User @relation("StaffLinkStaff", fields: [staffId], references: [id], onDelete: Cascade)
+  kind      StaffKind?
+  client    User            @relation("StaffLinkClient", fields: [clientId], references: [id], onDelete: Cascade)
+  staff     User            @relation("StaffLinkStaff", fields: [staffId], references: [id], onDelete: Cascade)
 
   @@unique([clientId, staffId, role])
   @@index([staffId, status])
@@ -310,48 +174,31 @@ model StaffLink {
   @@map("staff_links")
 }
 
-// An invitation from a staff member for a client to connect.
-//
-// The client must accept: a trainer cannot attach themselves to someone's
-// account, because the link is what later lets them read that person's data.
-// Accepting creates the StaffLink — and grants NO consent, so a fresh link sees
-// nothing until the client shares a category themselves.
-//
-// The code is the credential, so it is stored hashed and never read back after
-// creation — a leaked database dump must not let anyone redeem outstanding
-// invitations. It is short and human-typeable because it gets read aloud or
-// sent over chat; that's safe only because it expires, is single-use, and is
-// revocable.
 model ClientInvite {
-  id      String    @id @default(uuid()) @db.Uuid
-  staffId String    @map("staff_id") @db.Uuid
-  /** the capacity the resulting link will be held in */
-  kind    StaffKind
-  /** sha-256 of the normalised code; the plaintext exists only at creation */
-  codeHash String   @map("code_hash")
-  /**
-   * Optional: when set, only this email may redeem the invite. Stored
-   * lower-cased. Null means "anyone holding the code", which is why expiry and
-   * single use matter.
-   */
-  email     String?
-  expiresAt DateTime  @map("expires_at")
-  /** set on redemption; a non-null value means the code is spent */
+  id         String    @id @default(uuid()) @db.Uuid
+  staffId    String    @map("staff_id") @db.Uuid
+  /// * the capacity the resulting link will be held in
+  kind       StaffKind
+  /// * sha-256 of the normalised code; the plaintext exists only at creation
+  codeHash   String    @unique @map("code_hash")
+  /// *
+  ///    * Optional: when set, only this email may redeem the invite. Stored
+  ///    * lower-cased. Null means "anyone holding the code", which is why expiry and
+  ///    * single use matter.
+  email      String?
+  expiresAt  DateTime  @map("expires_at")
+  /// * set on redemption; a non-null value means the code is spent
   acceptedAt DateTime? @map("accepted_at")
   acceptedBy String?   @map("accepted_by") @db.Uuid
   revokedAt  DateTime? @map("revoked_at")
   createdAt  DateTime  @default(now()) @map("created_at")
+  client     User?     @relation("InviteClient", fields: [acceptedBy], references: [id])
+  staff      User      @relation("InviteStaff", fields: [staffId], references: [id], onDelete: Cascade)
 
-  staff    User  @relation("InviteStaff", fields: [staffId], references: [id], onDelete: Cascade)
-  client   User? @relation("InviteClient", fields: [acceptedBy], references: [id], onDelete: SetNull)
-
-  @@unique([codeHash])
   @@index([staffId, createdAt])
   @@map("client_invites")
 }
 
-// One consent decision: which category, shared with whom. A missing row means
-// NONE — the absence of a decision is never treated as permission.
 model Consent {
   id        String          @id @default(uuid()) @db.Uuid
   userId    String          @map("user_id") @db.Uuid
@@ -359,40 +206,31 @@ model Consent {
   audience  ConsentAudience @default(NONE)
   createdAt DateTime        @default(now()) @map("created_at")
   updatedAt DateTime        @updatedAt @map("updated_at")
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, category])
   @@index([userId])
   @@map("consents")
 }
 
-// A week's training plan a trainer assigns to a client. The exercises live in
-// `items` as an ordered JSON array ([{name, sets, reps}]) — the builder reorders
-// them by dragging, so array position IS the order and a separate row-per-
-// exercise table would buy nothing.
 model TrainingPlan {
   id        String   @id @default(uuid()) @db.Uuid
   trainerId String   @map("trainer_id") @db.Uuid
   clientId  String   @map("client_id") @db.Uuid
-  /** ISO week the plan targets, e.g. "2026-W30" */
+  /// * ISO week the plan targets, e.g. "2026-W30"
   week      String
   title     String
   items     Json
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
-
-  trainer User @relation("PlanTrainer", fields: [trainerId], references: [id], onDelete: Cascade)
-  client  User @relation("PlanClient", fields: [clientId], references: [id], onDelete: Cascade)
+  client    User     @relation("PlanClient", fields: [clientId], references: [id], onDelete: Cascade)
+  trainer   User     @relation("PlanTrainer", fields: [trainerId], references: [id], onDelete: Cascade)
 
   @@unique([trainerId, clientId, week])
   @@index([clientId])
   @@map("training_plans")
 }
 
-// A note a trainer writes after a session. `sharedWithClient` decides whether the
-// client can read it — the composer says so plainly, and the client-facing query
-// filters on it.
 model SessionNote {
   id               String   @id @default(uuid()) @db.Uuid
   trainerId        String   @map("trainer_id") @db.Uuid
@@ -400,32 +238,22 @@ model SessionNote {
   body             String
   sharedWithClient Boolean  @default(true) @map("shared_with_client")
   createdAt        DateTime @default(now()) @map("created_at")
-
-  trainer User @relation("NoteTrainer", fields: [trainerId], references: [id], onDelete: Cascade)
-  client  User @relation("NoteClient", fields: [clientId], references: [id], onDelete: Cascade)
+  client           User     @relation("NoteClient", fields: [clientId], references: [id], onDelete: Cascade)
+  trainer          User     @relation("NoteTrainer", fields: [trainerId], references: [id], onDelete: Cascade)
 
   @@index([clientId, createdAt])
   @@index([trainerId, createdAt])
   @@map("session_notes")
 }
 
-// An append-only record of who did what, for the compliance layer.
-//
-// Deliberately has NO foreign keys to `users`: an audit trail has to outlive the
-// records it describes, so a right-to-erasure deletion must not cascade these
-// rows away. `actorId`/`subjectId` are therefore plain uuid columns.
-//
-// It stores WHAT happened, never the health values involved — `meta` is passed
-// through `sanitiseAuditMeta` first, which strips nested data and known
-// health-bearing keys.
 model AuditLog {
   id        String   @id @default(uuid()) @db.Uuid
-  /** who performed the action */
+  /// * who performed the action
   actorId   String   @map("actor_id") @db.Uuid
-  /** whose record it affected, when that differs from the actor (staff access) */
+  /// * whose record it affected, when that differs from the actor (staff access)
   subjectId String?  @map("subject_id") @db.Uuid
   action    String
-  /** the kind of record touched, e.g. "meal", "supplement" */
+  /// * the kind of record touched, e.g. "meal", "supplement"
   entity    String?
   entityId  String?  @map("entity_id")
   meta      Json?
@@ -437,16 +265,79 @@ model AuditLog {
   @@map("audit_logs")
 }
 
-// A user's stated goal, optionally tied to the metric that measures it.
 model Goal {
   id           String      @id @default(uuid()) @db.Uuid
   userId       String      @map("user_id") @db.Uuid
   description  String
   targetMetric MetricType? @map("target_metric")
   createdAt    DateTime    @default(now()) @map("created_at")
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user         User        @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@map("goals")
+}
+
+enum Role {
+  USER
+  ADMIN
+  PT
+  PRACTITIONER
+}
+
+enum MetricType {
+  SLEEP_HOURS
+  SLEEP_QUALITY
+  RESTING_HR
+  HRV
+  GLUCOSE
+  WEIGHT
+  HYDRATION
+  ENERGY
+  MOOD
+}
+
+enum ConsentCategory {
+  BIOMETRICS
+  JOURNAL
+  DIAGNOSTICS
+  PHOTOS
+  ACTIVITY
+}
+
+enum ConsentAudience {
+  NONE
+  TRAINER
+  PRACTITIONER
+}
+
+enum SupplementTiming {
+  AM
+  PRE
+  PM
+}
+
+enum MetricSource {
+  MANUAL
+  HEALTH_CONNECT
+  APPLE_HEALTH
+  OURA
+  WHOOP
+  LIBRE
+}
+
+enum StaffKind {
+  PT
+  PRACTITIONER
+}
+
+enum StaffStatus {
+  PENDING
+  VERIFIED
+  SUSPENDED
+}
+
+enum StaffLinkStatus {
+  PENDING
+  ACTIVE
+  REVOKED
 }

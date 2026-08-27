@@ -27,15 +27,19 @@ const API_PORT = 4000;
  */
 function resolveBaseUrl(): string {
   const explicit = process.env.EXPO_PUBLIC_API_URL;
+  // Explicit URL wins in every mode: production has no Metro host, and in dev
+  // it lets us point at a remote backend (Render, staging, etc.) without
+  // changing code. Only fall back to the Metro host when nothing is set.
+  if (explicit) return explicit;
+
   if (!__DEV__) {
-    if (explicit) return explicit;
     // Misconfigured release build: say so loudly rather than fail as a hang.
     console.error("EXPO_PUBLIC_API_URL is not set — this build cannot reach the API.");
   }
 
   const host = Constants.expoConfig?.hostUri?.split(":")[0];
   if (host) return `http://${host}:${API_PORT}`;
-  return explicit ?? `http://localhost:${API_PORT}`;
+  return `http://localhost:${API_PORT}`;
 }
 
 const baseUrl = resolveBaseUrl();
