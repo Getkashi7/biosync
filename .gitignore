@@ -18,6 +18,11 @@ web-build/
 .env.*.local
 apps/mobile/.env
 apps/api/.env
+# a hand-made copy of a .env is still a file full of credentials
+.env.bak
+*.env.bak
+.env.backup
+.env.*.bak
 
 # prisma
 apps/api/prisma/*.db
@@ -25,5 +30,6 @@ apps/api/prisma/*.db
 # os / editor
 .DS_Store
 Thumbs.db
+.vscode/
 
 /generated/prisma
