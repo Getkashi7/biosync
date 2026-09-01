@@ -125,3 +125,16 @@ export {
   DEFAULT_QUIET_END,
 } from "./notifications";
 export type { NudgeType, NudgeSetting, NotificationPrefs, NotificationPrefsInput } from "./notifications";
+export {
+  photoAudience,
+  photoUploadInput,
+  photoIdInput,
+  photoVisibilityInput,
+  photoListInput,
+  effectivePhotoAudience,
+  hasVisibilityOverride,
+  tileDate,
+  monthHeading,
+  groupByMonth,
+} from "./photos";
+export type { PhotoUploadInput, PhotoIdInput, PhotoVisibilityInput, PhotoListInput } from "./photos";

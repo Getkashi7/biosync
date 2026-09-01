@@ -19,6 +19,7 @@ import { adminRouter } from "./routers/admin";
 import { invitesRouter } from "./routers/invites";
 import { accountRouter } from "./routers/account";
 import { notificationsRouter } from "./routers/notifications";
+import { photosRouter } from "./routers/photos";
 
 export const appRouter = router({
   /** Liveness check — no auth. */
@@ -76,6 +77,9 @@ export const appRouter = router({
 
   /** Notification settings — the device schedules; the server remembers. */
   notifications: notificationsRouter,
+
+  /** Progress photos — private by default; the bucket is never public. */
+  photos: photosRouter,
 });
 
 export type AppRouter = typeof appRouter;

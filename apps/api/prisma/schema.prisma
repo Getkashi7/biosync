@@ -23,6 +23,7 @@ model User {
   metrics            Metric[]
   notificationNudges NotificationNudge[]
   notificationPrefs  NotificationPrefs?
+  photos             Photo[]
   readinessSnapshots ReadinessSnapshot[]
   notesReceived      SessionNote[]       @relation("NoteClient")
   notesWritten       SessionNote[]       @relation("NoteTrainer")
@@ -274,6 +275,34 @@ model Goal {
 
   @@index([userId])
   @@map("goals")
+}
+
+/// A progress photo. The image itself lives in the private `progress-photos`
+/// Supabase Storage bucket and is never public; only its path is stored here,
+/// so a leaked row on its own reveals no imagery. Reads go through short-lived
+/// signed URLs the API mints after checking link + consent.
+model Photo {
+  id          String           @id @default(uuid()) @db.Uuid
+  userId      String           @map("user_id") @db.Uuid
+  /// Path inside the private bucket, "<userId>/<uuid>.<ext>".
+  storagePath String           @map("storage_path")
+  /// The day the photo represents, in the user's own local clock. The timeline
+  /// groups by this rather than upload time — a photo taken this morning and
+  /// uploaded tonight belongs to this morning.
+  takenOn     DateTime         @map("taken_on") @db.Date
+  /// Per-photo visibility, and the thing the lock chip on the thumbnail marks.
+  /// Null means "follow my PHOTOS consent audience". A value here can only make
+  /// one photo *more* private than the category default — it is intersected
+  /// with the category consent, never used to widen past it, so a single photo
+  /// can never be shared with someone the user hasn't consented to.
+  audienceOverride ConsentAudience? @map("audience_override")
+  mimeType    String           @map("mime_type")
+  byteSize    Int              @map("byte_size")
+  createdAt   DateTime         @default(now()) @map("created_at")
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, takenOn])
+  @@map("photos")
 }
 
 /// Quiet hours — one row per user, covering every nudge. Times are "HH:MM" in
