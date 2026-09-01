@@ -74,3 +74,20 @@ describe("notifications input validation", () => {
     expect(parsed).not.toHaveProperty("userId");
   });
 });
+
+describe("defaults are distinguishable from a real save", () => {
+  // A device that migrated settings from the old single-reminder model must be
+  // able to tell "the server has nothing" from "the server says everything is
+  // off" — otherwise the first sync silently switches the user's reminders off.
+  it("the default prefs a fresh account receives are all disabled", () => {
+    expect(defaultNotificationPrefs().nudges.every((n) => !n.enabled)).toBe(true);
+  });
+
+  it("so an all-off payload is a valid save, and only `stored` separates the two", () => {
+    const allOff = {
+      ...validPrefs,
+      nudges: validPrefs.nudges.map((n) => ({ ...n, enabled: false })),
+    };
+    expect(notificationPrefsInput.safeParse(allOff).success).toBe(true);
+  });
+});

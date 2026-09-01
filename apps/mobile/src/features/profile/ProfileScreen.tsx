@@ -11,8 +11,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { AuroraField } from "../../ui/bio/AuroraField";
 import { GlassSurface } from "../../ui/bio/GlassSurface";
 import { selectionHaptic } from "../../lib/haptics";
-import { getReminderPrefs, getUnitPref, setUnitPref, type WeightUnit } from "../../lib/prefs";
-import { formatHm } from "../../lib/reminderSchedule";
+import { getNotificationPrefs, getUnitPref, setUnitPref, type WeightUnit } from "../../lib/prefs";
+import { activeNudges, formatHm, parseHm } from "../../lib/reminderSchedule";
 import { bio, fontFamily } from "../../ui/theme";
 import { useAuth } from "../auth/AuthProvider";
 import { fetchDashboard } from "../dashboard/dashboardApi";
@@ -65,7 +65,18 @@ export function ProfileScreen({
     void getUnitPref().then(setUnit);
   }, []);
   useEffect(() => {
-    void getReminderPrefs().then((p) => setReminders(p.enabled ? formatHm(p.time) : "Off"));
+    // Summarise what will actually fire, not merely what is switched on: a
+    // nudge sitting inside quiet hours is silenced, and showing its time here
+    // would promise a reminder that never arrives.
+    void getNotificationPrefs().then((p) => {
+      const active = activeNudges(p);
+      if (active.length === 0) return setReminders("Off");
+      const soonest = active
+        .slice()
+        .sort((a, b) => (parseHm(a.time ?? "") ?? 0) - (parseHm(b.time ?? "") ?? 0))[0];
+      const label = soonest?.time ? formatHm(soonest.time) : "Off";
+      setReminders(active.length > 1 ? `${label} +${active.length - 1}` : label);
+    });
   }, [refreshKey]);
   useEffect(() => {
     void fetchDashboard()
@@ -166,7 +177,7 @@ export function ProfileScreen({
           </View>
           <View style={styles.sep} />
           <Pressable style={styles.row} onPress={onReminders} accessibilityRole="button">
-            <Text style={styles.rowLabel}>Reminders</Text>
+            <Text style={styles.rowLabel}>Notifications</Text>
             <View style={styles.rowVal}>
               <Text style={styles.rowValTxt}>{reminders}</Text>
               <Text style={styles.chev}>›</Text>

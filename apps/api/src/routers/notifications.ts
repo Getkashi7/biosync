@@ -37,6 +37,17 @@ export const notificationsRouter = router({
       quietStart: prefs?.quietStart ?? defaults.quietStart,
       quietEnd: prefs?.quietEnd ?? defaults.quietEnd,
       nudges: mergeNudges(nudges as NudgeSetting[]),
+      /**
+       * Whether this user has ever saved settings here.
+       *
+       * "Never saved" and "saved with everything switched off" look identical
+       * once defaults are filled in, but they must not be treated the same: a
+       * device that carried settings over from the old single-reminder model
+       * would otherwise have them wiped by empty defaults the first time it
+       * synced — the app appearing to forget, which is the whole thing the
+       * migration exists to avoid.
+       */
+      stored: prefs !== null || nudges.length > 0,
     };
   }),
 

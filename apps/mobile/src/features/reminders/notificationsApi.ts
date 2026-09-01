@@ -35,6 +35,16 @@ export async function fetchNotificationPrefs(): Promise<{
   const local = await getNotificationPrefs();
   try {
     const remote = await trpc.notifications.get.query();
+
+    // The server has never held settings for this account, so what came back
+    // is just defaults. Adopting them would switch off whatever this device
+    // already had — including settings carried over from the old single
+    // reminder. Keep the device's copy and seed the server with it instead.
+    if (!remote.stored) {
+      const sync = await saveNotificationPrefs(local);
+      return { prefs: local, sync };
+    }
+
     const prefs: NotificationPrefs = {
       quietStart: remote.quietStart,
       quietEnd: remote.quietEnd,
