@@ -1,7 +1,19 @@
-# Pulse — Engineering Guide (CLAUDE.md)
+# BIOSYNC — Engineering Guide (CLAUDE.md)
 
-Pulse is a health app ("Your body, decoded."). This monorepo holds the mobile client and its
+BIOSYNC is a health app ("Your body, decoded."). This monorepo holds the mobile client and its
 API. This file is the source of truth for stack and conventions — follow it.
+
+## Naming — BIOSYNC on the outside, `pulse` in the identifiers
+
+The app was renamed from Pulse to **BIOSYNC**. The rename deliberately stopped at user-facing
+surfaces: `app.json` `name`, the Render service, and product copy say BIOSYNC.
+
+Everything identifier-shaped still says `pulse` **on purpose** — root package `pulse-app`,
+workspaces `@pulse/api` and `@pulse/shared`, Expo `slug`/`scheme` `pulse`, bundle id
+`app.pulse.mobile`, EAS project `@kaze7777/pulse`. The `pulse://` scheme is baked into the
+installed dev client's deep link, and the bundle id is what Play Store installs key on: renaming
+them forces a new native build and breaks the device dev flow. **These are not leftovers — don't
+"tidy" them.**
 
 ## Monorepo
 
@@ -25,18 +37,28 @@ API. This file is the source of truth for stack and conventions — follow it.
 
 ## Local dev & device testing (Windows)
 
-- **Testing runs on the EAS development build** (a standalone "Pulse" app already installed on the
+- **Testing runs on the EAS development build** (a standalone BIOSYNC app already installed on the
   S23) — **not Expo Go** (Day 10 left the managed workflow; native modules like `expo-notifications`
-  can't run in Expo Go). The dev Wi-Fi router uses client isolation (**LAN/QR and `--tunnel` don't
-  work**), so the dev client rides **USB**:
-  1. `adb reverse tcp:8081 tcp:8081` && `adb reverse tcp:4000 tcp:4000`
-     (`adb` = `%USERPROFILE%\platform-tools\adb.exe`; re-run after every unplug).
-  2. Start the API: `pnpm --filter @pulse/api dev` (port 4000).
-  3. `$env:REACT_NATIVE_PACKAGER_HOSTNAME="localhost"; pnpm --filter mobile start -c`
+  can't run in Expo Go). The dev Wi-Fi router uses client isolation, so **LAN/QR and `--tunnel`
+  don't work**; the dev client reaches Metro through `adb reverse` tunnels instead. Those tunnels
+  work over either transport — **wireless debugging is preferred**, USB is the fallback:
+  1. Connect the device.
+     - *Wireless (preferred):* `adb mdns services` to find the phone, then `adb connect <ip:port>`.
+       Pairing is one-time (Settings → Developer options → Wireless debugging → Pair device with
+       pairing code). **The port rotates every time debugging restarts** — rediscover via `mdns`,
+       don't reuse the old one.
+     - *USB:* just plug in (`adb` = `%USERPROFILE%\platform-tools\adb.exe`).
+  2. Open the tunnels — re-run after every reconnect or unplug. With more than one device attached,
+     target it explicitly with `-s <dev>`:
+     `adb -s <dev> reverse tcp:8081 tcp:8081` && `adb -s <dev> reverse tcp:4000 tcp:4000`
+  3. Start the API: `pnpm --filter @pulse/api dev` (port 4000).
+  4. `$env:REACT_NATIVE_PACKAGER_HOSTNAME="localhost"; pnpm --filter mobile start -c`
      (expo-dev-client makes this a dev-client server, not Expo Go).
-  4. Launch on the device: `adb shell am start -a android.intent.action.VIEW -d
-     "pulse://expo-development-client/?url=http%3A%2F%2Flocalhost%3A8081"`. Metro **and** the API ride
-     the cable, so `src/lib/trpc.ts` resolves the API to `localhost:4000` and writes persist.
+  5. Launch on the device: `adb -s <dev> shell am start -a android.intent.action.VIEW -d
+     "pulse://expo-development-client/?url=http%3A%2F%2Flocalhost%3A8081"`. Metro **and** the API
+     ride the same tunnels, so `src/lib/trpc.ts` resolves the API to `localhost:4000` and writes
+     persist. (The `pulse://` scheme is the app's build-time identity — see Naming below.)
+  - Screenshots: `adb exec-out screencap -p > file.png`.
 - **Rebuild the dev client only when native deps/config change** (`app.json` plugins, a new native
   module): `cd apps/mobile && npx eas-cli build --platform android --profile development` (EAS project
   `@kaze7777/pulse`; profiles in `eas.json`; keystore already on EAS), then `adb install -r <apk>`.
@@ -70,6 +92,15 @@ API. This file is the source of truth for stack and conventions — follow it.
   `KeyboardAvoidingView` + `keyboardShouldPersistTaps="handled"`. `StatusBar style="light"`.
 - **Auth/session:** Supabase client in `src/lib/supabase.ts` with an AsyncStorage adapter,
   `persistSession` + `autoRefreshToken`. Session gates routing in `app/_layout.tsx`.
+- **`@pulse/shared` is type-only here.** `import type { … }` is fine; a **value** import from it
+  fails at runtime — shared is raw TS with no build step, so Metro can't resolve its runtime
+  exports the way the API's pipeline can. Need the logic on both sides? Duplicate the few lines
+  into `src/lib/format.ts` and cover them with a mobile test. That's the established pattern, not a
+  workaround to clean up.
+- **Never render an empty state for a failed request.** "No data yet" and "we couldn't reach the
+  server" are different claims, and showing the first for the second quietly lies to the user about
+  their own records. On a query error render `ui/bio/LoadFailed`, classifying with
+  `lib/netError.ts` `classifyNetError()` so the copy says *offline* vs *server error* honestly.
 - **Env:** only `EXPO_PUBLIC_*` vars reach the client. Never import a server secret into mobile.
 
 ## API (`apps/api`)
@@ -84,20 +115,45 @@ API. This file is the source of truth for stack and conventions — follow it.
 - **Authorization:** `protectedProcedure` throws `UNAUTHORIZED` when unauthenticated;
   `requireRole(role)` / `adminProcedure` throw `FORBIDDEN` on role mismatch. Put authz in
   middleware, not resolvers.
+- **Staff capability is NOT a role.** `User.role` is only ever `USER` or `ADMIN` in practice — a
+  properly granted trainer keeps `role = USER`. Staff access lives in `StaffProfile` (`kind` ×
+  `status`) and is gated by `staffProcedure`, which checks `ctx.user.staff`. Gating a staff feature
+  on `role` once shipped a bug where **every trainer had a permanently empty roster**.
+  - The `Role` enum still contains `PT`/`PRACTITIONER`, and `invites.ts` still writes them, purely
+    because the legacy `role` column is `NOT NULL` and part of the staff link's unique key until a
+    drop migration lands. **Reads must use `kind`.** Never revive role-based staff checks.
+  - `staffProcedure` only opens the surface. Every client read additionally needs an **ACTIVE
+    `StaffLink`** (`lib/staffLink.ts`) **and** the client's **consent**, capped by `ROLE_CEILING`
+    in `packages/shared/src/staffAccess.ts` — a PT is limited to `ACTIVITY`/`PHOTOS` and can never
+    see health records. Accepting an invitation creates the link but grants **no** consent; that
+    separation is deliberate.
+  - ADMIN is deliberately not staff: running the platform ≠ being someone's care provider.
 - **Data:** `User` mirrors Supabase `auth.users` by `id` (uuid). A `handle_new_user` Postgres
-  trigger seeds `public.users` on signup with the default `USER` role. Roles are a Prisma enum.
+  trigger seeds `public.users` on signup with the default `USER` role — it hard-codes `'USER'`, and
+  **signup must never grant staff capability**. Roles are a Prisma enum.
   Schema changes always ship a migration, never `db push` on shared DBs.
 - **Migrations — `prisma migrate dev` does not work here.** It fails `P3006`: the shadow database
   can't replay `0001_init`, because that migration's `handle_new_user` trigger references Supabase's
-  `auth` schema, which no shadow DB has. Instead, with the API server stopped:
-  1. Edit `schema.prisma`, then `prisma migrate status` to confirm the live DB has no drift.
+  `auth` schema, which no shadow DB has.
+
+  **Run every Prisma command from `apps/api`** (or scoped with `pnpm --filter @pulse/api exec`).
+  The schema paths below are relative, and the only schema in this repo is
+  `apps/api/prisma/schema.prisma`. Running the diff from the repo root would resolve
+  `prisma/schema.prisma` to a file that doesn't exist there — or, if one is ever scaffolded again,
+  to an **empty** datamodel, generating a migration that drops every table. A stray root
+  `prisma/schema.prisma` + `prisma.config.ts` were committed by accident once (`afeea7c`) and
+  removed for exactly this reason; don't let `prisma init` recreate them at the root.
+
+  With the API server stopped, from `apps/api`:
+  1. Edit `prisma/schema.prisma`, then `pnpm exec prisma migrate status` to confirm the live DB has
+     no drift.
   2. Generate the SQL by diffing the **live** DB (no shadow DB involved):
      `mkdir -p prisma/migrations/<NNNN>_<name> && pnpm exec prisma migrate diff
      --from-schema-datasource prisma/schema.prisma --to-schema-datamodel prisma/schema.prisma
      --script > prisma/migrations/<NNNN>_<name>/migration.sql`
   3. **Read the SQL before applying it.** It must be additive — any `DROP`/`TRUNCATE` means the diff
      misread the live schema; stop and investigate rather than run it.
-  4. `pnpm exec prisma migrate deploy` (applies without a shadow DB), then `prisma generate`.
+  4. `pnpm exec prisma migrate deploy` (applies without a shadow DB), then `pnpm exec prisma generate`.
 - **Type sharing:** the API exports its `AppRouter` type; the mobile client imports it type-only
   for end-to-end type safety. No runtime dependency from mobile on API code.
 

@@ -43,3 +43,20 @@
 - **Weight unit entry**: the underlying cause is still reachable — a user can type a lb number into
   a kg field. Worth a unit-aware weight input (or a "that looks like lb, convert?" confirm) in the
   quick-log sheet.
+
+## From the platform buildout
+- **Drop the legacy `role` column on staff links.** Staff capability moved to `StaffProfile`
+  (`kind` × `status`), but the old `role` column is still `NOT NULL` and part of the link's unique
+  key, so `invites.ts` keeps writing it via `kindToRole()` purely to satisfy the constraint. Reads
+  already use `kind`. Needs a migration that reworks the unique key off `role`, then drops the
+  column and the `PT`/`PRACTITIONER` values from the `Role` enum — while they exist, they're an
+  invitation to re-introduce the empty-roster bug by gating on role. Follow the `migrate diff`
+  procedure in CLAUDE.md; this one is **not** additive, so read the SQL especially carefully.
+
+## Ops / infrastructure
+- **Both hosting tiers sleep, and that's a launch blocker, not a bug.** Supabase (free) pauses the
+  database after 7 days idle — the symptom is `FATAL: (ENOTFOUND) tenant or user not found`, fixed
+  by restoring it in the dashboard; data survives. Render (free) sleeps the API after ~15 min idle
+  with a ~1 min cold start. Both are fine for closed testing and unacceptable once real people
+  check in every morning. Render is a one-line fix (`plan: starter` in `render.yaml`); Supabase
+  needs a paid tier. Decide before the store push.
