@@ -23,7 +23,9 @@ them forces a new native build and breaks the device dev flow. **These are not l
   - `apps/api` — standalone `@trpc/server` Node HTTP server + Prisma (Supabase Postgres).
   - `packages/shared` (`@pulse/shared`) — Zod schemas + pure logic (check-in validation, streak)
     shared by the API and, type-only, the mobile client. Consumed as raw TS source; no build step.
-- Root scripts run through Turbo: `pnpm typecheck`, `pnpm test`, `pnpm lint`, `pnpm build`.
+- Root scripts run through Turbo: `pnpm typecheck`, `pnpm test`, `pnpm lint`. **There is no build
+  step** — the API runs straight off `tsx`, `@pulse/shared` is raw TS, and the mobile app is built
+  by EAS. No workspace has a `build` script, so don't add a root one that resolves to nothing.
   Scope one workspace with `pnpm --filter mobile <script>` / `pnpm --filter @pulse/api <script>`.
 
 ## Versions — do not drift
