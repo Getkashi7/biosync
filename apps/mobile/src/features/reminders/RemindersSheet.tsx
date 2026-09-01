@@ -1,22 +1,36 @@
 /**
- * Reminders sheet — BIOSYNC redesign, the light rose "wind-down moment". A master
- * toggle, a big Doto clock of the nudge time, glass rows for time + quiet hours
- * (native time picker), and a dark quiet-hours summary. Scheduling logic lives in
- * src/lib/reminders / reminderSchedule; this is presentation + wiring.
+ * Notification settings (§12) — BIOSYNC redesign, the light rose "wind-down
+ * moment". A big Doto clock of the next nudge, a grouped glass list of nudge
+ * types (each a toggle + its time), and the quiet-hours window that governs
+ * them all. Scheduling logic lives in src/lib/reminders / reminderSchedule;
+ * this is presentation + wiring.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Pressable, StyleSheet, Switch, Text, View } from "react-native";
+import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from "react-native";
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import DateTimePicker, { type DateTimePickerEvent } from "@react-native-community/datetimepicker";
 import { AuroraField } from "../../ui/bio/AuroraField";
 import { selectionHaptic } from "../../lib/haptics";
-import { getReminderPrefs, setReminderPrefs, type ReminderPrefs } from "../../lib/prefs";
-import { DEFAULT_REMINDER_PREFS, formatHm, isInQuietHours, parseHm } from "../../lib/reminderSchedule";
+import {
+  NUDGE_COPY,
+  NUDGE_TYPES,
+  activeNudges,
+  defaultNotificationPrefs,
+  formatHm,
+  getNudge,
+  isNudgeSilenced,
+  parseHm,
+  type NotificationPrefs,
+  type NudgeType,
+} from "../../lib/reminderSchedule";
 import { getReminderPermission, requestReminderPermission, syncReminders } from "../../lib/reminders";
+import { fetchNotificationPrefs, saveNotificationPrefs } from "./notificationsApi";
 import { bio, fontFamily, motion } from "../../ui/theme";
 
 const INK = bio.color.onRose;
+const ACCENT = "#B8306E";
+const ACCENT_DEEP = "#8A2359";
 const ink = (a: number): string => `rgba(42,22,38,${a})`;
 
 function hmToDate(hm: string): Date {
@@ -29,16 +43,33 @@ function dateToHm(d: Date): string {
   return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 }
 
-type Field = "time" | "quietStart" | "quietEnd" | "digestTime";
+/** Which time the picker is editing: a nudge's time, or a quiet-hours edge. */
+type Picker = { kind: "nudge"; type: NudgeType } | { kind: "quiet"; edge: "quietStart" | "quietEnd" };
+
+/** The soonest nudge time still ahead today, else the earliest tomorrow. */
+function nextClock(prefs: NotificationPrefs): string | null {
+  const active = activeNudges(prefs);
+  if (active.length === 0) return null;
+  const now = new Date();
+  const mins = now.getHours() * 60 + now.getMinutes();
+  const slots = active
+    .map((n) => ({ time: n.time as string, slot: parseHm(n.time as string) ?? 0 }))
+    .sort((a, b) => a.slot - b.slot);
+  return (slots.find((s) => s.slot > mins) ?? slots[0])?.time ?? null;
+}
 
 export function RemindersSheet({ onClose }: { onClose: () => void }) {
   const insets = useSafeAreaInsets();
-  const [prefs, setPrefs] = useState<ReminderPrefs>(DEFAULT_REMINDER_PREFS);
-  const [picker, setPicker] = useState<Field | null>(null);
+  const [prefs, setPrefs] = useState<NotificationPrefs>(defaultNotificationPrefs());
+  const [picker, setPicker] = useState<Picker | null>(null);
   const [denied, setDenied] = useState(false);
+  const [offline, setOffline] = useState(false);
 
   useEffect(() => {
-    void getReminderPrefs().then(setPrefs);
+    void fetchNotificationPrefs().then(({ prefs: p, synced }) => {
+      setPrefs(p);
+      setOffline(!synced);
+    });
   }, []);
 
   const sheetP = useSharedValue(0);
@@ -64,28 +95,28 @@ export function RemindersSheet({ onClose }: { onClose: () => void }) {
   const sheetStyle = useAnimatedStyle(() => ({ transform: [{ translateY: (1 - sheetP.value) * (sheetH.value || 560) }] }));
   const scrimStyle = useAnimatedStyle(() => ({ opacity: scrimP.value }));
 
-  const apply = useCallback(async (next: ReminderPrefs) => {
+  /** Apply locally + schedule immediately, then mirror to the server. */
+  const apply = useCallback(async (next: NotificationPrefs) => {
     setPrefs(next);
-    await setReminderPrefs(next);
+    const synced = await saveNotificationPrefs(next);
+    setOffline(!synced);
     await syncReminders();
   }, []);
 
-  const onToggle = async (next: boolean) => {
-    selectionHaptic();
-    if (next) {
-      const granted = (await getReminderPermission()) || (await requestReminderPermission());
-      if (!granted) {
-        setDenied(true);
-        return;
-      }
-      setDenied(false);
-    }
-    await apply({ ...prefs, enabled: next });
-  };
+  const setNudge = useCallback(
+    async (type: NudgeType, patch: { enabled?: boolean; time?: string }) => {
+      const next: NotificationPrefs = {
+        ...prefs,
+        nudges: prefs.nudges.map((n) => (n.type === type ? { ...n, ...patch } : n)),
+      };
+      await apply(next);
+    },
+    [apply, prefs],
+  );
 
-  const onToggleDigest = async (next: boolean) => {
+  const onToggle = async (type: NudgeType, on: boolean) => {
     selectionHaptic();
-    if (next) {
+    if (on) {
       const granted = (await getReminderPermission()) || (await requestReminderPermission());
       if (!granted) {
         setDenied(true);
@@ -93,17 +124,26 @@ export function RemindersSheet({ onClose }: { onClose: () => void }) {
       }
       setDenied(false);
     }
-    await apply({ ...prefs, digestEnabled: next });
+    await setNudge(type, { enabled: on });
   };
 
   const onPickerChange = (e: DateTimePickerEvent, d?: Date) => {
-    const field = picker;
+    const active = picker;
     setPicker(null);
-    if (field && e.type === "set" && d) void apply({ ...prefs, [field]: dateToHm(d) });
+    if (!active || e.type !== "set" || !d) return;
+    const hm = dateToHm(d);
+    if (active.kind === "nudge") void setNudge(active.type, { time: hm });
+    else void apply({ ...prefs, [active.edge]: hm });
   };
 
-  const slot = parseHm(prefs.time);
-  const conflict = prefs.enabled && slot !== null && isInQuietHours(slot, prefs.quietStart, prefs.quietEnd);
+  const clock = nextClock(prefs);
+  const silenced = NUDGE_TYPES.filter((t) => isNudgeSilenced(prefs, t));
+  const pickerValue =
+    picker === null
+      ? "20:00"
+      : picker.kind === "quiet"
+        ? prefs[picker.edge]
+        : (getNudge(prefs, picker.type).time ?? "20:00");
 
   return (
     <View style={StyleSheet.absoluteFill}>
@@ -111,56 +151,95 @@ export function RemindersSheet({ onClose }: { onClose: () => void }) {
         <Pressable style={StyleSheet.absoluteFill} onPress={close} accessibilityLabel="Dismiss" />
       </Animated.View>
 
-      <Animated.View style={[styles.sheet, { paddingBottom: insets.bottom + 24 }, sheetStyle]} onLayout={(e) => onSheetLayout(e.nativeEvent.layout.height)}>
+      <Animated.View
+        style={[styles.sheet, { paddingBottom: insets.bottom + 24 }, sheetStyle]}
+        onLayout={(e) => onSheetLayout(e.nativeEvent.layout.height)}
+      >
         <AuroraField
           blobs={[{ hue: "214,44,122", size: 430, cx: true, top: 30, stops: [{ o: 0, a: 0.6 }, { o: 40, a: 0.24 }, { o: 74, a: 0 }] }]}
         />
         <View style={styles.grabber} />
         <View style={styles.head}>
-          <Text style={styles.title}>Reminders</Text>
-          <Switch
-            value={prefs.enabled}
-            onValueChange={(v) => void onToggle(v)}
-            trackColor={{ false: "rgba(42,22,38,0.25)", true: "#B8306E" }}
-            thumbColor="#FBEEF5"
-          />
+          <Text style={styles.title}>Notifications</Text>
         </View>
 
         <View style={styles.clockWrap}>
-          <Text style={styles.clock}>{prefs.time}</Text>
-          <Text style={styles.clockLabel}>daily nudge</Text>
+          <Text style={styles.clock}>{clock ?? "--:--"}</Text>
+          <Text style={styles.clockLabel}>{clock ? "next nudge" : "nothing scheduled"}</Text>
         </View>
 
-        {prefs.enabled ? (
-          <>
-            <Row label="Time" value={formatHm(prefs.time)} onPress={() => setPicker("time")} />
-            <Row label="Quiet hours start" value={formatHm(prefs.quietStart)} onPress={() => setPicker("quietStart")} />
-            <Row label="Quiet hours end" value={formatHm(prefs.quietEnd)} onPress={() => setPicker("quietEnd")} />
-          </>
-        ) : null}
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={styles.scrollBody}
+          showsVerticalScrollIndicator={false}
+        >
+          {NUDGE_TYPES.map((type) => {
+            const nudge = getNudge(prefs, type);
+            const copy = NUDGE_COPY[type];
+            return (
+              <View key={type} style={styles.group}>
+                <View style={styles.groupHead}>
+                  <View style={styles.groupText}>
+                    <Text style={styles.groupTitle}>{copy.label}</Text>
+                    <Text style={styles.groupCaption}>{copy.caption}</Text>
+                  </View>
+                  <Switch
+                    value={nudge.enabled}
+                    onValueChange={(v) => void onToggle(type, v)}
+                    trackColor={{ false: ink(0.25), true: ACCENT }}
+                    thumbColor="#FBEEF5"
+                    accessibilityLabel={copy.label}
+                  />
+                </View>
+                {nudge.enabled ? (
+                  <Row
+                    label="Time"
+                    value={formatHm(nudge.time ?? "20:00")}
+                    onPress={() => setPicker({ kind: "nudge", type })}
+                  />
+                ) : null}
+              </View>
+            );
+          })}
 
-        {denied ? (
-          <Text style={styles.notice}>Notifications are off for BIOSYNC. Enable them in system settings, then try again.</Text>
-        ) : conflict ? (
-          <Text style={styles.notice}>That time is inside your quiet hours — no reminder will fire. Pick a time outside the window.</Text>
-        ) : null}
+          <Text style={styles.sectionLabel}>Quiet hours</Text>
+          <Text style={styles.groupCaption}>Nothing fires inside this window.</Text>
+          <View style={styles.quietRows}>
+            <Row
+              label="Start"
+              value={formatHm(prefs.quietStart)}
+              onPress={() => setPicker({ kind: "quiet", edge: "quietStart" })}
+            />
+            <Row
+              label="End"
+              value={formatHm(prefs.quietEnd)}
+              onPress={() => setPicker({ kind: "quiet", edge: "quietEnd" })}
+            />
+          </View>
 
-        <View style={styles.digestHead}>
-          <Text style={styles.digestTitle}>Morning digest</Text>
-          <Switch
-            value={prefs.digestEnabled}
-            onValueChange={(v) => void onToggleDigest(v)}
-            trackColor={{ false: "rgba(42,22,38,0.25)", true: "#B8306E" }}
-            thumbColor="#FBEEF5"
-          />
-        </View>
-        <Text style={styles.digestCaption}>A short read on your night, delivered each morning in Ask.</Text>
-        {prefs.digestEnabled ? (
-          <Row label="Digest time" value={formatHm(prefs.digestTime)} onPress={() => setPicker("digestTime")} />
-        ) : null}
+          {denied ? (
+            <Text style={styles.notice}>
+              Notifications are off for BIOSYNC. Enable them in system settings, then try again.
+            </Text>
+          ) : null}
+          {silenced.length > 0 ? (
+            <Text style={styles.notice}>
+              {silenced.length === 1
+                ? `${NUDGE_COPY[silenced[0] as NudgeType].label} is set inside your quiet hours, so it won't fire. Move its time or the window.`
+                : `${silenced.length} nudges are set inside your quiet hours, so they won't fire. Move their times or the window.`}
+            </Text>
+          ) : null}
+          {offline ? (
+            <Text style={styles.notice}>
+              Saved on this phone. We couldn&apos;t reach the server, so these won&apos;t follow you to a new device yet.
+            </Text>
+          ) : null}
+        </ScrollView>
       </Animated.View>
 
-      {picker ? <DateTimePicker mode="time" display="clock" value={hmToDate(prefs[picker])} onChange={onPickerChange} /> : null}
+      {picker ? (
+        <DateTimePicker mode="time" display="clock" value={hmToDate(pickerValue)} onChange={onPickerChange} />
+      ) : null}
     </View>
   );
 }
@@ -181,6 +260,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
+    maxHeight: "92%",
     backgroundColor: bio.color.rose,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
@@ -191,9 +271,41 @@ const styles = StyleSheet.create({
   grabber: { width: 44, height: 5, borderRadius: 3, backgroundColor: ink(0.2), alignSelf: "center" },
   head: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 18 },
   title: { fontFamily: fontFamily.bold, fontSize: 24, letterSpacing: -0.24, color: INK },
-  clockWrap: { alignItems: "center", marginTop: 30, marginBottom: 24 },
-  clock: { fontFamily: fontFamily.dot, fontSize: 60, letterSpacing: 6, color: "#5A1B3E", textShadowColor: "rgba(214,44,122,0.35)", textShadowRadius: 24, textShadowOffset: { width: 0, height: 0 } },
-  clockLabel: { fontFamily: fontFamily.semibold, fontSize: 11, letterSpacing: 2, color: ink(0.55), textTransform: "uppercase", marginTop: 4 },
+  clockWrap: { alignItems: "center", marginTop: 22, marginBottom: 18 },
+  clock: {
+    fontFamily: fontFamily.dot,
+    fontSize: 60,
+    letterSpacing: 6,
+    color: "#5A1B3E",
+    textShadowColor: "rgba(214,44,122,0.35)",
+    textShadowRadius: 24,
+    textShadowOffset: { width: 0, height: 0 },
+  },
+  clockLabel: {
+    fontFamily: fontFamily.semibold,
+    fontSize: 11,
+    letterSpacing: 2,
+    color: ink(0.55),
+    textTransform: "uppercase",
+    marginTop: 4,
+  },
+  scroll: { flexGrow: 0 },
+  scrollBody: { paddingBottom: 8 },
+  group: { marginBottom: 18 },
+  groupHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  groupText: { flex: 1, paddingRight: 12 },
+  groupTitle: { fontFamily: fontFamily.semibold, fontSize: 15, color: INK },
+  groupCaption: { fontFamily: fontFamily.regular, fontSize: 12.5, lineHeight: 18, color: ink(0.55), marginTop: 2 },
+  sectionLabel: {
+    fontFamily: fontFamily.semibold,
+    fontSize: 15,
+    color: INK,
+    marginTop: 4,
+    paddingTop: 18,
+    borderTopWidth: 1,
+    borderTopColor: ink(0.12),
+  },
+  quietRows: { marginTop: 10 },
   row: {
     height: 60,
     paddingHorizontal: 18,
@@ -204,20 +316,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 10,
+    marginTop: 10,
   },
   rowLabel: { fontFamily: fontFamily.semibold, fontSize: 14, color: INK },
-  rowValue: { fontFamily: fontFamily.bold, fontSize: 14, color: "#8A2359" },
-  notice: { fontFamily: fontFamily.regular, fontSize: 12.5, lineHeight: 18, color: ink(0.6), marginTop: 6 },
-  digestHead: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginTop: 22,
-    paddingTop: 18,
-    borderTopWidth: 1,
-    borderTopColor: "rgba(42,22,38,0.12)",
-  },
-  digestTitle: { fontFamily: fontFamily.semibold, fontSize: 15, color: INK },
-  digestCaption: { fontFamily: fontFamily.regular, fontSize: 12.5, lineHeight: 18, color: ink(0.55), marginTop: 4, marginBottom: 12 },
+  rowValue: { fontFamily: fontFamily.bold, fontSize: 14, color: ACCENT_DEEP },
+  notice: { fontFamily: fontFamily.regular, fontSize: 12.5, lineHeight: 18, color: ink(0.6), marginTop: 14 },
 });

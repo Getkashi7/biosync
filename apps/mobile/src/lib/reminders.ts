@@ -1,21 +1,46 @@
 /**
- * Reminder orchestration: wraps expo-notifications around the pure scheduling in
- * `reminderSchedule.ts`. "Smart" = we keep exactly one scheduled notification,
- * the next occurrence, and re-derive it whenever inputs change (app start, app
- * foreground, after a check-in, after settings change) so it skips days already
- * checked in and stays out of quiet hours.
+ * Nudge orchestration: wraps expo-notifications around the pure scheduling in
+ * `reminderSchedule.ts`. Everything fires locally on the device — there is no
+ * push service in play — so this reconciles the OS's scheduled set with the
+ * user's current settings whenever inputs change (app start, foreground, after
+ * a check-in, after a settings change).
+ *
+ * The check-in nudge is "smart": exactly one scheduled occurrence, re-derived
+ * so it skips days already logged. The rest are plain daily triggers. A nudge
+ * whose time lands inside quiet hours is not scheduled at all.
  *
  * Only usable on a dev/native build — expo-notifications doesn't run in Expo Go.
  */
 import * as Notifications from "expo-notifications";
-import { getLastCheckinDate, getReminderPrefs } from "./prefs";
-import { nextReminderAt, parseHm } from "./reminderSchedule";
+import { getLastCheckinDate, getNotificationPrefs } from "./prefs";
+import {
+  NUDGE_COPY,
+  activeNudges,
+  getNudge,
+  nextReminderAt,
+  parseHm,
+  type NudgeType,
+} from "./reminderSchedule";
 
-const CHANNEL_ID = "check-in-reminders";
-const DIGEST_CHANNEL_ID = "morning-digest";
+/** One Android channel per nudge, so the OS lets people tune them separately. */
+const CHANNELS: Record<NudgeType, { id: string; name: string }> = {
+  CHECK_IN: { id: "check-in-reminders", name: "Check-in reminders" },
+  MORNING_DIGEST: { id: "morning-digest", name: "Morning digest" },
+  SUPPLEMENTS: { id: "supplement-reminders", name: "Supplement reminders" },
+  HYDRATION: { id: "hydration-reminders", name: "Hydration reminders" },
+  GOALS: { id: "goal-nudges", name: "Goal nudges" },
+};
+
+/** Where tapping the notification should land. */
+const NUDGE_SCREEN: Partial<Record<NudgeType, string>> = {
+  MORNING_DIGEST: "ask",
+  SUPPLEMENTS: "supplements",
+  GOALS: "goals",
+};
+
 let configured = false;
 
-/** Set the foreground handler + Android channel. Idempotent; call once at startup. */
+/** Set the foreground handler + Android channels. Idempotent; call once at startup. */
 export async function configureNotifications(): Promise<void> {
   if (configured) return;
   configured = true;
@@ -28,14 +53,12 @@ export async function configureNotifications(): Promise<void> {
     }),
   });
   try {
-    await Notifications.setNotificationChannelAsync(CHANNEL_ID, {
-      name: "Check-in reminders",
-      importance: Notifications.AndroidImportance.DEFAULT,
-    });
-    await Notifications.setNotificationChannelAsync(DIGEST_CHANNEL_ID, {
-      name: "Morning digest",
-      importance: Notifications.AndroidImportance.DEFAULT,
-    });
+    for (const channel of Object.values(CHANNELS)) {
+      await Notifications.setNotificationChannelAsync(channel.id, {
+        name: channel.name,
+        importance: Notifications.AndroidImportance.DEFAULT,
+      });
+    }
   } catch {
     // channel setup is best-effort (no-op off-Android)
   }
@@ -54,53 +77,69 @@ export async function requestReminderPermission(): Promise<boolean> {
 }
 
 /**
- * Reconcile both scheduled notifications with current prefs: cancel everything,
- * then re-schedule whichever are enabled. The check-in reminder is a single
- * "smart" next occurrence (skips days already logged, dodges quiet hours); the
- * morning digest is a plain daily trigger at its time. Safe to call often; a
- * no-op when both are off or permission is missing.
+ * Reconcile the OS's scheduled notifications with current settings: cancel
+ * everything, then re-schedule whatever should fire. Safe to call often; a
+ * no-op when nothing is enabled or permission is missing.
  */
 export async function syncReminders(): Promise<void> {
   try {
-    const prefs = await getReminderPrefs();
+    const prefs = await getNotificationPrefs();
     await Notifications.cancelAllScheduledNotificationsAsync();
-    if (!prefs.enabled && !prefs.digestEnabled) return;
+
+    const active = activeNudges(prefs);
+    if (active.length === 0) return;
     if (!(await getReminderPermission())) return;
 
-    if (prefs.enabled) {
-      const next = nextReminderAt(prefs, new Date(), await getLastCheckinDate());
-      if (next) {
-        await Notifications.scheduleNotificationAsync({
-          content: {
-            title: "Time for your check-in",
-            body: "Log your sleep, energy and mood to keep your streak going.",
-          },
-          trigger: {
-            type: Notifications.SchedulableTriggerInputTypes.DATE,
-            date: next,
-            channelId: CHANNEL_ID,
-          },
-        });
-      }
-    }
+    const lastCheckin = await getLastCheckinDate();
 
-    if (prefs.digestEnabled) {
-      const slot = parseHm(prefs.digestTime);
-      if (slot !== null) {
-        await Notifications.scheduleNotificationAsync({
-          content: {
-            title: "Your morning digest is ready",
-            body: "A quick read on last night — open Ask to see it.",
-            data: { screen: "ask" },
+    for (const nudge of active) {
+      const copy = NUDGE_COPY[nudge.type];
+      const channelId = CHANNELS[nudge.type].id;
+      const screen = NUDGE_SCREEN[nudge.type];
+      const content = {
+        title: copy.title,
+        body: copy.body,
+        ...(screen ? { data: { screen } } : {}),
+      };
+
+      if (nudge.type === "CHECK_IN") {
+        // Smart: a single next occurrence that skips a day already logged.
+        const checkin = getNudge(prefs, "CHECK_IN");
+        if (checkin.time === null) continue;
+        const next = nextReminderAt(
+          {
+            enabled: true,
+            time: checkin.time,
+            quietStart: prefs.quietStart,
+            quietEnd: prefs.quietEnd,
           },
-          trigger: {
-            type: Notifications.SchedulableTriggerInputTypes.DAILY,
-            hour: Math.floor(slot / 60),
-            minute: slot % 60,
-            channelId: DIGEST_CHANNEL_ID,
-          },
-        });
+          new Date(),
+          lastCheckin,
+        );
+        if (next) {
+          await Notifications.scheduleNotificationAsync({
+            content,
+            trigger: {
+              type: Notifications.SchedulableTriggerInputTypes.DATE,
+              date: next,
+              channelId,
+            },
+          });
+        }
+        continue;
       }
+
+      const slot = nudge.time === null ? null : parseHm(nudge.time);
+      if (slot === null) continue;
+      await Notifications.scheduleNotificationAsync({
+        content,
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.DAILY,
+          hour: Math.floor(slot / 60),
+          minute: slot % 60,
+          channelId,
+        },
+      });
     }
   } catch {
     // best-effort — a scheduling hiccup must never crash the app

@@ -53,6 +53,22 @@
   invitation to re-introduce the empty-roster bug by gating on role. Follow the `migrate diff`
   procedure in CLAUDE.md; this one is **not** additive, so read the SQL especially carefully.
 
+## From §12 (Notification settings)
+- **Appointment nudges** are deliberately absent from `NudgeType`. The §12 brief lists them, but
+  booking (§6/§7) doesn't exist yet, and a toggle that can never fire is worse than no toggle. Add
+  the enum value on both sides (`packages/shared/src/notifications.ts` and `schema.prisma`) when
+  appointments land — `mergeNudges` backfills existing users, so no data migration is needed.
+- **Nudges are device-local only.** Everything fires through `expo-notifications` on the phone;
+  the server stores preferences but sends nothing. That's fine for time-of-day reminders, but
+  anything event-driven (an appointment moved, a trainer shared a plan) needs real push — a token
+  table plus FCM/Expo push. The `FCM vs Expo push` decision in the provisions list is still open.
+- **Per-supplement timing**: the SUPPLEMENTS nudge is one daily reminder for the whole stack,
+  because `Supplement` has no time field. The §5 schedule slots (morning/evening) could drive
+  several, if the single nudge proves too blunt.
+- **Quiet hours silence rather than shift.** A nudge inside the window doesn't fire at all; it
+  isn't moved to the edge of the window. The settings screen says so, but "remind me after quiet
+  hours end" may be the kinder behaviour.
+
 ## Ops / infrastructure
 - **Both hosting tiers sleep, and that's a launch blocker, not a bug.** Supabase (free) pauses the
   database after 7 days idle — the symptom is `FATAL: (ENOTFOUND) tenant or user not found`, fixed

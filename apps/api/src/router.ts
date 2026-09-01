@@ -18,6 +18,7 @@ import { trainingRouter } from "./routers/training";
 import { adminRouter } from "./routers/admin";
 import { invitesRouter } from "./routers/invites";
 import { accountRouter } from "./routers/account";
+import { notificationsRouter } from "./routers/notifications";
 
 export const appRouter = router({
   /** Liveness check — no auth. */
@@ -72,6 +73,9 @@ export const appRouter = router({
 
   /** Account actions — currently only `deleteAccount`. */
   account: accountRouter,
+
+  /** Notification settings — the device schedules; the server remembers. */
+  notifications: notificationsRouter,
 });
 
 export type AppRouter = typeof appRouter;

@@ -4,10 +4,18 @@
  * date (a local signal the reminder scheduler reads to skip already-logged days).
  */
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { DEFAULT_REMINDER_PREFS, type ReminderPrefs } from "./reminderSchedule";
+import {
+  DEFAULT_REMINDER_PREFS,
+  defaultNotificationPrefs,
+  mergeNudges,
+  migrateLegacyPrefs,
+  type NotificationPrefs,
+  type ReminderPrefs,
+} from "./reminderSchedule";
 
 const UNIT_KEY = "pulse.unitPref";
 const REMINDER_KEY = "pulse.reminderPrefs";
+const NOTIFICATION_KEY = "pulse.notificationPrefs";
 const LAST_CHECKIN_KEY = "pulse.lastCheckinDate";
 const INTENT_KEY = "pulse.appIntent";
 const WELCOMED_KEY = "pulse.welcomed";
@@ -97,6 +105,43 @@ export async function setReminderPrefs(prefs: ReminderPrefs): Promise<void> {
     await AsyncStorage.setItem(REMINDER_KEY, JSON.stringify(prefs));
   } catch {
     // best-effort
+  }
+}
+
+export type { NotificationPrefs, NudgeSetting } from "./reminderSchedule";
+
+/**
+ * The device's copy of the notification settings. The server is the source of
+ * truth, but the scheduler must work offline and at cold start — before any
+ * query resolves — so the last known settings are cached here.
+ *
+ * On first read after the upgrade there is no v2 entry, so an existing user's
+ * single reminder + digest are carried across rather than reset to off.
+ */
+export async function getNotificationPrefs(): Promise<NotificationPrefs> {
+  try {
+    const raw = await AsyncStorage.getItem(NOTIFICATION_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw) as Partial<NotificationPrefs>;
+      const base = defaultNotificationPrefs();
+      return {
+        quietStart: parsed.quietStart ?? base.quietStart,
+        quietEnd: parsed.quietEnd ?? base.quietEnd,
+        nudges: mergeNudges(parsed.nudges ?? []),
+      };
+    }
+    const legacy = await AsyncStorage.getItem(REMINDER_KEY);
+    return migrateLegacyPrefs(legacy ? (JSON.parse(legacy) as Partial<ReminderPrefs>) : null);
+  } catch {
+    return defaultNotificationPrefs();
+  }
+}
+
+export async function setNotificationPrefs(prefs: NotificationPrefs): Promise<void> {
+  try {
+    await AsyncStorage.setItem(NOTIFICATION_KEY, JSON.stringify(prefs));
+  } catch {
+    // best-effort — the settings still apply for this session
   }
 }
 

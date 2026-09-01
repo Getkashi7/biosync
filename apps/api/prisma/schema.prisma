@@ -21,6 +21,8 @@ model User {
   goals              Goal[]
   meals              Meal[]
   metrics            Metric[]
+  notificationNudges NotificationNudge[]
+  notificationPrefs  NotificationPrefs?
   readinessSnapshots ReadinessSnapshot[]
   notesReceived      SessionNote[]       @relation("NoteClient")
   notesWritten       SessionNote[]       @relation("NoteTrainer")
@@ -277,11 +279,56 @@ model Goal {
   @@map("goals")
 }
 
+/// Quiet hours — one row per user, covering every nudge. Times are "HH:MM" in
+/// the user's device-local clock, not UTC: 22:00 means ten at night wherever
+/// they are, and an instant would drift the moment they travel.
+model NotificationPrefs {
+  id         String   @id @default(uuid()) @db.Uuid
+  userId     String   @unique @map("user_id") @db.Uuid
+  quietStart String   @default("22:00") @map("quiet_start")
+  quietEnd   String   @default("07:00") @map("quiet_end")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notification_prefs")
+}
+
+/// One row per nudge the user has touched. Absent rows fall back to the shared
+/// defaults (all off), so a new nudge type ships without backfilling anyone.
+/// The device still schedules these locally; the server only remembers them.
+model NotificationNudge {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  type      NudgeType
+  enabled   Boolean   @default(false)
+  /// "HH:MM" device-local; null when the user hasn't picked a time yet.
+  time      String?
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, type])
+  @@index([userId])
+  @@map("notification_nudges")
+}
+
 enum Role {
   USER
   ADMIN
   PT
   PRACTITIONER
+}
+
+/// The nudges that have something real behind them. Appointment nudges land
+/// with booking (§6/§7) — a toggle that can never fire would be a lie.
+/// Mirrors NUDGE_TYPES in @pulse/shared; keep the two in step.
+enum NudgeType {
+  CHECK_IN
+  MORNING_DIGEST
+  SUPPLEMENTS
+  HYDRATION
+  GOALS
 }
 
 enum MetricType {

@@ -5,8 +5,15 @@
 import { describe, it, expect } from "vitest";
 import {
   DEFAULT_REMINDER_PREFS,
+  NUDGE_TYPES,
+  activeNudges,
+  defaultNotificationPrefs,
   formatHm,
+  getNudge,
   isInQuietHours,
+  isNudgeSilenced,
+  mergeNudges,
+  migrateLegacyPrefs,
   nextReminderAt,
   parseHm,
   type ReminderPrefs,
@@ -102,5 +109,73 @@ describe("nextReminderAt", () => {
 
   it("returns null for a malformed time", () => {
     expect(nextReminderAt(on({ time: "8pm" }), at(12), null)).toBeNull();
+  });
+});
+
+describe("migrateLegacyPrefs", () => {
+  it("carries an existing reminder + digest across to the nudge model", () => {
+    const migrated = migrateLegacyPrefs({
+      enabled: true,
+      time: "21:30",
+      quietStart: "23:00",
+      quietEnd: "06:00",
+      digestEnabled: true,
+      digestTime: "07:15",
+    });
+    expect(migrated.quietStart).toBe("23:00");
+    expect(migrated.quietEnd).toBe("06:00");
+    expect(getNudge(migrated, "CHECK_IN")).toEqual({ type: "CHECK_IN", enabled: true, time: "21:30" });
+    expect(getNudge(migrated, "MORNING_DIGEST")).toEqual({
+      type: "MORNING_DIGEST",
+      enabled: true,
+      time: "07:15",
+    });
+  });
+
+  it("leaves the new nudge types off for an upgrading user", () => {
+    const migrated = migrateLegacyPrefs({ enabled: true, time: "20:00" });
+    for (const type of ["SUPPLEMENTS", "HYDRATION", "GOALS"] as const) {
+      expect(getNudge(migrated, type).enabled).toBe(false);
+    }
+  });
+
+  it("falls back to defaults when there is nothing stored", () => {
+    expect(migrateLegacyPrefs(null)).toEqual(defaultNotificationPrefs());
+  });
+});
+
+describe("mergeNudges", () => {
+  it("fills in types the stored rows don't cover, in declared order", () => {
+    const merged = mergeNudges([{ type: "HYDRATION", enabled: true, time: "12:00" }]);
+    expect(merged.map((n) => n.type)).toEqual([...NUDGE_TYPES]);
+    expect(merged.find((n) => n.type === "HYDRATION")?.enabled).toBe(true);
+    expect(merged.find((n) => n.type === "CHECK_IN")?.enabled).toBe(false);
+  });
+});
+
+describe("isNudgeSilenced / activeNudges", () => {
+  const prefs = {
+    quietStart: "22:00",
+    quietEnd: "07:00",
+    nudges: [
+      { type: "CHECK_IN" as const, enabled: true, time: "20:00" },
+      { type: "MORNING_DIGEST" as const, enabled: true, time: "03:00" },
+      { type: "SUPPLEMENTS" as const, enabled: false, time: "09:00" },
+      { type: "HYDRATION" as const, enabled: true, time: null },
+      { type: "GOALS" as const, enabled: true, time: "18:00" },
+    ],
+  };
+
+  it("flags an enabled nudge that quiet hours will silence", () => {
+    expect(isNudgeSilenced(prefs, "MORNING_DIGEST")).toBe(true);
+    expect(isNudgeSilenced(prefs, "CHECK_IN")).toBe(false);
+  });
+
+  it("does not flag a nudge that is switched off", () => {
+    expect(isNudgeSilenced(prefs, "SUPPLEMENTS")).toBe(false);
+  });
+
+  it("schedules only the nudges that will actually fire", () => {
+    expect(activeNudges(prefs).map((n) => n.type)).toEqual(["CHECK_IN", "GOALS"]);
   });
 });
