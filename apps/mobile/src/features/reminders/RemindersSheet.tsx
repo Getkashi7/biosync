@@ -25,7 +25,7 @@ import {
   type NudgeType,
 } from "../../lib/reminderSchedule";
 import { getReminderPermission, requestReminderPermission, syncReminders } from "../../lib/reminders";
-import { fetchNotificationPrefs, saveNotificationPrefs } from "./notificationsApi";
+import { fetchNotificationPrefs, saveNotificationPrefs, type SyncState } from "./notificationsApi";
 import { bio, fontFamily, motion } from "../../ui/theme";
 
 const INK = bio.color.onRose;
@@ -63,12 +63,12 @@ export function RemindersSheet({ onClose }: { onClose: () => void }) {
   const [prefs, setPrefs] = useState<NotificationPrefs>(defaultNotificationPrefs());
   const [picker, setPicker] = useState<Picker | null>(null);
   const [denied, setDenied] = useState(false);
-  const [offline, setOffline] = useState(false);
+  const [sync, setSync] = useState<SyncState>("synced");
 
   useEffect(() => {
-    void fetchNotificationPrefs().then(({ prefs: p, synced }) => {
+    void fetchNotificationPrefs().then(({ prefs: p, sync: s }) => {
       setPrefs(p);
-      setOffline(!synced);
+      setSync(s);
     });
   }, []);
 
@@ -98,8 +98,7 @@ export function RemindersSheet({ onClose }: { onClose: () => void }) {
   /** Apply locally + schedule immediately, then mirror to the server. */
   const apply = useCallback(async (next: NotificationPrefs) => {
     setPrefs(next);
-    const synced = await saveNotificationPrefs(next);
-    setOffline(!synced);
+    setSync(await saveNotificationPrefs(next));
     await syncReminders();
   }, []);
 
@@ -229,9 +228,15 @@ export function RemindersSheet({ onClose }: { onClose: () => void }) {
                 : `${silenced.length} nudges are set inside your quiet hours, so they won't fire. Move their times or the window.`}
             </Text>
           ) : null}
-          {offline ? (
+          {sync === "offline" ? (
             <Text style={styles.notice}>
-              Saved on this phone. We couldn&apos;t reach the server, so these won&apos;t follow you to a new device yet.
+              Saved on this phone. You&apos;re offline, so these won&apos;t follow you to a new device
+              until you reconnect.
+            </Text>
+          ) : sync === "error" ? (
+            <Text style={styles.notice}>
+              Saved on this phone. The server couldn&apos;t store them, so these won&apos;t follow you to
+              a new device yet.
             </Text>
           ) : null}
         </ScrollView>
