@@ -11,7 +11,16 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+/**
+ * Resolved once and remembered: privacy.html ships inside the image, so the
+ * path can't change while the process lives. Only a hit is cached — a miss
+ * stays retryable rather than poisoning every later request.
+ */
+let cachedPath: string | null = null;
+
 function findPrivacyHtml(): string | null {
+  if (cachedPath) return cachedPath;
+
   const candidates = [
     path.resolve(__dirname, "../../../../privacy.html"),
     path.resolve(__dirname, "../../../../../privacy.html"),
@@ -19,13 +28,20 @@ function findPrivacyHtml(): string | null {
     path.resolve(process.cwd(), "privacy.html"),
   ];
   for (const p of candidates) {
-    if (existsSync(p)) return p;
+    if (existsSync(p)) {
+      cachedPath = p;
+      return p;
+    }
   }
   return null;
 }
 
 export function servePrivacy(req: IncomingMessage, res: ServerResponse): boolean {
-  if (req.url !== "/privacy") return false;
+  // Compare the path alone: a link from a store listing or an email arrives
+  // with tracking params (`/privacy?utm_source=...`), and comparing the whole
+  // URL would 404 it.
+  const pathname = (req.url ?? "").split("?")[0] ?? "";
+  if (pathname !== "/privacy" && pathname !== "/privacy.html") return false;
 
   const filePath = findPrivacyHtml();
   if (!filePath) {
