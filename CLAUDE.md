@@ -144,6 +144,13 @@ them forces a new native build and breaks the device dev flow. **These are not l
   `prisma/schema.prisma` + `prisma.config.ts` were committed by accident once (`afeea7c`) and
   removed for exactly this reason; don't let `prisma init` recreate them at the root.
 
+  **A bare `Error: Schema engine error:` with no detail means the URLs are swapped.**
+  `DATABASE_URL` is the *pooled* connection (port **6543**, `?pgbouncer=true`) and `DIRECT_URL` is
+  the *session* one (port **5432**, no params). Reversed, the app still runs and plain queries
+  still succeed — only `prisma migrate` fails, because transaction-mode pooling can't hold the
+  advisory locks a migration needs. Check the ports before debugging anything else. (Found
+  reversed on 2026-09-01; `.env.example` has the correct mapping.)
+
   With the API server stopped, from `apps/api`:
   1. Edit `prisma/schema.prisma`, then `pnpm exec prisma migrate status` to confirm the live DB has
      no drift.
