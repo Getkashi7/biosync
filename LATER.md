@@ -69,6 +69,28 @@
   isn't moved to the edge of the window. The settings screen says so, but "remind me after quiet
   hours end" may be the kinder behaviour.
 
+## From §1 (Progress photos)
+- **Offline gallery (design 5C) is not built.** The design shows cached photos dimmed plus a
+  "waiting for connection" tile, under a banner reading *"Showing photos saved on this phone"*.
+  Nothing is cached on the device yet, so that banner over an empty grid would be a lie — in the
+  one feature built around not lying. Offline currently renders 5B with offline copy instead
+  ("They're safe — you just look offline. Nothing was deleted."), which is true. Doing 5C properly
+  needs the photo list in AsyncStorage **and** the images themselves on disk, since a signed URL
+  can't load offline: that's a real caching layer, not a banner.
+- **Queued uploads don't survive the app closing.** A failed upload keeps its tile with Retry for
+  the session, but the pending list is in memory. Persisting the queue (and retrying it on
+  reconnect) is what would make the 5C promise "new photos upload automatically when you're back
+  online" true.
+- **Photos aren't compressed before upload.** The bucket caps at 10 MB and the picker rejects
+  anything larger, so a modern phone photo can be refused outright. `expo-image-manipulator`
+  (~14.0.7 for SDK 54) would let a photo be resized before it counts against that cap — but it's
+  another native module, so it waits for a dev-client rebuild.
+- **Staff can't read photos yet.** The API deliberately has no staff-facing photo procedure: it
+  needs an active StaffLink AND the PHOTOS consent AND the per-photo override intersection
+  (`effectivePhotoAudience`), and belongs with §9 where it can be tested end to end. Until then
+  the visibility selector records intent that nothing acts on — the copy is honest about who
+  *would* see it, but no staff surface reads photos today.
+
 ## Ops / infrastructure
 - **Both hosting tiers sleep, and that's a launch blocker, not a bug.** Supabase (free) pauses the
   database after 7 days idle — the symptom is `FATAL: (ENOTFOUND) tenant or user not found`, fixed

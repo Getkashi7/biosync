@@ -47,7 +47,10 @@ import { AddSupplementSheet } from "../supplements/AddSupplementSheet";
 import { ConsentCentreScreen } from "../consent/ConsentCentreScreen";
 import { PhotosGalleryScreen, type PendingUpload } from "../photos/PhotosGalleryScreen";
 import { PhotoAddSheet } from "../photos/PhotoAddSheet";
-import { uploadPhoto, fetchPhotosAudience, type ConsentAudience } from "../photos/photosApi";
+import { PhotoDetailScreen } from "../photos/PhotoDetailScreen";
+import { PhotoCompareScreen } from "../photos/PhotoCompareScreen";
+import { fetchPhotos, fetchPhotosAudience, uploadPhoto, type ConsentAudience, type Photo } from "../photos/photosApi";
+import { getUnitPref, type WeightUnit } from "../../lib/prefs";
 import { todayIso } from "../../lib/photoFormat";
 import type { PickedPhoto } from "../photos/photoPicker";
 import { RolesScreen } from "../consent/RolesScreen";
@@ -114,6 +117,11 @@ export function MainTabs() {
   // honest: consent alone shares nothing, so picking an audience with nobody
   // connected has to say that rather than imply the photo went somewhere.
   const [connected, setConnected] = useState({ trainer: false, practitioner: false });
+  /** the photo whose detail view is open, if any */
+  const [openPhoto, setOpenPhoto] = useState<Photo | null>(null);
+  /** the photo set being compared, if the compare screen is open */
+  const [comparing, setComparing] = useState<Photo[] | null>(null);
+  const [unitPref, setUnitPref2] = useState<WeightUnit>("kg");
   // Bumped when a logging sheet closes so the dashboard refetches its score.
   const [refreshKey, setRefreshKey] = useState(0);
   // Hide the floating tab bar while the keyboard is up (it would otherwise
@@ -406,6 +414,19 @@ export function MainTabs() {
         />
       ) : profileArea === "trainerFeed" ? (
         <MyTrainerScreen onBack={() => setProfileArea("none")} />
+      ) : comparing ? (
+        <PhotoCompareScreen photos={comparing} unit={unitPref} onBack={() => setComparing(null)} />
+      ) : openPhoto ? (
+        <PhotoDetailScreen
+          photo={openPhoto}
+          galleryDefault={galleryDefault}
+          unit={unitPref}
+          onBack={() => setOpenPhoto(null)}
+          onDeleted={() => {
+            setOpenPhoto(null);
+            setPhotosKey((k) => k + 1);
+          }}
+        />
       ) : photosView === "gallery" ? (
         <PhotosGalleryScreen
           onBack={() => setPhotosView("none")}
@@ -421,8 +442,28 @@ export function MainTabs() {
               .catch(() => {});
             setPhotoAdd(true);
           }}
-          onOpenPhoto={() => {}}
-          onCompare={() => {}}
+          onOpenPhoto={(id) => {
+            // The gallery already holds the row and its signed URL, so re-fetch
+            // rather than thread it through: the URL is short-lived and a stale
+            // one would open onto a photo that can't load.
+            void Promise.all([fetchPhotos(), fetchPhotosAudience(), getUnitPref()])
+              .then(([list, aud, u]) => {
+                const found = list.find((p) => p.id === id);
+                if (!found) return;
+                setGalleryDefault(aud);
+                setUnitPref2(u);
+                setOpenPhoto(found);
+              })
+              .catch(() => {});
+          }}
+          onCompare={() => {
+            void Promise.all([fetchPhotos(), getUnitPref()])
+              .then(([list, u]) => {
+                setUnitPref2(u);
+                setComparing(list);
+              })
+              .catch(() => {});
+          }}
           pending={pending}
           onRetry={(key) => {
             const input = uploadInputs.current.get(key);

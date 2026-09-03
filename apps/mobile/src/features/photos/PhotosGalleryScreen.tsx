@@ -5,7 +5,7 @@
  * screen refuses to do, each of them a promise the design makes:
  *
  * - **Failed never looks like empty.** A load failure keeps the header and
- *   renders LoadFailed; only a genuinely empty timeline shows the dotted frame.
+ *   renders PhotosFailed; only a genuinely empty timeline shows the dotted frame.
  * - **An upload in flight, or one that failed, lives in the grid** as its own
  *   tile — never a silent drop, and a failed one offers Retry.
  * - **The lock chip appears only when a photo differs from the gallery
@@ -18,8 +18,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import Svg, { Circle, Path, Rect } from "react-native-svg";
 import { AuroraField } from "../../ui/bio/AuroraField";
 import { ScreenHeader } from "../../ui/bio/ScreenHeader";
-import { Spinner } from "../../ui/Spinner";
-import { LoadFailed } from "../../ui/bio/LoadFailed";
+import { PhotosFailed, PhotosSkeleton } from "./PhotosStates";
 import { classifyNetError, type NetFailure } from "../../lib/netError";
 import { bio, fontFamily } from "../../ui/theme";
 import { pressHaptic } from "../../lib/haptics";
@@ -138,13 +137,9 @@ export function PhotosGalleryScreen({
         />
 
         {failed ? (
-          <View style={styles.failWrap}>
-            <LoadFailed what="your photos" kind={failed} onRetry={() => void load()} />
-          </View>
+          <PhotosFailed kind={failed} onRetry={() => void load()} />
         ) : photos === null ? (
-          <View style={styles.loadWrap}>
-            <Spinner />
-          </View>
+          <PhotosSkeleton />
         ) : isEmpty ? (
           <EmptyGallery onAdd={onAdd} />
         ) : (
