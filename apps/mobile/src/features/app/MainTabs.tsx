@@ -44,6 +44,7 @@ import { DoseStripScreen } from "../supplements/DoseStripScreen";
 import { SuggestionsScreen } from "../supplements/SuggestionsScreen";
 import { AddSupplementSheet } from "../supplements/AddSupplementSheet";
 import { ConsentCentreScreen } from "../consent/ConsentCentreScreen";
+import { PhotosGalleryScreen, type PendingUpload } from "../photos/PhotosGalleryScreen";
 import { RolesScreen } from "../consent/RolesScreen";
 import { MyTrainerScreen } from "../mytrainer/MyTrainerScreen";
 import { TrainerRosterScreen } from "../trainer/TrainerRosterScreen";
@@ -84,6 +85,9 @@ type SupplementView = "none" | "stack" | "doses" | "suggestions";
 /** The trust layer, pushed from Profile. */
 type ConsentView = "none" | "centre" | "roles";
 
+/** Progress photos, pushed from Profile. */
+type PhotosView = "none" | "gallery";
+
 /** The client's view of what a trainer shared, pushed from Profile. */
 type ProfileArea = "none" | "trainerFeed" | "careTeam" | "enterCode" | "admin";
 
@@ -94,6 +98,11 @@ export function MainTabs() {
   const insets = useSafeAreaInsets();
   const [active, setActive] = useState<TabKey>("home");
   const [sheet, setSheet] = useState<Sheet>("none");
+  const [photosView, setPhotosView] = useState<PhotosView>("none");
+  // Uploads still in flight, rendered as their own tiles in the grid so a photo
+  // is never silently dropped.
+  const [pending, setPending] = useState<PendingUpload[]>([]);
+  const [photosKey, setPhotosKey] = useState(0);
   // Bumped when a logging sheet closes so the dashboard refetches its score.
   const [refreshKey, setRefreshKey] = useState(0);
   // Hide the floating tab bar while the keyboard is up (it would otherwise
@@ -354,6 +363,16 @@ export function MainTabs() {
         />
       ) : profileArea === "trainerFeed" ? (
         <MyTrainerScreen onBack={() => setProfileArea("none")} />
+      ) : photosView === "gallery" ? (
+        <PhotosGalleryScreen
+          onBack={() => setPhotosView("none")}
+          onAdd={() => {}}
+          onOpenPhoto={() => {}}
+          onCompare={() => {}}
+          pending={pending}
+          onRetry={(key) => setPending((ps) => ps.filter((p) => p.key !== key))}
+          refreshKey={photosKey}
+        />
       ) : consent === "centre" ? (
         <ConsentCentreScreen onBack={() => setConsent("none")} onOpenRoles={() => setConsent("roles")} />
       ) : consent === "roles" ? (
@@ -407,6 +426,10 @@ export function MainTabs() {
           onReminders={() => setSheet("reminders")}
           onCoachPlan={() => setSheet("plan")}
           onConsent={() => setConsent("centre")}
+          onPhotos={() => {
+            setPhotosKey((k) => k + 1);
+            setPhotosView("gallery");
+          }}
           onTrainerFeed={() => setProfileArea("trainerFeed")}
           onCareTeam={() => setProfileArea("careTeam")}
           onAdmin={role === "ADMIN" ? () => setProfileArea("admin") : undefined}

@@ -30,6 +30,7 @@ type Props = {
   onReminders: () => void;
   onCoachPlan: () => void;
   onConsent: () => void;
+  onPhotos: () => void;
   /** only present for staff accounts (PT / practitioner) */
   onTrainer?: (() => void) | undefined;
   /** the client's view of what a trainer shared with them */
@@ -46,6 +47,7 @@ export function ProfileScreen({
   onReminders,
   onCoachPlan,
   onConsent,
+  onPhotos,
   onTrainer,
   onTrainerFeed,
   onCareTeam,
@@ -244,6 +246,14 @@ export function ProfileScreen({
 
         <Text style={styles.group}>Privacy</Text>
         <GlassSurface style={styles.card} soft>
+          <Pressable style={styles.row} onPress={onPhotos} accessibilityRole="button">
+            <Text style={styles.rowLabel}>Progress photos</Text>
+            <View style={styles.rowVal}>
+              <Text style={styles.rowValTxt}>Private</Text>
+              <Text style={styles.chev}>›</Text>
+            </View>
+          </Pressable>
+          <View style={styles.sep} />
           <Pressable style={styles.row} onPress={onConsent} accessibilityRole="button">
             <Text style={styles.rowLabel}>Who sees what</Text>
             <View style={styles.rowVal}>

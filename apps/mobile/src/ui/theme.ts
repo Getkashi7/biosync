@@ -541,6 +541,8 @@ export const bio = {
     /** destructive label on glass (Delete row) */
     coralLt2: "#FFA79E",
     violetLt: "#C5A9FF",
+    /** violet used for small chips + the active tab glyph (§1 photos) */
+    violetChip: "#C4B0F7",
     /** — nutrition (amber family) — */
     /** section labels + the light end of the amber FAB / ring glow */
     amberLt: "#F8CD8B",
@@ -597,6 +599,21 @@ export const bio = {
    * bloom), the client screens the standard consumer system (glass, violet).
    * Values that differ between the two are named for their side.
    */
+  /** — §1 progress photos — */
+  photos: {
+    /** one tile in the 3-column dated grid */
+    tile: { height: 137, radius: 16, gap: 8 },
+    /** the scrim behind a tile's Doto date */
+    scrim: 44,
+    /** lock chip marking a photo whose visibility differs from the default */
+    lockChip: 20,
+    /** upload progress ring on an in-flight tile */
+    ring: 34,
+    /** dotted frame on the empty gallery */
+    emptyFrame: { width: 190, height: 238, radius: 22 },
+    /** floating add button on the gallery */
+    fab: { size: 56, right: 20, bottom: 106 },
+  },
   invite: {
     /** the code itself, on the reveal screen */
     code: { fontFamily: fontFamily.dot, fontSize: 40, letterSpacing: 3.2 },
