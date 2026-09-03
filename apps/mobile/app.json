@@ -43,6 +43,13 @@
         {
           "color": "#FF7A6E"
         }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "BIOSYNC uses your photo library only for progress photos you choose to add. They are stored privately and are never shared unless you turn sharing on yourself.",
+          "cameraPermission": "BIOSYNC uses the camera only for progress photos you take. They are stored privately and are never shared unless you turn sharing on yourself."
+        }
       ]
     ],
     "experiments": {

@@ -8,7 +8,7 @@
  * so the sheets stay presentation-only — MainTabs owns persistence, and bumps
  * refreshKey when a logging sheet closes so the dashboard refetches.
  */
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AppState, Keyboard, StyleSheet, View } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -28,6 +28,7 @@ import { InviteListScreen } from "../invites/InviteListScreen";
 import { EnterCodeScreen } from "../invites/EnterCodeScreen";
 import { CareTeamScreen } from "../invites/CareTeamScreen";
 import { AdminScreen } from "../admin/AdminScreen";
+import { fetchCareTeam } from "../invites/invitesApi";
 import type { CreatedInvite, StaffKind } from "../invites/invitesApi";
 import { TimelineScreen } from "../timeline/TimelineScreen";
 import { NewGoalSheet } from "../goals/NewGoalSheet";
@@ -45,6 +46,10 @@ import { SuggestionsScreen } from "../supplements/SuggestionsScreen";
 import { AddSupplementSheet } from "../supplements/AddSupplementSheet";
 import { ConsentCentreScreen } from "../consent/ConsentCentreScreen";
 import { PhotosGalleryScreen, type PendingUpload } from "../photos/PhotosGalleryScreen";
+import { PhotoAddSheet } from "../photos/PhotoAddSheet";
+import { uploadPhoto, fetchPhotosAudience, type ConsentAudience } from "../photos/photosApi";
+import { todayIso } from "../../lib/photoFormat";
+import type { PickedPhoto } from "../photos/photoPicker";
 import { RolesScreen } from "../consent/RolesScreen";
 import { MyTrainerScreen } from "../mytrainer/MyTrainerScreen";
 import { TrainerRosterScreen } from "../trainer/TrainerRosterScreen";
@@ -103,6 +108,12 @@ export function MainTabs() {
   // is never silently dropped.
   const [pending, setPending] = useState<PendingUpload[]>([]);
   const [photosKey, setPhotosKey] = useState(0);
+  const [photoAdd, setPhotoAdd] = useState(false);
+  const [galleryDefault, setGalleryDefault] = useState<ConsentAudience>("NONE");
+  // Who this account is actually linked to. The add sheet needs it to be
+  // honest: consent alone shares nothing, so picking an audience with nobody
+  // connected has to say that rather than imply the photo went somewhere.
+  const [connected, setConnected] = useState({ trainer: false, practitioner: false });
   // Bumped when a logging sheet closes so the dashboard refetches its score.
   const [refreshKey, setRefreshKey] = useState(0);
   // Hide the floating tab bar while the keyboard is up (it would otherwise
@@ -135,6 +146,38 @@ export function MainTabs() {
   const { session } = useAuth();
   /** name handed over from a suggestion — the user still writes dose + timing */
   const [seedName, setSeedName] = useState<string | null>(null);
+
+  /**
+   * Run one upload, keeping a tile in the grid the whole time. A failure leaves
+   * the tile in place marked failed rather than dropping it, so a photo never
+   * vanishes silently between picking it and it landing.
+   */
+  const runUpload = useCallback(
+    async (key: string, photo: PickedPhoto, override: ConsentAudience | null, takenOn: string) => {
+      setPending((ps) =>
+        ps.some((p) => p.key === key)
+          ? ps.map((p) => (p.key === key ? { ...p, failed: false, progress: 10 } : p))
+          : [...ps, { key, takenOn, progress: 10, failed: false }],
+      );
+      const res = await uploadPhoto({
+        uri: photo.uri,
+        takenOn,
+        mimeType: photo.mimeType,
+        byteSize: photo.byteSize,
+        audienceOverride: override,
+      });
+      if (res.ok) {
+        setPending((ps) => ps.filter((p) => p.key !== key));
+        setPhotosKey((k) => k + 1);
+      } else {
+        setPending((ps) => ps.map((p) => (p.key === key ? { ...p, failed: true, progress: null } : p)));
+      }
+    },
+    [],
+  );
+
+  /** Keeps the picked photo so Retry can re-run the same upload. */
+  const uploadInputs = useRef(new Map<string, { photo: PickedPhoto; override: ConsentAudience | null; takenOn: string }>());
 
   const closeSheet = useCallback(() => {
     setSheet("none");
@@ -366,11 +409,25 @@ export function MainTabs() {
       ) : photosView === "gallery" ? (
         <PhotosGalleryScreen
           onBack={() => setPhotosView("none")}
-          onAdd={() => {}}
+          onAdd={() => {
+            void fetchPhotosAudience().then(setGalleryDefault).catch(() => {});
+            void fetchCareTeam()
+              .then((t) =>
+                setConnected({
+                  trainer: t.staff.some((s) => s.kind === "PT"),
+                  practitioner: t.staff.some((s) => s.kind === "PRACTITIONER"),
+                }),
+              )
+              .catch(() => {});
+            setPhotoAdd(true);
+          }}
           onOpenPhoto={() => {}}
           onCompare={() => {}}
           pending={pending}
-          onRetry={(key) => setPending((ps) => ps.filter((p) => p.key !== key))}
+          onRetry={(key) => {
+            const input = uploadInputs.current.get(key);
+            if (input) void runUpload(key, input.photo, input.override, input.takenOn);
+          }}
           refreshKey={photosKey}
         />
       ) : consent === "centre" ? (
@@ -475,6 +532,22 @@ export function MainTabs() {
           onQuickLog={() => setSheet("quicklog")}
           onNutrition={() => setNutrition("today")}
           onSupplements={() => setSupplements("stack")}
+        />
+      ) : null}
+
+      {photoAdd ? (
+        <PhotoAddSheet
+          galleryDefault={galleryDefault}
+          practitionerConnected={connected.practitioner}
+          trainerConnected={connected.trainer}
+          onClose={() => setPhotoAdd(false)}
+          onPicked={(photo, override) => {
+            setPhotoAdd(false);
+            const key = `u${Date.now()}`;
+            const takenOn = todayIso();
+            uploadInputs.current.set(key, { photo, override, takenOn });
+            void runUpload(key, photo, override, takenOn);
+          }}
         />
       ) : null}
 

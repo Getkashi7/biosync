@@ -94,11 +94,24 @@ them forces a new native build and breaks the device dev flow. **These are not l
   `KeyboardAvoidingView` + `keyboardShouldPersistTaps="handled"`. `StatusBar style="light"`.
 - **Auth/session:** Supabase client in `src/lib/supabase.ts` with an AsyncStorage adapter,
   `persistSession` + `autoRefreshToken`. Session gates routing in `app/_layout.tsx`.
-- **`@pulse/shared` is type-only here.** `import type { … }` is fine; a **value** import from it
-  fails at runtime — shared is raw TS with no build step, so Metro can't resolve its runtime
-  exports the way the API's pipeline can. Need the logic on both sides? Duplicate the few lines
-  into `src/lib/format.ts` and cover them with a mobile test. That's the established pattern, not a
-  workaround to clean up.
+- **Mobile does not import `@pulse/shared` at all — not even for types.** Shared is raw TS with no
+  build step, and mobile's `tsconfig` has no path to it: `import type { … } from "@pulse/shared"`
+  fails `tsc` with *"Cannot find module"*, and a **value** import additionally fails at runtime
+  under Metro. No file in `apps/mobile` imports it; don't be the first.
+
+  Get types from the **tRPC router** instead — the client already has that surface, and it's
+  generated from the same Zod schemas, so it can't drift:
+
+  ```ts
+  export type ConsentList = Awaited<ReturnType<typeof trpc.consent.list.query>>;
+  export type ConsentRow = ConsentList["consents"][number];
+  export type ConsentAudience = ConsentRow["audience"];
+  ```
+
+  Need the *logic* on both sides? Duplicate the few lines into `src/lib/*.ts` (`format.ts`,
+  `photoFormat.ts`, `reminderSchedule.ts` all do this) and cover them with a mobile test, noting in
+  the header which shared module they mirror. That's the established pattern, not a workaround to
+  clean up.
 - **Never render an empty state for a failed request.** "No data yet" and "we couldn't reach the
   server" are different claims, and showing the first for the second quietly lies to the user about
   their own records. On a query error render `ui/bio/LoadFailed`, classifying with
