@@ -13,6 +13,7 @@ import { appRouter } from "./router";
 import { createContext } from "./context";
 import { assertServerEnv, allowedOrigins, env, isProduction } from "./env";
 import { RateLimiter, clientKey } from "./lib/rateLimit";
+import { prisma } from "./db";
 import { servePrivacy } from "./lib/privacy";
 
 assertServerEnv();
@@ -108,6 +109,26 @@ const server = http.createServer((req, res) => {
   if (!allowed) {
     res.setHeader("Retry-After", String(retryAfterSec));
     send(res, 429, JSON.stringify({ error: "Too many requests" }));
+    return;
+  }
+
+  /**
+   * Keep-alive for the database, distinct from `/health` above.
+   *
+   * Supabase's free tier pauses a project after ~7 days with no DATABASE
+   * activity, and `/health` deliberately never queries Postgres — so an uptime
+   * pinger keeps the API awake while the database quietly pauses underneath
+   * it. This endpoint exists to be called RARELY (daily is plenty) by a
+   * scheduled ping, purely so the project counts as active.
+   *
+   * Deliberately below the rate limiter, unlike `/health`: it touches the
+   * database, so it must not be usable as a way to hammer Postgres.
+   */
+  if (req.url === "/health/db") {
+    void prisma
+      .$queryRaw`select 1`
+      .then(() => send(res, 200, JSON.stringify({ ok: true, db: "reachable" })))
+      .catch(() => send(res, 503, JSON.stringify({ ok: false, db: "unreachable" })));
     return;
   }
 

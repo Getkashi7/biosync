@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { Stack, useRouter, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
+import { warmApi } from "../src/lib/warmup";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { AuthProvider, useAuth } from "../src/features/auth/AuthProvider";
@@ -20,6 +21,12 @@ if (sentryDsn) {
 }
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
+
+// Start waking the API at the earliest possible moment — module scope, before
+// any component mounts. The free tier sleeps when idle, and the cold start is
+// long enough that the user should never be the one who triggers it: this
+// overlaps the wake-up with fonts loading and the session resolving.
+void warmApi();
 
 /** Redirects reactively when the session appears (post-login) or clears (post-signout). */
 function useProtectedRoute() {
