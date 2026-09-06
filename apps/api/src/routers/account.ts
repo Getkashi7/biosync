@@ -17,6 +17,7 @@
 import { router, ownerProcedure } from "../trpc";
 import { prisma } from "../db";
 import { env } from "../env";
+import { createSignedReadUrl, deleteAllUserObjects } from "../lib/storage";
 
 export const accountRouter = router({
   /**
@@ -28,6 +29,20 @@ export const accountRouter = router({
    */
   deleteAccount: ownerProcedure.mutation(async ({ ctx }) => {
     const userId = ctx.user.id;
+
+    // Stored images FIRST, before the rows that point at them. Photo rows go
+    // when the user row cascades, but the files would otherwise stay in the
+    // bucket with nothing left to reference them — unreachable, still stored,
+    // and a direct contradiction of what the delete dialog promises. Erasure
+    // has to reach the bytes.
+    //
+    // Best-effort: a storage hiccup must not block the account deletion the
+    // user asked for. A shortfall is logged as a count, never as paths — a
+    // path contains the user's id.
+    const purge = await deleteAllUserObjects(userId);
+    if (purge.failed > 0) {
+      console.error(`[account] ${purge.failed} stored object(s) could not be deleted`);
+    }
 
     // Best-effort cascade: delete every row that references this user.
     // Order doesn't matter for `deleteMany`, but we group by entity for
@@ -100,5 +115,92 @@ export const accountRouter = router({
     }
 
     return { ok: true };
+  }),
+
+  /**
+   * Everything this account holds, as one JSON document.
+   *
+   * The legal counterpart to `deleteAccount`: under UK GDPR the right to
+   * erasure and the right to portability travel together, so shipping one
+   * without the other leaves a real gap. Deliberately the mirror of the
+   * deletion cascade above — if a table is worth deleting on the way out, it
+   * is worth handing over first. When one changes, change the other.
+   *
+   * Photos are exported as metadata plus a short-lived signed URL rather than
+   * inlined bytes: a gallery of base64 images would be tens of megabytes in a
+   * single JSON response. The export says plainly that those links expire.
+   */
+  exportData: ownerProcedure.query(async ({ ctx }) => {
+    const userId = ctx.user.id;
+
+    const [
+      user, dailyLogs, metrics, readiness, meals, supplements, supplementLogs,
+      goals, consents, photos, notificationPrefs, notificationNudges,
+      staffProfiles, staffLinks, invites, plans, notes,
+    ] = await Promise.all([
+      prisma.user.findUnique({
+        where: { id: userId },
+        select: { id: true, email: true, fullName: true, role: true, createdAt: true },
+      }),
+      prisma.dailyLog.findMany({ where: { userId }, orderBy: { date: "desc" } }),
+      prisma.metric.findMany({ where: { userId }, orderBy: { recordedAt: "desc" } }),
+      prisma.readinessSnapshot.findMany({ where: { userId }, orderBy: { date: "desc" } }),
+      prisma.meal.findMany({ where: { userId }, orderBy: { date: "desc" } }),
+      prisma.supplement.findMany({ where: { userId } }),
+      prisma.supplementLog.findMany({ where: { userId }, orderBy: { date: "desc" } }),
+      prisma.goal.findMany({ where: { userId } }),
+      prisma.consent.findMany({ where: { userId } }),
+      prisma.photo.findMany({ where: { userId }, orderBy: { takenOn: "desc" } }),
+      prisma.notificationPrefs.findUnique({ where: { userId } }),
+      prisma.notificationNudge.findMany({ where: { userId } }),
+      prisma.staffProfile.findMany({ where: { userId } }),
+      prisma.staffLink.findMany({ where: { OR: [{ clientId: userId }, { staffId: userId }] } }),
+      // codeHash is deliberately not selected: it's a credential digest, and
+      // exporting it serves no portability purpose.
+      prisma.clientInvite.findMany({
+        where: { OR: [{ staffId: userId }, { acceptedBy: userId }] },
+        select: {
+          id: true, staffId: true, kind: true, email: true, expiresAt: true,
+          acceptedAt: true, acceptedBy: true, revokedAt: true, createdAt: true,
+        },
+      }),
+      prisma.trainingPlan.findMany({ where: { OR: [{ clientId: userId }, { trainerId: userId }] } }),
+      prisma.sessionNote.findMany({ where: { OR: [{ clientId: userId }, { trainerId: userId }] } }),
+    ]);
+
+    const photosWithUrls = await Promise.all(
+      photos.map(async (p) => ({
+        id: p.id,
+        takenOn: p.takenOn.toISOString().slice(0, 10),
+        audienceOverride: p.audienceOverride,
+        mimeType: p.mimeType,
+        byteSize: p.byteSize,
+        createdAt: p.createdAt.toISOString(),
+        downloadUrl: await createSignedReadUrl(p.storagePath),
+      })),
+    );
+
+    return {
+      exportedAt: new Date().toISOString(),
+      format: "biosync.export.v1",
+      notes: [
+        "This is every record BIOSYNC holds for this account.",
+        "Photo download links are temporary and expire a few minutes after this export was made. Re-export to get fresh ones.",
+        "Audit entries are omitted: they record who touched what, and include other people's actions on your data.",
+      ],
+      account: user,
+      dailyLogs,
+      metrics,
+      readinessSnapshots: readiness,
+      meals,
+      supplements,
+      supplementLogs,
+      goals,
+      consents,
+      photos: photosWithUrls,
+      notifications: { prefs: notificationPrefs, nudges: notificationNudges },
+      staff: { profiles: staffProfiles, links: staffLinks, invites },
+      coaching: { trainingPlans: plans, sessionNotes: notes },
+    };
   }),
 });

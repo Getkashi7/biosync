@@ -91,3 +91,51 @@ export async function deleteObject(path: string): Promise<boolean> {
   });
   return res.ok;
 }
+
+/**
+ * Remove every object belonging to one user.
+ *
+ * Account deletion has to reach the bytes, not just the rows. Photo rows go
+ * when the user row cascades, but the images would otherwise stay in the
+ * bucket forever — unreachable, still stored, and a straight contradiction of
+ * what the delete dialog promises. Erasure has to be actual.
+ *
+ * Best-effort by design: deletion must not be blocked by a storage hiccup, so
+ * this reports what it managed rather than throwing. The caller logs a
+ * shortfall — never the paths, which contain the user's id.
+ */
+export async function deleteAllUserObjects(userId: string): Promise<{ deleted: number; failed: number }> {
+  assertConfigured();
+  let deleted = 0;
+  let failed = 0;
+
+  try {
+    // Supabase lists at most 100 per call; loop until a page comes back short.
+    for (let offset = 0; ; offset += 100) {
+      const res = await fetch(`${env.SUPABASE_URL}/storage/v1/object/list/${PHOTO_BUCKET}`, {
+        method: "POST",
+        headers: storageHeaders(),
+        body: JSON.stringify({ prefix: `${userId}/`, limit: 100, offset }),
+      });
+      if (!res.ok) return { deleted, failed: failed + 1 };
+
+      const page = (await res.json()) as { name?: string }[];
+      if (!Array.isArray(page) || page.length === 0) return { deleted, failed };
+
+      const paths = page.filter((o) => o.name).map((o) => `${userId}/${o.name}`);
+      if (paths.length > 0) {
+        const del = await fetch(`${env.SUPABASE_URL}/storage/v1/object/${PHOTO_BUCKET}`, {
+          method: "DELETE",
+          headers: storageHeaders(),
+          body: JSON.stringify({ prefixes: paths }),
+        });
+        if (del.ok) deleted += paths.length;
+        else failed += paths.length;
+      }
+
+      if (page.length < 100) return { deleted, failed };
+    }
+  } catch {
+    return { deleted, failed: failed + 1 };
+  }
+}
