@@ -1,0 +1,129 @@
+# Build an installable Android APK on free CI.
+#
+# Why this exists: EAS Build needs an Expo login, and a local Gradle build needs
+# a JDK plus ~3GB of Android SDK. GitHub's ubuntu runners already ship both, and
+# the free minutes cover far more builds than this project will ever need — so
+# this produces a shareable APK with no account and nothing to install locally.
+#
+# Signing: `expo prebuild` generates the standard Android debug keystore, and
+# Expo's template signs `release` with it. That is what makes an unsigned-secret
+# build possible at all. The catch is real and worth knowing: the keystore is
+# regenerated every run, so each APK has a DIFFERENT signature and Android will
+# refuse to install one over another. Testers must uninstall first. That is fine
+# for a closed beta and NOT fine for the Play Store, which needs a stable upload
+# key — see the note at the bottom of this file.
+#
+# The client env comes from eas.json's `preview` profile so there is one source
+# of truth. Those three values are all public client-side config (the Supabase
+# anon key is designed to ship inside apps); nothing secret is read here.
+
+name: Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+concurrency:
+  group: android-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read client env from eas.json
+        id: env
+        working-directory: apps/mobile
+        run: |
+          node -e '
+            const p = require("./eas.json").build.preview.env || {};
+            const need = ["EXPO_PUBLIC_SUPABASE_URL","EXPO_PUBLIC_SUPABASE_ANON_KEY","EXPO_PUBLIC_API_URL"];
+            const missing = need.filter((k) => !p[k]);
+            if (missing.length) {
+              console.error("::error::eas.json preview profile is missing: " + missing.join(", "));
+              process.exit(1);
+            }
+            // Masked in the log even though these are public values — a build log
+            // is not the place to print configuration wholesale.
+            for (const k of need) console.log(`::add-mask::${p[k]}`);
+            const fs = require("fs");
+            for (const k of need) fs.appendFileSync(process.env.GITHUB_ENV, `${k}=${p[k]}\n`);
+          '
+          echo "client env loaded from eas.json preview profile"
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        # --frozen-lockfile so CI can never silently resolve a different version
+        # than the machine that committed the lockfile. The SDK pins in this repo
+        # are load-bearing: drifting expo past the native build breaks the app.
+        run: pnpm install --frozen-lockfile
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Generate the native project
+        working-directory: apps/mobile
+        # --no-install because pnpm already did it, and letting prebuild run its
+        # own install would use npm and break the hoisted layout autolinking needs.
+        run: npx expo prebuild --platform android --clean --no-install
+
+      - name: Build release APK
+        working-directory: apps/mobile/android
+        env:
+          GRADLE_OPTS: -Dorg.gradle.jvmargs=-Xmx4g -Dorg.gradle.daemon=false
+        run: |
+          chmod +x ./gradlew
+          ./gradlew assembleRelease --no-daemon --stacktrace
+
+      - name: Locate the APK
+        id: apk
+        run: |
+          path=$(find apps/mobile/android -name "*.apk" -path "*release*" | head -1)
+          if [ -z "$path" ]; then
+            echo "::error::Gradle finished but no release APK was produced"
+            find apps/mobile/android -name "*.apk" || true
+            exit 1
+          fi
+          echo "path=$path" >> "$GITHUB_OUTPUT"
+          echo "Built: $path ($(du -h "$path" | cut -f1))"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: biosync-apk
+          path: ${{ steps.apk.outputs.path }}
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: How to install
+        run: |
+          echo "### BIOSYNC APK built" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Download **biosync-apk** from the Artifacts section of this run." >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Install with \`adb install -r <file>.apk\`, or send it to a phone and open it." >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "**Uninstall any previous BIOSYNC build first.** Each run generates a fresh" >> "$GITHUB_STEP_SUMMARY"
+          echo "debug keystore, so signatures differ between builds and Android refuses" >> "$GITHUB_STEP_SUMMARY"
+          echo "to install over the top." >> "$GITHUB_STEP_SUMMARY"
+
+# Play Store, later:
+#   A store build needs a STABLE upload key, not a per-run debug keystore.
+#   Generate one once (`keytool -genkeypair -v -keystore upload.jks -alias upload
+#   -keyalg RSA -keysize 2048 -validity 10000`), base64 it into a repository
+#   secret, decode it in a step here, and point a `release` signingConfig at it.
+#   Enrol in Play App Signing so Google holds the real app-signing key and this
+#   one only signs uploads — then losing it is recoverable.
