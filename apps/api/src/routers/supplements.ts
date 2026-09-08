@@ -181,7 +181,7 @@ export const supplementsRouter = router({
     if (!hasGroqKey()) return { suggestions: null, configured: false as const };
     const patterns = await buildPatterns(ctx.user.id);
     const focus = input.focus?.trim();
-    const content = await groqChat(
+    const result = await groqChat(
       [
         { role: "system", content: `${SUGGEST_SYSTEM}\n\n--- The user's recent patterns ---\n${patterns}` },
         {
@@ -193,6 +193,9 @@ export const supplementsRouter = router({
       ],
       { json: true, maxTokens: 700 },
     );
-    return { suggestions: content ? parseSuggestions(content) : null, configured: true as const };
+    if (!result.ok) {
+      return { suggestions: null, configured: result.reason !== "rejected" };
+    }
+    return { suggestions: parseSuggestions(result.content), configured: true as const };
   }),
 });

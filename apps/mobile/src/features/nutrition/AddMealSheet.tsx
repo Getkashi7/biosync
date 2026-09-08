@@ -34,6 +34,7 @@ import { AuroraField } from "../../ui/bio/AuroraField";
 import { bio, fontFamily, motion } from "../../ui/theme";
 import { pressHaptic, successHaptic } from "../../lib/haptics";
 import { dateLabel } from "../../lib/format";
+import { classifyNetError } from "../../lib/netError";
 import { estimateMeal, logMeal, type MacroEstimate } from "./nutritionApi";
 
 const RECENTS = [
@@ -104,27 +105,44 @@ export function AddMealSheet({ onClose, onSaved }: { onClose: () => void; onSave
     pressHaptic();
     setStage("estimating");
     setNotice(null);
-    try {
-      const result = await estimateMeal(description);
-      if (result) {
-        setEstimate(result);
-        setItems(result.items ?? []);
-        setEdited(false);
-        setStage("estimated");
-      } else {
-        // Coach off or unusable output — let them enter the numbers by hand.
-        setEstimate({ calories: 0, proteinG: 0, carbsG: 0, fatG: 0 });
-        setItems([]);
-        setEdited(true);
-        setNotice("Couldn’t reach the coach — enter the numbers yourself.");
-        setStage("estimated");
-      }
-    } catch {
+    // Whatever happens, the sheet stays usable — the numbers can always be
+    // typed. Only the explanation changes, and it has to be the true one:
+    // sending someone to check their wi-fi over a key we haven't set up is
+    // the same lie as showing an empty state for a failed request.
+    const manual = () => {
       setEstimate({ calories: 0, proteinG: 0, carbsG: 0, fatG: 0 });
       setItems([]);
       setEdited(true);
-      setNotice("Couldn’t reach the coach — enter the numbers yourself.");
       setStage("estimated");
+    };
+
+    try {
+      const result = await estimateMeal(description);
+      if (result.estimate) {
+        setEstimate(result.estimate);
+        setItems(result.estimate.items ?? []);
+        setEdited(false);
+        setStage("estimated");
+        return;
+      }
+      manual();
+      setNotice(
+        result.reason === "off"
+          ? "The coach isn’t switched on — enter the numbers yourself."
+          : result.reason === "busy"
+            ? "The coach is busy right now — enter the numbers yourself, or try again shortly."
+            : result.reason === "unusable"
+              ? "The coach couldn’t read that — enter the numbers yourself."
+              : "Couldn’t reach the coach — enter the numbers yourself.",
+      );
+    } catch (err) {
+      manual();
+      // A thrown error never got an answer, so this really is reachability.
+      setNotice(
+        classifyNetError(err) === "offline"
+          ? "You’re offline — enter the numbers yourself."
+          : "Couldn’t reach the coach — enter the numbers yourself.",
+      );
     }
   }, [text]);
 

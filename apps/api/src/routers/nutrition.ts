@@ -27,7 +27,7 @@ import {
 import { router, ownerProcedure } from "../trpc";
 import { prisma } from "../db";
 import { toDbDate } from "../dbDate";
-import { groqChat, hasGroqKey } from "../lib/groq";
+import { groqChat } from "../lib/groq";
 import { recordAudit } from "../lib/audit";
 
 const userProcedure = ownerProcedure;
@@ -71,15 +71,29 @@ export const nutritionRouter = router({
    * lets the user enter the numbers by hand.
    */
   estimate: userProcedure.input(estimateInput).mutation(async ({ input }) => {
-    if (!hasGroqKey()) return { estimate: null, configured: false as const };
-    const content = await groqChat(
+    const result = await groqChat(
       [
         { role: "system", content: ESTIMATE_SYSTEM },
         { role: "user", content: input.description },
       ],
       { json: true, maxTokens: 400 },
     );
-    return { estimate: content ? parseMacroEstimate(content) : null, configured: true as const };
+
+    if (!result.ok) {
+      // The reason travels to the client so the sheet can say something true.
+      // "Couldn't reach the coach" was being shown for a rejected API key,
+      // which sent people to check their wi-fi over a problem only we can fix.
+      return { estimate: null, configured: result.reason !== "unconfigured", reason: result.reason };
+    }
+
+    const estimate = parseMacroEstimate(result.content);
+    return {
+      estimate,
+      configured: true as const,
+      // Answered, but not with numbers we can use — a different thing again
+      // from never having answered.
+      reason: estimate ? null : ("unusable" as const),
+    };
   }),
 
   /**

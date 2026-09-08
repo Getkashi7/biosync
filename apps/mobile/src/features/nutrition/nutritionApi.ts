@@ -24,9 +24,32 @@ export async function fetchDay(): Promise<NutritionDay> {
  * null when the coach is off or returned something untrustworthy — the caller
  * then lets the user type the numbers instead.
  */
-export async function estimateMeal(description: string): Promise<MacroEstimate | null> {
+/**
+ * Why an estimate didn't come back, so the sheet can say something true.
+ *
+ * The API already distinguishes these; the client used to discard the
+ * distinction and show "couldn't reach the coach" for all of them — which sent
+ * people to check their connection over a rejected API key.
+ */
+export type EstimateOutcome =
+  | { estimate: MacroEstimate }
+  | { estimate: null; reason: "off" | "busy" | "unreachable" | "unusable" };
+
+export async function estimateMeal(description: string): Promise<EstimateOutcome> {
   const res = await trpc.nutrition.estimate.mutate({ description });
-  return res.estimate;
+  if (res.estimate) return { estimate: res.estimate };
+
+  // `configured: false` means no key at all; a rejected one is equally ours to
+  // fix and equally permanent, so both read as "off" to the user.
+  const reason =
+    res.reason === "unconfigured" || res.reason === "rejected" || !res.configured
+      ? "off"
+      : res.reason === "rate_limited"
+        ? "busy"
+        : res.reason === "unusable"
+          ? "unusable"
+          : "unreachable";
+  return { estimate: null, reason };
 }
 
 export type NewMeal = {

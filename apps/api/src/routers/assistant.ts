@@ -235,14 +235,22 @@ export const assistantRouter = router({
   plan: userProcedure.input(planInput).mutation(async ({ ctx, input }) => {
     if (!hasGroqKey()) return { plan: PLAN_NO_KEY, configured: false as const };
     const context = await buildContext(ctx.user.id);
-    const content = await groqChat(
+    const result = await groqChat(
       [
         { role: "system", content: `${PLAN_SYSTEM}\n\n--- The user's current data ---\n${context}` },
         { role: "user", content: `Build me a ${input.focus} plan for today.` },
       ],
       { json: true },
     );
-    return { plan: (content && parsePlan(content)) || PLAN_ERROR, configured: true as const };
+    // A rejected key is ours to fix and won't come right by retrying, so it
+    // reads as "not switched on" rather than as a transient error.
+    if (!result.ok) {
+      return {
+        plan: result.reason === "rejected" ? PLAN_NO_KEY : PLAN_ERROR,
+        configured: result.reason !== "rejected",
+      };
+    }
+    return { plan: parsePlan(result.content) || PLAN_ERROR, configured: true as const };
   }),
 
   /** Send the conversation; get one grounded, non-diagnostic reply back. */
@@ -251,11 +259,18 @@ export const assistantRouter = router({
       return { reply: NO_KEY_REPLY, configured: false as const };
     }
     const context = await buildContext(ctx.user.id);
-    const reply = await groqChat([
+    const result = await groqChat([
       { role: "system", content: `${SYSTEM}\n\n--- The user's current data ---\n${context}` },
       ...input.messages.map((m) => ({ role: m.role, content: m.content })),
     ]);
-    // Network / rate-limit / transient API errors: keep the chat usable.
-    return { reply: reply ?? ERR_REPLY, configured: true as const };
+    if (!result.ok) {
+      // A rejected key can't be retried into working, so say the coach is off
+      // rather than inviting the user to try again forever.
+      return {
+        reply: result.reason === "rejected" ? NO_KEY_REPLY : ERR_REPLY,
+        configured: result.reason !== "rejected",
+      };
+    }
+    return { reply: result.content, configured: true as const };
   }),
 });
