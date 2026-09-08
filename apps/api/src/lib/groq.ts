@@ -15,8 +15,23 @@
  */
 import { env } from "../env";
 
-/** Groq's free-tier chat model. Override with GROQ_MODEL. */
-export const GROQ_MODEL = process.env.GROQ_MODEL || "llama-3.3-70b-versatile";
+/**
+ * The chat model, overridable with GROQ_MODEL.
+ *
+ * Groq retires models, and a decommissioned one fails exactly like a bad key
+ * from the app's side — which is how `llama-3.3-70b-versatile` sat here after
+ * Groq dropped it, quietly breaking every AI feature.
+ *
+ * qwen3.8-27b was chosen by testing what the app actually needs against every
+ * model the account can see: it answers JSON mode correctly (~370ms) and plain
+ * chat (~450ms). The `openai/gpt-oss-*` models were rejected — they return
+ * HTTP 400 "Failed to generate JSON" on the estimator's prompt, so they cannot
+ * do the one job nutrition needs.
+ *
+ * If AI features stop working, check this model still exists before anything
+ * else: `curl -H "Authorization: Bearer $GROQ_API_KEY" https://api.groq.com/openai/v1/models`
+ */
+export const GROQ_MODEL = process.env.GROQ_MODEL || "qwen/qwen3.8-27b";
 
 const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
 
@@ -42,11 +57,17 @@ export type GroqResult =
   | { ok: false; reason: GroqFailure };
 
 /**
- * A rejected key fails identically on every request, so log it once rather
- * than on every meal anyone logs. Reset on success, so a fixed key goes quiet
- * and a re-broken one is reported again.
+ * A misconfiguration fails identically on every request, so log it once rather
+ * than on every meal anyone logs. Reset on success, so a fix goes quiet and a
+ * fresh break is reported again.
  */
 let warnedRejected = false;
+
+function warnOnce(message: string): void {
+  if (warnedRejected) return;
+  warnedRejected = true;
+  console.error(message);
+}
 
 /**
  * One chat completion. `json: true` asks Groq for a JSON object back (the
@@ -75,12 +96,14 @@ export async function groqChat(
     if (res.status === 401 || res.status === 403) {
       // Never the key itself, and never the request body — that carries health
       // data. Only the fact that Groq is refusing us.
-      if (!warnedRejected) {
-        warnedRejected = true;
-        console.error(
-          `[groq] key rejected (HTTP ${res.status}) — AI features are off until it is replaced`,
-        );
-      }
+      warnOnce(`[groq] key rejected (HTTP ${res.status}) — AI features are off until it is replaced`);
+      return { ok: false, reason: "rejected" };
+    }
+    // A retired model looks identical to a bad key from the app's side, and is
+    // just as permanent: `llama-3.3-70b-versatile` sat in this file after Groq
+    // dropped it, silently breaking every AI feature. Say which model.
+    if (res.status === 404) {
+      warnOnce(`[groq] model "${GROQ_MODEL}" was not found — it may have been retired`);
       return { ok: false, reason: "rejected" };
     }
     if (res.status === 429) return { ok: false, reason: "rate_limited" };

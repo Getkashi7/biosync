@@ -7,7 +7,7 @@
  * user is permanence — a rejected key never comes right by retrying.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { groqChat, __resetGroqWarning } from "../lib/groq";
+import { groqChat, GROQ_MODEL, __resetGroqWarning } from "../lib/groq";
 
 const OLD_KEY = process.env.GROQ_API_KEY;
 const MSG = [{ role: "user" as const, content: "hi" }];
@@ -43,6 +43,21 @@ describe("groqChat failure reasons", () => {
   it("treats 403 as rejected too — also ours to fix", async () => {
     vi.stubGlobal("fetch", reply(403, {}));
     expect(await groqChat(MSG)).toEqual({ ok: false, reason: "rejected" });
+  });
+
+  // A retired model is as permanent as a bad key and looked identical from the
+  // app's side — which is exactly how a decommissioned llama model sat in the
+  // config breaking every AI feature.
+  it("treats a missing model as rejected, not as a transient blip", async () => {
+    vi.stubGlobal("fetch", reply(404, {}));
+    expect(await groqChat(MSG)).toEqual({ ok: false, reason: "rejected" });
+  });
+
+  it("names the model when it is missing, so the cause is obvious", async () => {
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.stubGlobal("fetch", reply(404, {}));
+    await groqChat(MSG);
+    expect(String(err.mock.calls[0]?.[0])).toContain(GROQ_MODEL);
   });
 
   it("reports rate limiting separately, since that one is worth retrying", async () => {
