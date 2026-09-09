@@ -34,6 +34,8 @@ model User {
   supplements        Supplement[]
   plansReceived      TrainingPlan[]      @relation("PlanClient")
   plansWritten       TrainingPlan[]      @relation("PlanTrainer")
+  treatmentRequests  TreatmentRequest[]  @relation("TreatmentClient")
+  treatmentReviews   TreatmentRequest[]  @relation("TreatmentReviewer")
 
   @@map("users")
 }
@@ -413,4 +415,53 @@ enum StaffLinkStatus {
   PENDING
   ACTIVE
   REVOKED
+}
+
+/// §7 treatment requests. A request is created only when the client asks —
+/// suggestions themselves are computed, never stored, so nothing is written
+/// until a person acts.
+enum TreatmentStatus {
+  REQUESTED
+  APPROVED
+  DECLINED
+  WITHDRAWN
+  EXPIRED
+}
+
+/// One client's request for a practitioner to review a treatment protocol.
+///
+/// The row is the durable record that a clinical decision was made by a named
+/// person at a known time, so it outlives the reviewer's account (the reviewer
+/// FK nulls rather than cascading) and its decision fields are never rewritten
+/// once set.
+model TreatmentRequest {
+  id           String          @id @default(uuid()) @db.Uuid
+  userId       String          @map("user_id") @db.Uuid
+  /// Slug from TREATMENT_PROTOCOLS in @pulse/shared. Stored, not referenced:
+  /// the catalogue is code reviewed in pull requests, not a table an admin
+  /// screen can edit. `protocolName()` degrades a retired slug gracefully.
+  protocolSlug String          @map("protocol_slug")
+  status       TreatmentStatus @default(REQUESTED)
+  /// The data-derived reason as it read AT REQUEST TIME. Frozen deliberately:
+  /// it is what the client saw when they asked, and a practitioner reviewing a
+  /// week later must see that, not a figure recomputed from newer readings.
+  reason       String
+  /// The client's optional note to the reviewer.
+  note         String?
+  reviewedById String?         @map("reviewed_by_id") @db.Uuid
+  reviewedAt   DateTime?       @map("reviewed_at")
+  /// Set only on approval; `canProceedToBooking` treats a null here on an
+  /// APPROVED row as not-approved, because an unreadable authorisation is not
+  /// an authorisation.
+  approvedAt   DateTime?       @map("approved_at")
+  /// Required on DECLINE, optional on APPROVE.
+  decisionNote String?         @map("decision_note")
+  createdAt    DateTime        @default(now()) @map("created_at")
+  updatedAt    DateTime        @updatedAt @map("updated_at")
+  user         User            @relation("TreatmentClient", fields: [userId], references: [id], onDelete: Cascade)
+  reviewedBy   User?           @relation("TreatmentReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  @@index([userId, status])
+  @@index([status, createdAt])
+  @@map("treatment_requests")
 }

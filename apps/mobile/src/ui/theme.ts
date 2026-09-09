@@ -543,6 +543,8 @@ export const bio = {
     violetLt: "#C5A9FF",
     /** violet used for small chips + the active tab glyph (§1 photos) */
     violetChip: "#C4B0F7",
+  /** chip text on the §7 approvals queue (staff register) */
+  violetChipText: "#C3B2FF",
     /** — nutrition (amber family) — */
     /** section labels + the light end of the amber FAB / ring glow */
     amberLt: "#F8CD8B",
@@ -578,6 +580,8 @@ export const bio = {
   magentaAlpha: (a: number): string => `rgba(232,107,199,${a})`,
   /** violet-accent alpha ramp (consent centre, trust layer) */
   violetAlpha: (a: number): string => `rgba(167,139,250,${a})`,
+  /** blue-accent alpha ramp — §7 treatments, and the practitioner role */
+  blueAlpha: (a: number): string => `rgba(108,168,255,${a})`,
   /** dark-ink alpha ramp for the pale-rose "Add to stack" moment */
   roseInkAlpha: (a: number): string => `rgba(44,25,38,${a})`,
   /** dark-ink alpha ramp for the peach "Add meal" moment */
@@ -599,6 +603,37 @@ export const bio = {
    * bloom), the client screens the standard consumer system (glass, violet).
    * Values that differ between the two are named for their side.
    */
+  /**
+   * — §7 IV therapy & treatments —
+   *
+   * The status dot is the one element carrying regulatory weight: "pending
+   * review" must never look like a confirmed booking, so the pending and
+   * approved states differ in colour AND in fill, not colour alone.
+   */
+  treatment: {
+    /** the disclaimer band above the suggestions a client sees */
+    disclaimerRadius: 14,
+    /** status dot on a client request row */
+    dot: 9,
+    /** icon plate on a suggestion card */
+    plate: 38,
+    cardRadius: 20,
+    /* — practitioner approvals queue (design 5B, violet staff register) — */
+    queue: {
+      /** the Doto pending count in the header */
+      count: 30,
+      avatar: 36,
+      /** pill actions: Decline / Approve, Cancel / Confirm decline */
+      action: 44,
+      /** status chip: pending / approved / declined */
+      chipDot: 5,
+      /** inline decline reason field — declining happens ON the card */
+      reasonBox: 74,
+      reasonRadius: 14,
+      /** dot on a Decided today row */
+      decidedDot: 6,
+    },
+  },
   /** — §1 progress photos — */
   photos: {
     /** one tile in the 3-column dated grid */

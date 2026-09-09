@@ -10,6 +10,7 @@
  * health-bearing keys, so the trail can say a meal was logged without recording
  * what was in it.
  */
+import type { Prisma } from "@prisma/client";
 import { sanitiseAuditMeta, type AuditAction } from "@pulse/shared";
 import { prisma } from "../db";
 
@@ -40,4 +41,32 @@ export async function recordAudit(args: RecordArgs): Promise<void> {
   } catch {
     // Never let auditing break the action it describes.
   }
+}
+
+/**
+ * Append one entry inside a caller-supplied transaction, and THROW if it fails.
+ *
+ * The opposite trade-off to `recordAudit` above, for the one case that needs it:
+ * a §7 treatment decision is a clinical act by a named person, and the trail is
+ * the only durable record that it happened. An approval that silently loses its
+ * audit row is worse than an approval that fails — so this one is atomic with
+ * the status change, and a failed write rolls the decision back with it.
+ *
+ * Pass the transaction client from `prisma.$transaction`, not `prisma`.
+ */
+export async function recordAuditTx(
+  tx: Prisma.TransactionClient,
+  args: RecordArgs,
+): Promise<void> {
+  const meta = sanitiseAuditMeta(args.meta);
+  await tx.auditLog.create({
+    data: {
+      actorId: args.actorId,
+      subjectId: args.subjectId ?? null,
+      action: args.action,
+      entity: args.entity ?? null,
+      entityId: args.entityId ?? null,
+      meta: meta ?? undefined,
+    },
+  });
 }

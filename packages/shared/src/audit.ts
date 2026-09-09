@@ -30,6 +30,14 @@ export const AUDIT = {
   inviteRevoked: "invite.revoked",
   inviteAccepted: "invite.accepted",
   linkRevoked: "link.revoked",
+  // §7 treatments. A separate action per decision, so an access review can
+  // answer "who approved what" without decoding `meta` — these are clinical
+  // decisions, and the trail is the only durable record that a person made one.
+  treatmentRequested: "treatment.requested",
+  treatmentApproved: "treatment.approved",
+  treatmentDeclined: "treatment.declined",
+  treatmentWithdrawn: "treatment.withdrawn",
+  treatmentExpired: "treatment.expired",
 } as const;
 
 export type AuditAction = (typeof AUDIT)[keyof typeof AUDIT];

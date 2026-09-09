@@ -48,6 +48,11 @@ import { ConsentCentreScreen } from "../consent/ConsentCentreScreen";
 import { PhotosGalleryScreen, type PendingUpload } from "../photos/PhotosGalleryScreen";
 import { PhotoAddSheet } from "../photos/PhotoAddSheet";
 import { PhotoDetailScreen } from "../photos/PhotoDetailScreen";
+import { TreatmentsScreen } from "../treatments/TreatmentsScreen";
+import { TreatmentOfferSheet } from "../treatments/TreatmentOfferSheet";
+import { fetchSuggestions, fetchRequests, type Suggestion } from "../treatments/treatmentsApi";
+import { shouldOffer, lastOfferAt, markOfferShown } from "../../lib/treatmentOffer";
+import { ReviewQueueScreen } from "../treatments/ReviewQueueScreen";
 import { PhotoCompareScreen } from "../photos/PhotoCompareScreen";
 import { fetchPhotos, fetchPhotosAudience, uploadPhoto, type ConsentAudience, type Photo } from "../photos/photosApi";
 import { getUnitPref, type WeightUnit } from "../../lib/prefs";
@@ -97,7 +102,7 @@ type ConsentView = "none" | "centre" | "roles";
 type PhotosView = "none" | "gallery";
 
 /** The client's view of what a trainer shared, pushed from Profile. */
-type ProfileArea = "none" | "trainerFeed" | "careTeam" | "enterCode" | "admin";
+type ProfileArea = "none" | "trainerFeed" | "careTeam" | "enterCode" | "admin" | "treatments";
 
 /** Where the staff invite flow is: the list, the create form, or a fresh code. */
 type InviteView = { step: "none" } | { step: "list" } | { step: "create" } | { step: "code"; invite: CreatedInvite; lockedTo?: string | undefined };
@@ -130,6 +135,17 @@ export function MainTabs() {
   // Capability is fetched HERE, inside the (app) area — never in the root
   // AuthProvider, which pulls the API client into RN's earliest startup and
   // breaks the runtime. Null until known, so we never flash the wrong shell.
+  // The §7 review queue, pushed from the roster. Only ever reachable with a
+  // PRACTITIONER capability — the API refuses a PT outright, and the entry
+  // point below is withheld from one too.
+  const [reviewQueue, setReviewQueue] = useState(false);
+  /**
+   * The §7 offer. Checked once per app session and rate-limited to once a
+   * fortnight in `lib/treatmentOffer.ts` — a nudge that reappears daily is
+   * nagging, and this is the one surface where that would also be predatory.
+   */
+  const [offer, setOffer] = useState<Suggestion | null>(null);
+  const offerChecked = useRef(false);
   const [staff, setStaff] = useState<{ kind: string }[] | null>(null);
   /** platform role — only ADMIN unlocks the admin surface. Never a capability. */
   const [role, setRole] = useState<string | null>(null);
@@ -265,11 +281,50 @@ export function MainTabs() {
 
   // Staff keep the consumer app — they have a body too. Capability decides what
   // they MAY do; intent decides which shell they see.
+  // Deliberately not on every tab change: one check per launch, on Home, and
+  // only for someone whose own readings already crossed a threshold.
+  useEffect(() => {
+    if (offerChecked.current) return;
+    if (active !== "home" || intent !== "personal") return;
+    offerChecked.current = true;
+    void (async () => {
+      try {
+        const [s, requests, lastAt] = await Promise.all([
+          fetchSuggestions(),
+          fetchRequests(),
+          lastOfferAt(),
+        ]);
+        const open = requests.filter((r) => r.status === "REQUESTED" || r.status === "APPROVED");
+        const top = s.suggestions[0];
+        if (!top) return;
+        const ok = shouldOffer({
+          suggestionCount: s.suggestions.length,
+          hasPractitioner: s.hasPractitioner,
+          openRequestCount: open.length,
+          lastShownAt: lastAt,
+          now: Date.now(),
+        });
+        if (!ok) return;
+        await markOfferShown();
+        setOffer(top);
+      } catch {
+        // An offer is the least important thing on screen. If it cannot be
+        // decided, it simply does not appear.
+      }
+    })();
+  }, [active, intent]);
+
   const isStaff = (staff?.length ?? 0) > 0;
   /** The capacities this account holds — an invite can only be minted in one. */
   const staffKinds = (staff ?? [])
     .map((s) => s.kind)
     .filter((k): k is StaffKind => k === "PT" || k === "PRACTITIONER");
+  /**
+   * Only a practitioner reviews treatments. A PT holds a real staff capability
+   * and still must not see this — mirrored server-side by `canReview`, because
+   * withholding a button is presentation, not access control.
+   */
+  const canReviewTreatments = staffKinds.includes("PRACTITIONER");
 
   // Wait for all three before rendering, so we never flash the wrong shell —
   // or the welcome at someone who dismissed it on a previous launch.
@@ -349,6 +404,8 @@ export function MainTabs() {
               setRefreshKey((k) => k + 1);
             }}
           />
+        ) : reviewQueue ? (
+          <ReviewQueueScreen onBack={() => setReviewQueue(false)} />
         ) : client ? (
           <TrainerClientScreen
             clientId={client}
@@ -362,6 +419,7 @@ export function MainTabs() {
             trainerName="Your roster"
             onOpenClient={setClient}
             onInvite={() => setInvite({ step: "list" })}
+            onReviewQueue={canReviewTreatments ? () => setReviewQueue(true) : undefined}
           />
         )}
         {/*
@@ -370,7 +428,7 @@ export function MainTabs() {
           a bottom CTA — a floating tab bar would sit on top of "Save note" /
           "Assign plan". You leave those via Back, then the tab bar returns.
         */}
-        {keyboardUp || client || noteFor || planFor || invite.step !== "none" ? null : (
+        {keyboardUp || client || noteFor || planFor || reviewQueue || invite.step !== "none" ? null : (
           <BioTabBar
             active={active}
             onSelect={(t) => {
@@ -382,6 +440,7 @@ export function MainTabs() {
               setClient(null);
               setNoteFor(null);
               setPlanFor(null);
+              setReviewQueue(false);
               setActive(t);
             }}
             onLog={() => setSheet("chooser")}
@@ -412,6 +471,8 @@ export function MainTabs() {
           onEnterCode={() => setProfileArea("enterCode")}
           refreshKey={teamKey}
         />
+      ) : profileArea === "treatments" ? (
+        <TreatmentsScreen onBack={() => setProfileArea("none")} />
       ) : profileArea === "trainerFeed" ? (
         <MyTrainerScreen onBack={() => setProfileArea("none")} />
       ) : comparing ? (
@@ -530,6 +591,7 @@ export function MainTabs() {
           }}
           onTrainerFeed={() => setProfileArea("trainerFeed")}
           onCareTeam={() => setProfileArea("careTeam")}
+          onTreatments={() => setProfileArea("treatments")}
           onAdmin={role === "ADMIN" ? () => setProfileArea("admin") : undefined}
           onTrainer={
             isStaff
@@ -565,6 +627,18 @@ export function MainTabs() {
           fabTone={supplements !== "none" ? "magenta" : nutrition !== "none" ? "amber" : "brand"}
         />
       )}
+
+      {offer ? (
+        <TreatmentOfferSheet
+          suggestion={offer}
+          onClose={() => setOffer(null)}
+          onOpenTreatments={() => {
+            setOffer(null);
+            setActive("profile");
+            setProfileArea("treatments");
+          }}
+        />
+      ) : null}
 
       {sheet === "chooser" ? (
         <LogChooser

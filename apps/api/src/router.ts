@@ -20,6 +20,7 @@ import { invitesRouter } from "./routers/invites";
 import { accountRouter } from "./routers/account";
 import { notificationsRouter } from "./routers/notifications";
 import { photosRouter } from "./routers/photos";
+import { treatmentsRouter } from "./routers/treatments";
 
 export const appRouter = router({
   /** Liveness check — no auth. */
@@ -80,6 +81,9 @@ export const appRouter = router({
 
   /** Progress photos — private by default; the bucket is never public. */
   photos: photosRouter,
+
+  /** IV therapy & treatments — suggestions are computed, approval is a practitioner act. */
+  treatments: treatmentsRouter,
 });
 
 export type AppRouter = typeof appRouter;

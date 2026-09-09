@@ -37,11 +37,18 @@ export function TrainerRosterScreen({
   trainerName,
   onOpenClient,
   onInvite,
+  onReviewQueue,
 }: {
   trainerName: string;
   onOpenClient: (id: string) => void;
   /** open the invitations surface — the only way a client can be added */
   onInvite: () => void;
+  /**
+   * Open the §7 treatment review queue. Undefined for a PT: a trainer is not
+   * a clinician and never reviews a treatment. Absent rather than disabled,
+   * so the surface simply is not part of their app.
+   */
+  onReviewQueue?: (() => void) | undefined;
 }) {
   const insets = useSafeAreaInsets();
   const [clients, setClients] = useState<RosterClient[] | null>(null);
@@ -109,6 +116,22 @@ export function TrainerRosterScreen({
             <View style={styles.inviteH} />
           </Pressable>
         </View>
+
+        {onReviewQueue ? (
+          <Pressable
+            onPress={() => {
+              pressHaptic();
+              onReviewQueue();
+            }}
+            style={({ pressed }) => [styles.reviewRow, pressed && styles.pressed]}
+            accessibilityRole="button"
+            accessibilityLabel="Treatment review queue"
+          >
+            <View style={styles.reviewDot} />
+            <Text style={styles.reviewLabel}>Treatment review queue</Text>
+            <Text style={styles.reviewChev}>›</Text>
+          </Pressable>
+        ) : null}
 
         <ScopeLine />
 
@@ -288,6 +311,27 @@ function EmptyRoster({ onInvite }: { onInvite: () => void }) {
 }
 
 const styles = StyleSheet.create({
+  reviewRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 11,
+    marginTop: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 13,
+    borderRadius: bio.radius.sm,
+    backgroundColor: bio.blueAlpha(0.08),
+    borderWidth: 1,
+    borderColor: bio.blueAlpha(0.26),
+  },
+  reviewDot: {
+    width: bio.treatment.dot,
+    height: bio.treatment.dot,
+    borderRadius: bio.treatment.dot / 2,
+    borderWidth: 1.5,
+    borderColor: bio.color.blue,
+  },
+  reviewLabel: { flex: 1, fontFamily: fontFamily.semibold, fontSize: 13.5, color: bio.color.blueLt },
+  reviewChev: { fontFamily: fontFamily.medium, fontSize: 16, color: bio.blueAlpha(0.6) },
   root: { flex: 1, backgroundColor: bio.color.ink },
   flex: { flex: 1 },
   inner: { flex: 1, paddingHorizontal: 20 },

@@ -37,6 +37,8 @@ type Props = {
   onTrainerFeed: () => void;
   /** who this account is connected to, and the way to connect to someone new */
   onCareTeam: () => void;
+  /** §7 treatments — suggestions and the requests awaiting a practitioner */
+  onTreatments: () => void;
   /** only present for ADMIN accounts — platform administration, not care */
   onAdmin?: (() => void) | undefined;
   refreshKey: number;
@@ -51,6 +53,7 @@ export function ProfileScreen({
   onTrainer,
   onTrainerFeed,
   onCareTeam,
+  onTreatments,
   onAdmin,
   refreshKey,
 }: Props) {
@@ -212,6 +215,16 @@ export function ProfileScreen({
               </Pressable>
             </>
           ) : null}
+          <View style={styles.sep} />
+          {/* Unconditional, like Care team: the screen explains that a
+              practitioner is needed, which is more use than a hidden row. */}
+          <Pressable style={styles.row} onPress={onTreatments} accessibilityRole="button">
+            <Text style={styles.rowLabel}>Treatments</Text>
+            <View style={styles.rowVal}>
+              <Text style={styles.rowValTxt}>Practitioner-reviewed</Text>
+              <Text style={styles.chev}>›</Text>
+            </View>
+          </Pressable>
         </GlassSurface>
 
         {onTrainer ? (
