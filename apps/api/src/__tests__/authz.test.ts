@@ -3,7 +3,24 @@
  * we hand-build the context (as createContext would produce) and assert the
  * three required outcomes plus a passing protected call.
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
+/**
+ * `admin.stats` is a real aggregate query, and this file is otherwise DB-free.
+ * Without this mock the very first test opened a connection to Supabase and
+ * failed on latency rather than on policy — a test named
+ * "correct role passes an admin procedure" must not be able to fail because a
+ * free-tier database was slow. Counting is stubbed; the authorization it is
+ * actually asserting runs for real.
+ */
+vi.mock("../db", () => ({
+  prisma: {
+    user: { count: async () => 0 },
+    staffProfile: { count: async () => 0 },
+    staffLink: { count: async () => 0 },
+    clientInvite: { count: async () => 0 },
+  },
+}));
+
 import { appRouter } from "../router";
 import { router, ownerProcedure } from "../trpc";
 import { ctx } from "./testContext";
