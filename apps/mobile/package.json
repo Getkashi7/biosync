@@ -20,7 +20,6 @@
     "@react-native-async-storage/async-storage": "2.2.0",
     "@react-native-community/datetimepicker": "8.4.4",
     "@react-native-masked-view/masked-view": "0.3.2",
-    "@sentry/react-native": "~5.25.0",
     "@supabase/supabase-js": "^2.46.1",
     "@trpc/client": "^11.0.0",
     "expo": "54.0.8",
