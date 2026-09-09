@@ -91,6 +91,88 @@
   the visibility selector records intent that nothing acts on — the copy is honest about who
   *would* see it, but no staff surface reads photos today.
 
+## From §7 (IV therapy & treatments)
+
+- **Expiry is derived, never written.** `effectiveStatus` shows a lapsed approval as EXPIRED on
+  read, so the UI is right the instant it lapses and no cron can fall behind. The stored status
+  stays APPROVED as the record that a practitioner did approve. The consequence: `EXPIRED` exists
+  in the enum and the transition table but is never persisted. If an expiry ever needs to *fire*
+  something (notify the client, free an appointment slot), that needs a real job — and it should
+  use the `APPROVED → EXPIRED / SYSTEM` transition that is already defined and tested.
+- **No appointment nudge yet.** §12 deliberately has no `APPOINTMENT` nudge type because booking
+  didn't exist. It still doesn't — BIOSYNC never books; a practitioner arranges it out of band. A
+  nudge for "your practitioner approved a review" is the honest version of that toggle, and needs
+  real push (a token table + FCM/Expo), not a device-local schedule, since it's event-driven.
+- **The client isn't told when a decision lands.** They see it next time they open the screen.
+  Same push dependency as above.
+- **No practitioner-side history.** `reviewQueue` shows only REQUESTED. A practitioner can't see
+  what they previously approved or declined for a client, which they will want for their own
+  records — the rows exist (`reviewedById`, `reviewedAt`, `decisionNote`), only the read is missing.
+- **Signals are UTC-bucketed.** `ownSignalDays` keys hydration by `recordedAt`'s UTC day while
+  check-ins and readiness are already device-local `@db.Date`. At a timezone boundary a late-evening
+  drink can land on the next day's bucket. Same class of issue as the `insights.list` weight
+  bucketing already noted; fix both together by taking the client's local day.
+- **The catalogue has four entries and one trigger each.** A protocol that should surface on a
+  *combination* of signals (low energy AND short sleep) can't be expressed. Worth doing only when
+  there's a clinical reason to, and it must stay pure and testable — never a model call.
+- **`decisionNote` is never editable.** A practitioner who declines with a typo cannot correct it.
+  Deliberate for now (the row is a clinical record), but an append-only correction — a second note,
+  never an overwrite — would be the right shape if it's ever needed.
+
+## From §7 — building `Practitioner Queue.dc.html` (design 5B)
+
+Five places the design and the data model did not line up. Each was resolved toward what we can
+say truthfully; none is a defect in the design, they are just decisions it could not have made.
+
+- **The design's sample cards name products** — "IV — Magnesium + B-complex", "IV — Vitamin C &
+  zinc". `TREATMENT_PROTOCOLS` deliberately does not: it holds *consultation categories*, and the
+  catalogue guard fails the build on a substance name. Those titles were not adopted. The defensible
+  version, if formulation detail is ever wanted, is a **practitioner-only field the client never
+  sees** — the queue is professional-facing, so naming a formulation there is record-keeping rather
+  than advertising, but the same string must not travel back to the client's request row, which is
+  public-facing. That is a schema change (`clinicalDetail` on `TreatmentRequest`, written by the
+  practitioner, never returned by `treatments.list`), not a catalogue edit.
+- **The card's meta line assumes a booking already exists** — "The Wellness Rooms, Shoreditch ·
+  Sat 6 Sep, 10:20". We model no clinic and no slot. What shipped instead is a **post-approval
+  hand-off**: an APPROVED request can open `EXPO_PUBLIC_CLINIC_BOOKING_URL`, the clinic's own
+  site. The design's order (slot held, then approved) was rejected deliberately — it would have
+  the app take a treatment booking from the public before any clinical review. Per-clinic
+  routing and a real slot still need the §6/§7 booking model and its own schema; today there is
+  one URL for the whole app, and the practitioner card cannot show which clinic or when.
+- **"Decided today" is not built.** The design has a section listing earlier decisions
+  ("Approved 8:12 · logged"). `reviewQueue` returns only REQUESTED rows, so it could only be
+  populated from the current session — and a section headed "today" that silently omits this
+  morning's decisions would be worse than no section. The columns exist (`reviewedAt`,
+  `reviewedById`, `decisionNote`); this needs the API read noted above under §7.
+- **The staff tab bar (Clients · Queue · Messages · Me) is not built.** `MainTabs` has no staff tab
+  bar at all — the professional shell is a push stack — so the queue is reached from the roster.
+  Note the design's bar uses `backdrop-filter: blur(28px)`, which CLAUDE.md rules out in RN; the
+  translation is an elevated surface plus a hairline.
+- **Confirm-decline gating differs on purpose.** The design enables Confirm on any non-empty
+  reason; the server requires ten characters (`MIN_DECLINE_REASON`). We hold the server's rule and
+  say what is still needed, because a Confirm that gets rejected is worse than one that waits.
+
+## From the build unblock
+
+- **There is no crash reporting.** `@sentry/react-native` was removed: it was pinned `~5.25.0`
+  against SDK 54's expected `~6.20.0` — five majors behind, on RN 0.81 with the new architecture —
+  and it was **inert anyway**, because `Sentry.init` is guarded on `EXPO_PUBLIC_SENTRY_DSN` and no
+  build profile sets one. Worse, its `ErrorBoundary` with no `fallback` renders `null`, so an
+  unhandled render error was a blank white screen. `src/ui/AppErrorBoundary.tsx` replaces the
+  boundary honestly. Doing Sentry properly means: `@sentry/react-native@~6.20.0`, its
+  `@sentry/react-native/expo` config plugin in `app.json`, a real Sentry project, the DSN in every
+  `eas.json` profile **and** in the workflow's `need` array, and a decision about the Gradle
+  source-map upload task (which wants `SENTRY_AUTH_TOKEN` at build time). Worth doing before real
+  users, not before the first green Gradle run.
+- **The APK workflow has still never run.** Both variants are unverified — first CI runs commonly
+  need a fix or two, and this one now has a `variant` input, a conditional env step and a
+  capitalised Gradle task that have never executed. Run `debug` first; it is the one on the
+  critical path.
+- **`versionCode` is pinned to 1.** Fine while the keystore rotates every run (installs already
+  require an uninstall), but it must start incrementing the moment a stable upload key lands —
+  `eas.json`'s `production.autoIncrement` writes back into `app.json`, which is why the field now
+  exists at all.
+
 ## Ops / infrastructure
 - **Both hosting tiers sleep, and that's a launch blocker, not a bug.** Supabase (free) pauses the
   database after 7 days idle — the symptom is `FATAL: (ENOTFOUND) tenant or user not found`, fixed

@@ -61,10 +61,31 @@ them forces a new native build and breaks the device dev flow. **These are not l
      ride the same tunnels, so `src/lib/trpc.ts` resolves the API to `localhost:4000` and writes
      persist. (The `pulse://` scheme is the app's build-time identity — see Naming below.)
   - Screenshots: `adb exec-out screencap -p > file.png`.
-- **Rebuild the dev client only when native deps/config change** (`app.json` plugins, a new native
-  module): `cd apps/mobile && npx eas-cli build --platform android --profile development` (EAS project
-  `@kaze7777/pulse`; profiles in `eas.json`; keystore already on EAS), then `adb install -r <apk>`.
-  Pure-JS changes just hot-reload over Metro — no rebuild.
+- **Rebuilding the native app — two routes, and the free one is usually right.**
+  A rebuild is needed only when a **native** dependency or `app.json` config changes; pure-JS
+  changes hot-reload over Metro.
+  - **Free CI (no Expo account):** GitHub → Actions → **Android APK** → Run workflow, and pick a
+    `variant`:
+    - `debug` — a **development client**. It contains no JS bundle; it loads from Metro over the
+      `adb reverse` tunnels, so once installed **every JS change hot-reloads with no further
+      native build**. This is the one to keep on the S23 while building.
+    - `release` — a standalone APK for testers, JS baked in, pointed at the `preview` profile's
+      API URL.
+    Download `biosync-apk-<variant>` from the run's Artifacts, then `adb install -r`. Each run
+    generates a fresh debug keystore, so signatures differ between builds — **uninstall the
+    previous BIOSYNC first**, every time.
+  - **EAS (needs `eas login`):** `cd apps/mobile && npx eas-cli build --platform android --profile
+    development` (project `@kaze7777/pulse`; keystore already on EAS), then `adb install -r <apk>`.
+- **`apps/mobile/eas.json` must stay strict JSON — no comments.** EAS CLI tolerates them; the
+  Android APK workflow reads the file with Node's `require()`, which does not. A comment there
+  fails the build at the first step.
+- **The `development` profile deliberately omits `EXPO_PUBLIC_API_URL`.** `src/lib/trpc.ts` lets an
+  explicit URL win *in every mode*, so baking the Render URL into a dev build would permanently
+  point the dev client away from the local API on `localhost:4000` — silently breaking the loop
+  above, where Metro and the API ride the same tunnels. Supabase URL and anon key are present
+  because `src/lib/supabase.ts` throws at module scope without them. (The `debug` CI variant needs
+  no env at all: `EXPO_PUBLIC_*` values are inlined by Metro at bundle time from
+  `apps/mobile/.env` on this machine, and a debug APK carries no bundle.)
 - **Stop the API server before `pnpm install`, `prisma generate`, or `prisma migrate`** — a running
   API locks the Prisma query-engine DLL and the install dies with `EPERM`. If it must stay up, use
   `pnpm install --ignore-scripts`.
@@ -178,6 +199,64 @@ them forces a new native build and breaks the device dev flow. **These are not l
   4. `pnpm exec prisma migrate deploy` (applies without a shadow DB), then `pnpm exec prisma generate`.
 - **Type sharing:** the API exports its `AppRouter` type; the mobile client imports it type-only
   for end-to-end type safety. No runtime dependency from mobile on API code.
+
+## §7 Treatments — the one module where a bug is a regulatory problem
+
+IV therapy (§7) is the only surface here where getting it wrong stops being a bad screen and
+becomes a regulated-medicine matter. In the UK a prescription-only medicine may not be advertised
+to the public (Human Medicines Regulations 2012, reg. 279), and a health claim must be authorised
+and substantiated (ASA/CAP). Four rules make that **structural rather than a matter of copy**, and
+all four live in `packages/shared/src/treatments.ts`:
+
+- **The catalogue is code, not data.** `TREATMENT_PROTOCOLS` is a constant reviewed in pull
+  requests — deliberately not a table an admin screen can edit, and deliberately **never**
+  model-generated. Nothing in it names a substance, a dose, or a route; every entry is a
+  *consultation category* ("Energy review"), never a product. Adding one is a regulatory change:
+  the catalogue guard in `packages/shared/src/__tests__/treatments.test.ts` fails the build on a
+  product word or a claim word.
+- **The "why" is computed, never generated.** `suggestTreatments` is a pure function of the user's
+  own readings, exactly like `nutritionRead` — it restates ("you logged low energy on 3 of the last
+  7 days") and never predicts. There is no LLM anywhere in this path, and `SIGNAL_THRESHOLDS` keeps
+  "what counts as low" in reviewed, tested code rather than in a query.
+- **Approval is an act.** The transition table is data, and nothing reaches `APPROVED` except a
+  PRACTITIONER deciding. Silence does not approve, time does not approve, and an approval *expires*
+  (`APPROVAL_TTL_DAYS`). `canProceedToBooking` is the only function permitted to say a booking may
+  go ahead — never `status === "APPROVED"`, which is also true of a lapsed approval. `effectiveStatus`
+  derives expiry on read, so no background job can fall behind.
+- **A PT can never review one.** `canReview` refuses PT, and unlike every other staff surface this
+  ceiling is **not consent-widenable**: the client is not offered a control that would lower it. A
+  trainer is not a clinician.
+
+Two consequences elsewhere. Treatment decisions use `recordAuditTx` — atomic with the status change,
+and it **throws** — because `recordAudit`'s own header says best-effort auditing is the wrong
+trade-off once the trail is the record of a regulated claim. And `apps/mobile/src/lib/treatmentCopy.ts`
+mirrors the disclaimer (mobile cannot import shared); the shared test reads that file off disk and
+fails if the two drift, because a drifted disclaimer is a compliance defect, not a typo.
+
+**Booking is a hand-off, and only after approval.** BIOSYNC never takes a booking. An
+APPROVED request can open the clinic's own site via `EXPO_PUBLIC_CLINIC_BOOKING_URL`, gated on
+`canBook` so it is unreachable before a practitioner has decided — the design's flow (client
+picks a slot, practitioner approves it) was deliberately **not** built, because it puts the app
+in the position of taking a treatment booking from the public before any clinical review. With
+the variable unset the button is absent and the card says the practitioner will arrange it.
+
+**`pnpm test` is DB-free and must stay that way.** Every API test mocks `../db`; the suite is
+verified to pass with an unreachable `DATABASE_URL`, so CI and offline work never depend on
+Supabase. The one real-database test is opt-in and excluded by default:
+
+```
+cd apps/api && RUN_DB_TESTS=1 pnpm exec vitest run src/__tests__/treatments.db.test.ts
+```
+
+It drives the whole §7 loop against the live database — request, queue, approve, decline,
+withdraw — because a mocked Prisma can prove a query's *shape* but not that the decide
+transaction and its audit row actually commit together. It namespaces every row to a per-run
+uuid and deletes them (including audit rows, which have no FK and do not cascade). Raise its
+timeouts, not vitest's global ones: those numbers are about the pooler, not about slow code.
+
+Note the deviation from `BIOSYNC_FEATURE_DESIGN_PROMPTS.md`, which describes §7 as "AI-surfaced".
+It is not, and must not become so: an LLM that invents a protocol name is one token away from
+naming a prescription-only medicine to the public.
 
 ## Conventions
 
