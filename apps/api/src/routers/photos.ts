@@ -88,7 +88,16 @@ export const photosRouter = router({
     try {
       const { signedUrl, token } = await createSignedUploadUrl(path);
       return { path, signedUrl, token };
-    } catch {
+    } catch (err) {
+      // The user-facing message stays vague on purpose — they can do nothing
+      // about it either way. The SERVER log must not be, though: swallowing the
+      // cause here is what made an unconfigured bucket look identical to a
+      // network blip, and it is the same mistake the Groq client used to make.
+      //
+      // Safe to log: the reason. NOT safe, and deliberately absent: `path`,
+      // which begins with the owner's user id.
+      const reason = err instanceof Error ? err.message : "unknown";
+      console.error(`[storage] could not sign an upload URL — ${reason}`);
       throw new TRPCError({
         code: "INTERNAL_SERVER_ERROR",
         message: "Could not start the upload. Nothing was saved.",
