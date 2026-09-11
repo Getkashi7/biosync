@@ -10,6 +10,7 @@
  * No health values and no storage paths in log statements — a path contains the
  * owner's user id.
  */
+import { randomUUID } from "node:crypto";
 import { env } from "../env";
 
 export const PHOTO_BUCKET = "progress-photos";
@@ -17,12 +18,33 @@ export const PHOTO_BUCKET = "progress-photos";
 /** Signed URLs live just long enough to load a screen, not to be shared on. */
 const READ_TTL_SECONDS = 60 * 5;
 
-function storageHeaders(): Record<string, string> {
+/**
+ * Credentials only — for requests that send no body.
+ *
+ * Splitting these apart is not tidiness, it is the fix for a bug that made
+ * photo upload and photo deletion fail everywhere, from the day they were
+ * written. Both sent `Content-Type: application/json` with no body, and
+ * Supabase's Fastify layer rejects that combination outright:
+ *
+ *   400 "Body cannot be empty when content-type is set to 'application/json'"
+ *
+ * It never reached the bucket, so it looked like a storage or credential
+ * problem rather than a malformed request. `deleteObject` was the worse of the
+ * two: the 400 was indistinguishable from a real failure, so `photos.remove`
+ * kept the row and told the user to try again — forever.
+ *
+ * Rule: if a call has no body, it must not claim a content type.
+ */
+function authHeaders(): Record<string, string> {
   return {
     apikey: env.SUPABASE_SERVICE_ROLE_KEY,
     Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
-    "Content-Type": "application/json",
   };
+}
+
+/** Credentials plus the content type — only for requests that DO send a body. */
+function jsonHeaders(): Record<string, string> {
+  return { ...authHeaders(), "Content-Type": "application/json" };
 }
 
 /**
@@ -40,6 +62,38 @@ export function storageConfigured(): boolean {
 function assertConfigured(): void {
   if (!storageConfigured()) {
     throw new Error("Storage is not configured: SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY missing");
+  }
+}
+
+/**
+ * Ask the bucket whether it will actually talk to us, and report only the
+ * status code.
+ *
+ * A credential being *present* is not the same as it being *accepted*, and this
+ * is the gap that cost days: `/health/config` said storage was configured while
+ * every upload died at the first hop, and the reason lived in a deploy log
+ * nobody could reach without dashboard access.
+ *
+ * Signing an upload URL writes nothing — it mints a token for a path that is
+ * never used — so this is a read-only probe. The path is namespaced under
+ * `_probe/` so it can never collide with a real user's object, and the return
+ * value carries a status and a short reason, never the URL, the token or the
+ * key.
+ */
+export async function probeStorage(): Promise<{ ok: boolean; status: number; reason: string }> {
+  if (!storageConfigured()) {
+    return { ok: false, status: 0, reason: "not configured" };
+  }
+  try {
+    const res = await fetch(
+      `${env.SUPABASE_URL}/storage/v1/object/upload/sign/${PHOTO_BUCKET}/_probe/${randomUUID()}.jpg`,
+      { method: "POST", headers: authHeaders() },
+    );
+    // Supabase's body names the bucket and the failure, never the caller.
+    const reason = res.ok ? "ok" : (await res.text().catch(() => "")).slice(0, 200);
+    return { ok: res.ok, status: res.status, reason };
+  } catch (err) {
+    return { ok: false, status: 0, reason: err instanceof Error ? err.message : "unreachable" };
   }
 }
 
@@ -68,7 +122,7 @@ export async function createSignedUploadUrl(
   assertConfigured();
   const res = await fetch(
     `${env.SUPABASE_URL}/storage/v1/object/upload/sign/${PHOTO_BUCKET}/${path}`,
-    { method: "POST", headers: storageHeaders() },
+    { method: "POST", headers: authHeaders() },
   );
   if (!res.ok) throw new Error(`Storage refused an upload URL (${res.status})`);
   const body = (await res.json()) as { url?: string; token?: string };
@@ -81,7 +135,7 @@ export async function createSignedReadUrl(path: string): Promise<string | null> 
   assertConfigured();
   const res = await fetch(`${env.SUPABASE_URL}/storage/v1/object/sign/${PHOTO_BUCKET}/${path}`, {
     method: "POST",
-    headers: storageHeaders(),
+    headers: jsonHeaders(),
     body: JSON.stringify({ expiresIn: READ_TTL_SECONDS }),
   });
   if (!res.ok) return null;
@@ -99,7 +153,7 @@ export async function deleteObject(path: string): Promise<boolean> {
   assertConfigured();
   const res = await fetch(`${env.SUPABASE_URL}/storage/v1/object/${PHOTO_BUCKET}/${path}`, {
     method: "DELETE",
-    headers: storageHeaders(),
+    headers: authHeaders(),
   });
   return res.ok;
 }
@@ -126,7 +180,7 @@ export async function deleteAllUserObjects(userId: string): Promise<{ deleted: n
     for (let offset = 0; ; offset += 100) {
       const res = await fetch(`${env.SUPABASE_URL}/storage/v1/object/list/${PHOTO_BUCKET}`, {
         method: "POST",
-        headers: storageHeaders(),
+        headers: jsonHeaders(),
         body: JSON.stringify({ prefix: `${userId}/`, limit: 100, offset }),
       });
       if (!res.ok) return { deleted, failed: failed + 1 };
@@ -138,7 +192,7 @@ export async function deleteAllUserObjects(userId: string): Promise<{ deleted: n
       if (paths.length > 0) {
         const del = await fetch(`${env.SUPABASE_URL}/storage/v1/object/${PHOTO_BUCKET}`, {
           method: "DELETE",
-          headers: storageHeaders(),
+          headers: jsonHeaders(),
           body: JSON.stringify({ prefixes: paths }),
         });
         if (del.ok) deleted += paths.length;

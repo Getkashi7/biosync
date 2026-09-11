@@ -15,6 +15,7 @@ import { assertServerEnv, allowedOrigins, env, featureConfig, isProduction, repo
 import { RateLimiter, clientKey } from "./lib/rateLimit";
 import { prisma } from "./db";
 import { servePrivacy } from "./lib/privacy";
+import { probeStorage } from "./lib/storage";
 
 assertServerEnv();
 
@@ -142,6 +143,27 @@ const server = http.createServer((req, res) => {
    * Deliberately below the rate limiter, unlike `/health`: it touches the
    * database, so it must not be usable as a way to hammer Postgres.
    */
+  /**
+   * Does the bucket actually accept this deploy's credentials?
+   *
+   * `/health/config` only says a key is *present*. That proved not to be the
+   * same thing: it reported storage configured while every upload died at the
+   * first hop, and the reason was in a deploy log that needs dashboard access
+   * to read. This closes that gap — it reports the upstream status code, so
+   * "the key is missing", "the key is rejected" and "the bucket is gone" stop
+   * looking identical from outside.
+   *
+   * Below the rate limiter, like `/health/db` and for the same reason: it makes
+   * an outbound request, so it must not be usable to hammer Supabase. Returns a
+   * status and a short upstream reason — never the URL, the token or the key.
+   */
+  if (req.url === "/health/storage") {
+    void probeStorage()
+      .then((r) => send(res, r.ok ? 200 : 503, JSON.stringify({ ok: r.ok, storage: r })))
+      .catch(() => send(res, 503, JSON.stringify({ ok: false, storage: { reason: "probe failed" } })));
+    return;
+  }
+
   if (req.url === "/health/db") {
     void prisma
       .$queryRaw`select 1`
