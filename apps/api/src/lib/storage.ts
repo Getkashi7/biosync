@@ -25,8 +25,20 @@ function storageHeaders(): Record<string, string> {
   };
 }
 
+/**
+ * Whether this deploy can talk to the bucket at all.
+ *
+ * Exported so callers can tell "we are not set up for this" apart from "the
+ * request failed", the same distinction `hasGroqKey()` draws. Collapsing the
+ * two is what made an unfilled Render variable look like a network problem for
+ * weeks.
+ */
+export function storageConfigured(): boolean {
+  return Boolean(env.SUPABASE_URL && env.SUPABASE_SERVICE_ROLE_KEY);
+}
+
 function assertConfigured(): void {
-  if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) {
+  if (!storageConfigured()) {
     throw new Error("Storage is not configured: SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY missing");
   }
 }

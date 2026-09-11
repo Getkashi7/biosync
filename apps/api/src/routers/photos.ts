@@ -28,7 +28,13 @@ import {
 } from "@pulse/shared";
 import { router, ownerProcedure } from "../trpc";
 import { prisma } from "../db";
-import { createSignedReadUrl, createSignedUploadUrl, deleteObject, extensionFor } from "../lib/storage";
+import {
+  createSignedReadUrl,
+  createSignedUploadUrl,
+  deleteObject,
+  extensionFor,
+  storageConfigured,
+} from "../lib/storage";
 
 const userProcedure = ownerProcedure;
 
@@ -82,6 +88,21 @@ export const photosRouter = router({
    * finished — so the row waits for `confirmUpload`.
    */
   createUploadUrl: userProcedure.input(photoUploadInput).mutation(async ({ ctx, input }) => {
+    // Said plainly, before trying: a deploy with no storage key cannot ever
+    // succeed here, and telling the user "something went wrong, try again"
+    // invites them to retry something that will fail every time. This is the
+    // same distinction the coach draws between "not switched on" and "broke".
+    if (!storageConfigured()) {
+      console.error(
+        "[storage] photo upload attempted, but this deploy has no storage credentials " +
+          "(SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY)",
+      );
+      throw new TRPCError({
+        code: "PRECONDITION_FAILED",
+        message: "Photo storage isn't switched on for this app yet. Nothing was saved.",
+      });
+    }
+
     // The path is derived from the session, never from input: a client cannot
     // choose where its file lands or overwrite another user's object.
     const path = `${ctx.user.id}/${randomUUID()}.${extensionFor(input.mimeType)}`;

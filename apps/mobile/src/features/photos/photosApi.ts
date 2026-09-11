@@ -52,9 +52,18 @@ export async function fetchPhotosAudience(): Promise<ConsentAudience> {
  */
 export type UploadStep = "sign" | "read" | "put" | "confirm";
 
+/**
+ * Why an upload didn't land, in the terms that matter to the person waiting.
+ *
+ * `off` is the one that changes behaviour: photo storage not being switched on
+ * for this deploy is permanent until someone fixes the server, so a Retry
+ * button is a lie. `offline` and `error` are both worth retrying.
+ */
+export type UploadFailure = NetFailure | "off";
+
 export type UploadResult =
   | { ok: true; id: string }
-  | { ok: false; failure: NetFailure; step: UploadStep };
+  | { ok: false; failure: UploadFailure; step: UploadStep };
 
 /**
  * What is safe to log here: the step, and an HTTP status or tRPC code.
@@ -125,7 +134,11 @@ export async function uploadPhoto(params: {
     return { ok: true, id };
   } catch (err) {
     logUploadFailure(step, codeOf(err));
-    return { ok: false, failure: classifyNetError(err), step };
+    // PRECONDITION_FAILED from `createUploadUrl` means this deploy has no
+    // storage credentials. That will not come right by trying again, so it must
+    // not be dressed up as a transient failure.
+    const off = (err as { data?: { code?: string } })?.data?.code === "PRECONDITION_FAILED";
+    return { ok: false, failure: off ? "off" : classifyNetError(err), step };
   }
 }
 

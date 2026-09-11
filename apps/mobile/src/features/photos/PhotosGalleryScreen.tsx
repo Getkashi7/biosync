@@ -23,7 +23,13 @@ import { classifyNetError, type NetFailure } from "../../lib/netError";
 import { bio, fontFamily } from "../../ui/theme";
 import { pressHaptic } from "../../lib/haptics";
 import { groupPhotosByMonth, tilePhotoDate, photoHasOverride } from "../../lib/photoFormat";
-import { fetchPhotos, fetchPhotosAudience, type ConsentAudience, type Photo } from "./photosApi";
+import {
+  fetchPhotos,
+  fetchPhotosAudience,
+  type ConsentAudience,
+  type Photo,
+  type UploadFailure,
+} from "./photosApi";
 
 /** An upload the user started that hasn't landed yet. */
 export type PendingUpload = {
@@ -32,6 +38,14 @@ export type PendingUpload = {
   /** 0–100, or null once it has failed */
   progress: number | null;
   failed: boolean;
+  /**
+   * Why it failed, when it has.
+   *
+   * `off` means this deploy has no photo storage configured. That cannot
+   * come right by pressing Retry, so the tile must not offer one — an
+   * button that can only fail is worse than no button.
+   */
+  failure?: UploadFailure | null;
 };
 
 const S = bio.photos;
@@ -155,7 +169,7 @@ export function PhotosGalleryScreen({
                   <View style={styles.grid}>
                     {pending.map((p) =>
                       p.failed ? (
-                        <FailedTile key={p.key} onRetry={() => onRetry(p.key)} />
+                        <FailedTile key={p.key} failure={p.failure ?? null} onRetry={() => onRetry(p.key)} />
                       ) : (
                         <UploadingTile key={p.key} progress={p.progress ?? 0} />
                       ),
@@ -317,24 +331,38 @@ function UploadingTile({ progress }: { progress: number }) {
   );
 }
 
-function FailedTile({ onRetry }: { onRetry: () => void }) {
+function FailedTile({
+  failure,
+  onRetry,
+}: {
+  failure: UploadFailure | null;
+  onRetry: () => void;
+}) {
+  // Storage being switched off is permanent until someone changes the
+  // server. Saying "Didn't upload · Retry" for it would send the user round
+  // a loop that cannot end.
+  const off = failure === "off";
   return (
     <View style={styles.failedTile}>
       <View style={styles.failedBadge}>
         <Text style={styles.failedBang}>!</Text>
       </View>
-      <Text style={styles.failedLabel}>Didn&apos;t upload</Text>
-      <Pressable
-        onPress={() => {
-          pressHaptic();
-          onRetry();
-        }}
-        style={({ pressed }) => [styles.retryPill, pressed && styles.retryPressed]}
-        accessibilityRole="button"
-        accessibilityLabel="Retry this upload"
-      >
-        <Text style={styles.retryText}>Retry</Text>
-      </Pressable>
+      <Text style={styles.failedLabel}>
+        {off ? "Uploads are off" : "Didn't upload"}
+      </Text>
+      {off ? null : (
+        <Pressable
+          onPress={() => {
+            pressHaptic();
+            onRetry();
+          }}
+          style={({ pressed }) => [styles.retryPill, pressed && styles.retryPressed]}
+          accessibilityRole="button"
+          accessibilityLabel="Retry this upload"
+        >
+          <Text style={styles.retryText}>Retry</Text>
+        </Pressable>
+      )}
     </View>
   );
 }

@@ -11,7 +11,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { createHTTPHandler } from "@trpc/server/adapters/standalone";
 import { appRouter } from "./router";
 import { createContext } from "./context";
-import { assertServerEnv, allowedOrigins, env, isProduction } from "./env";
+import { assertServerEnv, allowedOrigins, env, featureConfig, isProduction, reportFeatureConfig } from "./env";
 import { RateLimiter, clientKey } from "./lib/rateLimit";
 import { prisma } from "./db";
 import { servePrivacy } from "./lib/privacy";
@@ -101,6 +101,24 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  /**
+   * Which optional features this deploy can actually serve.
+   *
+   * Exists because photo upload shipped broken and stayed broken: the storage
+   * key was declared in render.yaml, never filled in on the dashboard, and the
+   * only symptom was an opaque error when a user tapped "add photo". There was
+   * no way to ask the running service what it was configured for without
+   * dashboard access.
+   *
+   * Booleans only, and never the values — this is unauthenticated, so it must
+   * reveal that a key is *present*, never what it is, and never which of two
+   * variables was the missing one beyond the feature it powers.
+   */
+  if (req.url === "/health/config") {
+    send(res, 200, JSON.stringify({ ok: true, features: featureConfig() }));
+    return;
+  }
+
   if (servePrivacy(req, res)) return;
 
   const { allowed, retryAfterSec } = limiter.check(
@@ -145,6 +163,8 @@ const server = http.createServer((req, res) => {
 server.listen(env.PORT, env.HOST, () => {
   // No request data here — only that the process is up.
   console.log(`⚡ Pulse API listening on ${env.HOST}:${env.PORT}/trpc (${env.NODE_ENV})`);
+  // Say what this deploy cannot do, at the one moment someone is reading the log.
+  reportFeatureConfig();
   if (isProduction && allowedOrigins.length === 0) {
     console.warn("ALLOWED_ORIGINS is unset — browser requests from any origin are accepted.");
   }

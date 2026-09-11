@@ -197,6 +197,29 @@ them forces a new native build and breaks the device dev flow. **These are not l
   3. **Read the SQL before applying it.** It must be additive — any `DROP`/`TRUNCATE` means the diff
      misread the live schema; stop and investigate rather than run it.
   4. `pnpm exec prisma migrate deploy` (applies without a shadow DB), then `pnpm exec prisma generate`.
+- **Optional credentials must be loud, inspectable, and never fatal.** Photo upload shipped broken
+  and stayed broken for weeks: `SUPABASE_SERVICE_ROLE_KEY` was declared in `render.yaml` with
+  `sync: false`, never filled in on the dashboard, and the only symptom was an opaque error when a
+  user tapped "add photo". Three things now prevent that shape of bug:
+  - `featureConfig()` in `src/env.ts` reports which optional subsystems this deploy can serve
+    (`photoStorage`, `aiCoach`, `accountErasure`). Add a feature here when it gains a credential.
+  - `reportFeatureConfig()` prints the **user-visible consequence** at boot — "progress photos will
+    fail to upload", not "SUPABASE_SERVICE_ROLE_KEY is unset", because the second sentence means
+    nothing to whoever reads a deploy log.
+  - **`GET /health/config`** returns those booleans, unauthenticated. It exists so the running
+    service can be asked what it is configured for **without dashboard access** — that was the gap
+    that made this take weeks. Booleans only; never a value, never which of two variables was
+    missing beyond the feature it powers.
+
+  These are deliberately **not** added to `assertServerEnv()`. An API that refuses to boot because
+  photos aren't configured is a worse outage than the one it prevents — check-ins, nutrition and
+  the coach should keep working.
+- **A permanent failure must not be dressed as a transient one.** `photos.createUploadUrl` checks
+  `storageConfigured()` first and throws `PRECONDITION_FAILED` ("isn't switched on yet"), never
+  `INTERNAL_SERVER_ERROR`; the mobile gallery maps that to an `off` tile with **no Retry button**,
+  because a Retry that can only fail is worse than no button. Same distinction `hasGroqKey()` draws
+  for the coach. When adding a feature behind a credential, follow this: unconfigured → the user is
+  told it is off; broken → the user is invited to retry.
 - **Type sharing:** the API exports its `AppRouter` type; the mobile client imports it type-only
   for end-to-end type safety. No runtime dependency from mobile on API code.
 

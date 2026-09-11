@@ -50,3 +50,57 @@ export function assertServerEnv(): void {
     throw new Error("Set DATABASE_URL to start the Pulse API.");
   }
 }
+
+/**
+ * Which optional subsystems this deploy can actually serve.
+ *
+ * These are deliberately NOT fatal in `assertServerEnv`. A deploy missing the
+ * storage key should still serve check-ins, nutrition and the coach — taking
+ * the whole API down over one feature would be a worse outage than the one it
+ * prevents. But it must not be *silent* either, which is exactly how photo
+ * upload shipped broken: `SUPABASE_SERVICE_ROLE_KEY` was declared in
+ * render.yaml, never filled in on the dashboard, and nothing said so until a
+ * user tapped "add photo" weeks later and got an opaque error.
+ *
+ * So: booleans, reported at boot and over `/health/config`. Never the values.
+ */
+export type FeatureConfig = {
+  /** Progress photos (§1) — needs the service-role key to sign bucket URLs. */
+  photoStorage: boolean;
+  /** AI coach, macro estimates, supplement suggestions. */
+  aiCoach: boolean;
+  /** Account deletion's storage purge — same key as photos. */
+  accountErasure: boolean;
+};
+
+export function featureConfig(): FeatureConfig {
+  const storage = Boolean(env.SUPABASE_URL && env.SUPABASE_SERVICE_ROLE_KEY);
+  return {
+    photoStorage: storage,
+    aiCoach: Boolean(env.GROQ_API_KEY),
+    accountErasure: storage,
+  };
+}
+
+/**
+ * Say at boot what this deploy cannot do, and what that costs the user.
+ *
+ * Named per feature rather than per variable, because "SUPABASE_SERVICE_ROLE_KEY
+ * is unset" means nothing to whoever reads the deploy log at 2am; "progress
+ * photos will fail to upload" does.
+ */
+export function reportFeatureConfig(log: (msg: string) => void = console.warn): void {
+  const cfg = featureConfig();
+  const broken: string[] = [];
+  if (!cfg.photoStorage) {
+    broken.push(
+      "progress photos will fail to upload, and account deletion will not remove stored images " +
+        "(set SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY)",
+    );
+  }
+  if (!cfg.aiCoach) {
+    broken.push("the AI coach, macro estimates and supplement suggestions are off (set GROQ_API_KEY)");
+  }
+  if (broken.length === 0) return;
+  log(`[config] this deploy is missing optional configuration:\n  - ${broken.join("\n  - ")}`);
+}

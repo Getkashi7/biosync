@@ -194,7 +194,11 @@ export function MainTabs() {
         setPending((ps) => ps.filter((p) => p.key !== key));
         setPhotosKey((k) => k + 1);
       } else {
-        setPending((ps) => ps.map((p) => (p.key === key ? { ...p, failed: true, progress: null } : p)));
+        setPending((ps) =>
+          ps.map((p) =>
+            p.key === key ? { ...p, failed: true, progress: null, failure: res.failure } : p,
+          ),
+        );
       }
     },
     [],
