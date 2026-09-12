@@ -39,6 +39,8 @@ type Props = {
   onCareTeam: () => void;
   /** §7 treatments — suggestions and the requests awaiting a practitioner */
   onTreatments: () => void;
+  /** §3 training plan — the week built from readiness and goals */
+  onFitness: () => void;
   /** only present for ADMIN accounts — platform administration, not care */
   onAdmin?: (() => void) | undefined;
   refreshKey: number;
@@ -54,6 +56,7 @@ export function ProfileScreen({
   onTrainerFeed,
   onCareTeam,
   onTreatments,
+  onFitness,
   onAdmin,
   refreshKey,
 }: Props) {
@@ -222,6 +225,14 @@ export function ProfileScreen({
             <Text style={styles.rowLabel}>Treatments</Text>
             <View style={styles.rowVal}>
               <Text style={styles.rowValTxt}>Practitioner-reviewed</Text>
+              <Text style={styles.chev}>›</Text>
+            </View>
+          </Pressable>
+          <View style={styles.sep} />
+          <Pressable style={styles.row} onPress={onFitness} accessibilityRole="button">
+            <Text style={styles.rowLabel}>Training</Text>
+            <View style={styles.rowVal}>
+              <Text style={styles.rowValTxt}>Your week</Text>
               <Text style={styles.chev}>›</Text>
             </View>
           </Pressable>

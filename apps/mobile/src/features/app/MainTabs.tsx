@@ -49,6 +49,7 @@ import { PhotosGalleryScreen, type PendingUpload } from "../photos/PhotosGallery
 import { PhotoAddSheet } from "../photos/PhotoAddSheet";
 import { PhotoDetailScreen } from "../photos/PhotoDetailScreen";
 import { TreatmentsScreen } from "../treatments/TreatmentsScreen";
+import { FitnessScreen } from "../fitness/FitnessScreen";
 import { TreatmentOfferSheet } from "../treatments/TreatmentOfferSheet";
 import { fetchSuggestions, fetchRequests, type Suggestion } from "../treatments/treatmentsApi";
 import { shouldOffer, lastOfferAt, markOfferShown } from "../../lib/treatmentOffer";
@@ -102,7 +103,7 @@ type ConsentView = "none" | "centre" | "roles";
 type PhotosView = "none" | "gallery";
 
 /** The client's view of what a trainer shared, pushed from Profile. */
-type ProfileArea = "none" | "trainerFeed" | "careTeam" | "enterCode" | "admin" | "treatments";
+type ProfileArea = "none" | "trainerFeed" | "careTeam" | "enterCode" | "admin" | "treatments" | "fitness";
 
 /** Where the staff invite flow is: the list, the create form, or a fresh code. */
 type InviteView = { step: "none" } | { step: "list" } | { step: "create" } | { step: "code"; invite: CreatedInvite; lockedTo?: string | undefined };
@@ -475,6 +476,14 @@ export function MainTabs() {
           onEnterCode={() => setProfileArea("enterCode")}
           refreshKey={teamKey}
         />
+      ) : profileArea === "fitness" ? (
+        <FitnessScreen
+          onBack={() => setProfileArea("none")}
+          onSetGoal={() => {
+            setProfileArea("none");
+            setSheet("newgoal");
+          }}
+        />
       ) : profileArea === "treatments" ? (
         <TreatmentsScreen onBack={() => setProfileArea("none")} />
       ) : profileArea === "trainerFeed" ? (
@@ -596,6 +605,7 @@ export function MainTabs() {
           onTrainerFeed={() => setProfileArea("trainerFeed")}
           onCareTeam={() => setProfileArea("careTeam")}
           onTreatments={() => setProfileArea("treatments")}
+          onFitness={() => setProfileArea("fitness")}
           onAdmin={role === "ADMIN" ? () => setProfileArea("admin") : undefined}
           onTrainer={
             isStaff

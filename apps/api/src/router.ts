@@ -21,6 +21,7 @@ import { accountRouter } from "./routers/account";
 import { notificationsRouter } from "./routers/notifications";
 import { photosRouter } from "./routers/photos";
 import { treatmentsRouter } from "./routers/treatments";
+import { fitnessRouter } from "./routers/fitness";
 
 export const appRouter = router({
   /** Liveness check — no auth. */
@@ -81,6 +82,9 @@ export const appRouter = router({
 
   /** Progress photos — private by default; the bucket is never public. */
   photos: photosRouter,
+
+  /** Fitness plans — a week built by rule from readiness and goals, never generated. */
+  fitness: fitnessRouter,
 
   /** IV therapy & treatments — suggestions are computed, approval is a practitioner act. */
   treatments: treatmentsRouter,

@@ -634,6 +634,16 @@ export const bio = {
       decidedDot: 6,
     },
   },
+  /** — §3 fitness plans (coral) — */
+  fitness: {
+    /** intensity arc on the hero card */
+    ring: 46,
+    /** a day dot on the week spine */
+    dot: 10,
+    /** the tick box on an exercise row */
+    check: 22,
+    cardRadius: 20,
+  },
   /** — §1 progress photos — */
   photos: {
     /** one tile in the 3-column dated grid */
