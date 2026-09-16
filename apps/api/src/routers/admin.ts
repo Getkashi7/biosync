@@ -17,6 +17,7 @@ import { AUDIT, auditLabel, decodeCursor, keysetWhere, nextCursor } from "@pulse
 import { router, adminProcedure } from "../trpc";
 import { prisma } from "../db";
 import { recordAudit } from "../lib/audit";
+import { fetchPaidSessions, fetchRevenue, stripeConfigured } from "../lib/stripe";
 
 const staffKind = z.enum(["PT", "PRACTITIONER"]);
 
@@ -433,5 +434,55 @@ export const adminRouter = router({
     });
 
     return { ok: true as const, role: input.role };
+  }),
+
+  /**
+   * Recurring revenue, and how many sessions were paid for.
+   *
+   * Two numbers that look alike and are not: `paidSessions` comes from
+   * Stripe and `bookedSessions` from our own rows. Until Connect onboarding
+   * happens the first is zero — which is the truthful answer, not a bug —
+   * and merging them into one “sessions” figure would be the lie.
+   *
+   * When Stripe is unconfigured this is PRECONDITION_FAILED, never a zero.
+   * A zero MRR and an unknown MRR are different claims, and the screen must
+   * be able to tell them apart — the same distinction the coach and photo
+   * storage already draw.
+   */
+  revenue: adminProcedure.query(async () => {
+    if (!stripeConfigured()) {
+      throw new TRPCError({
+        code: "PRECONDITION_FAILED",
+        message: "Payments aren't switched on for this app yet.",
+      });
+    }
+
+    const since = Date.now() - 30 * 24 * 60 * 60 * 1000;
+    const [revenue, paid] = await Promise.all([fetchRevenue(), fetchPaidSessions(since)]);
+
+    if (!revenue.ok) {
+      // A rejected key cannot come right by retrying; a 5xx can.
+      throw new TRPCError({
+        code: revenue.reason === "unavailable" ? "INTERNAL_SERVER_ERROR" : "PRECONDITION_FAILED",
+        message:
+          revenue.reason === "rejected"
+            ? "Stripe is refusing our key. Revenue is unavailable until it is replaced."
+            : revenue.reason === "unconfigured"
+              ? "Payments aren't switched on for this app yet."
+              : "Couldn't reach Stripe just now.",
+      });
+    }
+
+    return {
+      mode: revenue.mode,
+      mrr: revenue.mrr,
+      paying: revenue.paying,
+      trialing: revenue.trialing,
+      paidSessions: paid.ok ? paid.count : null,
+      // Arrives with §6, which is what creates bookings at all. Null means we
+      // cannot say yet; zero would claim nobody has booked anything.
+      bookedSessions: null as number | null,
+      fetchedAt: revenue.fetchedAt,
+    };
   }),
 });

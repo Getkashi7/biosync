@@ -270,3 +270,31 @@ describe("admin.setRole", () => {
     expect(JSON.stringify(entry.meta)).toContain("ADMIN");
   });
 });
+
+describe("admin.revenue when payments are not switched on", () => {
+  /**
+   * A zero MRR and an unknown MRR are different claims. Returning zero here
+   * would put a confident, wrong number on the one screen someone makes a
+   * business decision from — so it refuses instead, with the code that means
+   * "permanently unavailable" rather than "try again".
+   */
+  it("refuses with PRECONDITION_FAILED rather than reporting zero", async () => {
+    const OLD = process.env.STRIPE_SECRET_KEY;
+    delete process.env.STRIPE_SECRET_KEY;
+    try {
+      const rejected = await admin().revenue().catch((e: Error) => e);
+      expect(rejected).toMatchObject({ code: "PRECONDITION_FAILED" });
+      expect(String((rejected as Error).message)).toContain("switched on");
+      expect(String((rejected as Error).message)).not.toMatch(/0|zero/i);
+    } finally {
+      if (OLD === undefined) delete process.env.STRIPE_SECRET_KEY;
+      else process.env.STRIPE_SECRET_KEY = OLD;
+    }
+  });
+
+  it("is admin-only, like everything else on this router", async () => {
+    await expect(
+      appRouter.createCaller(ctx({ id: "u1", role: "USER" })).admin.revenue(),
+    ).rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
+});

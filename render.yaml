@@ -65,6 +65,8 @@ services:
         sync: false
       - key: GROQ_API_KEY
         sync: false
+      - key: STRIPE_SECRET_KEY
+        sync: false
       # Browser origins allowed to call the API. Native clients send no Origin
       # and are unaffected. Empty is fine until the legal/marketing site exists.
       - key: ALLOWED_ORIGINS

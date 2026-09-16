@@ -212,3 +212,5 @@ export type {
 } from "./fitness";
 export { encodeCursor, decodeCursor, keysetWhere, nextCursor } from "./cursor";
 export type { Cursor } from "./cursor";
+export { monthlyMinorFor, sumMrr, countsTowardMrr, formatMinor } from "./billing";
+export type { BillingInterval, RecurringLine, CurrencyTotal } from "./billing";

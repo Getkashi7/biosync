@@ -57,11 +57,13 @@ describe("featureConfig", () => {
       SUPABASE_URL: "https://example.supabase.co",
       SUPABASE_SERVICE_ROLE_KEY: "service-key",
       GROQ_API_KEY: "groq-key",
+      STRIPE_SECRET_KEY: "sk_test_x",
     });
     expect(featureConfig()).toEqual({
       photoStorage: true,
       aiCoach: true,
       accountErasure: true,
+      payments: true,
     });
   });
 
@@ -83,6 +85,7 @@ describe("reportFeatureConfig", () => {
       SUPABASE_URL: "https://example.supabase.co",
       SUPABASE_SERVICE_ROLE_KEY: "service-key",
       GROQ_API_KEY: "groq-key",
+      STRIPE_SECRET_KEY: "sk_test_x",
     });
     const log = vi.fn();
     reportFeatureConfig(log);
@@ -99,6 +102,7 @@ describe("reportFeatureConfig", () => {
       SUPABASE_URL: "https://example.supabase.co",
       SUPABASE_SERVICE_ROLE_KEY: "",
       GROQ_API_KEY: "groq-key",
+      STRIPE_SECRET_KEY: "sk_test_x",
     });
     const log = vi.fn();
     reportFeatureConfig(log);

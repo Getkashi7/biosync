@@ -19,6 +19,9 @@ export const env = {
   /** Groq API key for the AI Coach (free tier). Optional — the chat degrades
    *  gracefully to a "not configured yet" reply when absent, so the app runs without it. */
   GROQ_API_KEY: process.env.GROQ_API_KEY ?? "",
+  /** Stripe secret key. Optional — the admin revenue figures report
+   *  themselves unavailable without it, and nothing else depends on it. */
+  STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY ?? "",
   PORT: Number(process.env.PORT) || 4000,
   /** Bind address. Containers must listen on 0.0.0.0, not loopback, to be reachable. */
   HOST: process.env.HOST ?? "0.0.0.0",
@@ -71,6 +74,8 @@ export type FeatureConfig = {
   aiCoach: boolean;
   /** Account deletion's storage purge — same key as photos. */
   accountErasure: boolean;
+  /** Admin revenue figures. Named for the feature, not the vendor. */
+  payments: boolean;
 };
 
 export function featureConfig(): FeatureConfig {
@@ -79,6 +84,7 @@ export function featureConfig(): FeatureConfig {
     photoStorage: storage,
     aiCoach: Boolean(env.GROQ_API_KEY),
     accountErasure: storage,
+    payments: Boolean(env.STRIPE_SECRET_KEY),
   };
 }
 
@@ -100,6 +106,9 @@ export function reportFeatureConfig(log: (msg: string) => void = console.warn): 
   }
   if (!cfg.aiCoach) {
     broken.push("the AI coach, macro estimates and supplement suggestions are off (set GROQ_API_KEY)");
+  }
+  if (!cfg.payments) {
+    broken.push("the admin revenue figures will report themselves unavailable (set STRIPE_SECRET_KEY)");
   }
   if (broken.length === 0) return;
   log(`[config] this deploy is missing optional configuration:\n  - ${broken.join("\n  - ")}`);
