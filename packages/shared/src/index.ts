@@ -97,7 +97,7 @@ export {
   INVITE_TTL_HOURS,
 } from "./invites";
 export type { InviteKind, InviteCreateInput, InviteCodeInput, InviteState } from "./invites";
-export { AUDIT, sanitiseAuditMeta } from "./audit";
+export { AUDIT, AUDIT_LABELS, auditLabel, sanitiseAuditMeta } from "./audit";
 export type { AuditAction, AuditMeta, AuditEntry } from "./audit";
 export type {
   SupplementTiming,
@@ -210,3 +210,5 @@ export type {
   ToggleExerciseInput,
   CompleteSessionInput,
 } from "./fitness";
+export { encodeCursor, decodeCursor, keysetWhere, nextCursor } from "./cursor";
+export type { Cursor } from "./cursor";

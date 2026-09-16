@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { AUDIT, sanitiseAuditMeta } from "../index";
+import { AUDIT, AUDIT_LABELS, auditLabel, sanitiseAuditMeta } from "../index";
 
 describe("AUDIT actions", () => {
   it("keeps stable string values (the trail is append-only)", () => {
@@ -61,5 +61,35 @@ describe("sanitiseAuditMeta", () => {
     expect(sanitiseAuditMeta({ note: "felt dizzy today", description: "2 eggs", name: "Zinc" })).toEqual({
       name: "Zinc",
     });
+  });
+});
+
+describe("audit labels", () => {
+  // The Record<AuditAction, string> type catches a missing key at compile time;
+  // this catches a STALE one after an action string is renamed, which the type
+  // cannot see.
+  it("labels every action in the vocabulary", () => {
+    for (const action of Object.values(AUDIT)) {
+      expect(AUDIT_LABELS[action], action).toBeTruthy();
+    }
+    expect(Object.keys(AUDIT_LABELS).sort()).toEqual([...Object.values(AUDIT)].sort());
+  });
+
+  /**
+   * The trail is append-only: a row written by a version that knew an action
+   * this one doesn't is normal, and showing the stored string beats showing
+   * nothing. Same posture as `protocolName()` for a retired treatment slug.
+   */
+  it("degrades to the raw string rather than throwing", () => {
+    expect(auditLabel("some.action.from.2029")).toBe("some.action.from.2029");
+    expect(auditLabel("")).toBe("");
+  });
+
+  it("reads as a sentence about a person, not a database event", () => {
+    expect(auditLabel(AUDIT.staffViewedClient)).toBe("Viewed a client");
+    expect(auditLabel(AUDIT.treatmentApproved)).toBe("Approved a treatment review");
+    for (const label of Object.values(AUDIT_LABELS)) {
+      expect(label).not.toMatch(/_|\./);
+    }
   });
 });

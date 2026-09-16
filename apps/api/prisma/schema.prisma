@@ -38,6 +38,8 @@ model User {
   treatmentRequests  TreatmentRequest[]  @relation("TreatmentClient")
   treatmentReviews   TreatmentRequest[]  @relation("TreatmentReviewer")
 
+  /// Serves the admin `recent` browse — newest members first, unfiltered.
+  @@index([createdAt])
   @@map("users")
 }
 
@@ -265,6 +267,9 @@ model AuditLog {
   @@index([actorId, createdAt])
   @@index([subjectId, createdAt])
   @@index([action, createdAt])
+  /// Serves the unfiltered viewer: none of the composites above can answer
+  /// an ORDER BY created_at DESC without a scan, on a table that only grows.
+  @@index([createdAt])
   @@map("audit_logs")
 }
 

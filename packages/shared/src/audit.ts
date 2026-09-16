@@ -38,9 +38,59 @@ export const AUDIT = {
   treatmentDeclined: "treatment.declined",
   treatmentWithdrawn: "treatment.withdrawn",
   treatmentExpired: "treatment.expired",
+  // §10. Reading the trail is itself a privileged read — it reveals who is
+  // connected to whom — so it is the one read in the system that watches itself.
+  auditViewed: "audit.viewed",
+  membersBrowsed: "members.browsed",
 } as const;
 
 export type AuditAction = (typeof AUDIT)[keyof typeof AUDIT];
+
+/**
+ * What each action says to a person reading the trail.
+ *
+ * The stored values are terse and stable (`staff.viewed_client`), because the
+ * log is append-only and old rows keep whatever they were written with. This is
+ * the presentation half, and it lives here rather than in a screen so the API
+ * and any future export agree on the wording.
+ */
+export const AUDIT_LABELS: Record<AuditAction, string> = {
+  "meal.logged": "Logged a meal",
+  "meal.removed": "Removed a meal",
+  "supplement.added": "Added a supplement",
+  "supplement.removed": "Removed a supplement",
+  "supplement.taken": "Took a supplement",
+  "checkin.saved": "Saved a check-in",
+  "account.deleted": "Deleted their account",
+  "consent.changed": "Changed what they share",
+  "plan.saved": "Saved a training plan",
+  "note.written": "Wrote a session note",
+  "role.changed": "Changed a capability",
+  "staff.viewed_client": "Viewed a client",
+  "invite.created": "Created an invitation",
+  "invite.revoked": "Revoked an invitation",
+  "invite.accepted": "Accepted an invitation",
+  "link.revoked": "Disconnected from someone",
+  "treatment.requested": "Asked for a treatment review",
+  "treatment.approved": "Approved a treatment review",
+  "treatment.declined": "Declined a treatment review",
+  "treatment.withdrawn": "Withdrew a treatment request",
+  "treatment.expired": "A treatment approval lapsed",
+  "audit.viewed": "Read the audit log",
+  "members.browsed": "Searched members",
+};
+
+/**
+ * The label for an action, degrading to the raw string.
+ *
+ * Never throws on an unknown value. The trail is append-only, so a row written
+ * by a version that knew an action this one does not is a normal occurrence —
+ * and showing the stored string is more useful than showing nothing. Same
+ * reasoning as `protocolName()` for a retired treatment slug.
+ */
+export function auditLabel(action: string): string {
+  return (AUDIT_LABELS as Record<string, string>)[action] ?? action;
+}
 
 /** What a sanitised `meta` may hold — scalars only, no nesting. */
 export type AuditMeta = Record<string, string | number | boolean>;
