@@ -530,6 +530,13 @@ export const bio = {
     onTeal: "#062018",
     /** ink on the SOLID teal CTA of the §6 gym screens (A1–A6 handoff) */
     onTealSolid: "#07251E",
+    /**
+     * "3 left" on a nearly-full class (A1).
+     *
+     * Its own value, not `amber` (#F5B85C): the handoff runs this one a touch
+     * deeper so it reads as urgency beside teal rather than as another accent.
+     */
+    seatsLow: "#E5B15F",
     /** the sliding knob on a filled toggle track */
     knob: "#FFFFFF",
     /** plum the ＋ glyph is knocked out in, on the magenta FAB */
@@ -676,8 +683,18 @@ export const bio = {
     knobTravel: 18,
     /** the static bloom behind every gym screen */
     bloom: { size: 460, left: -150, top: -150, alpha: 0.08 },
-    /** the selectable specialty / filter chip */
-    chip: { padV: 6, padH: 13, radius: 999 },
+    /** the selectable specialty chip (A6) */
+    chip: { padV: 6, padH: 13, radius: 999, size: 12 },
+    /** the venue / speciality FILTER chip (A1, A3) — a shade larger than A6's */
+    filterChip: { padV: 7, padH: 14, radius: 999, size: 12.5 },
+    /** the three square actions across the top of the schedule (A1) */
+    tile: { radius: 18, padV: 11, padH: 12 },
+    /** a class card, and the gap between two of them */
+    card: { radius: 24, padV: 13, padH: 16, gap: 6 },
+    /** the BOOKED / ATTENDED chip on a class card */
+    statusChip: { padV: 4, padH: 10, radius: 999, size: 9.5 },
+    /** Book (filled) and Cancel (outlined) on a class card */
+    rowBtn: { padV: 7, padHFilled: 18, padHGhost: 16, radius: 999, size: 12.5 },
     /** filled input boxes (name, bio, booking link) */
     input: { radius: 16, padV: 11, padH: 14 },
   },

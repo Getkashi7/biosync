@@ -36,8 +36,8 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
-import Svg, { Path } from "react-native-svg";
 import { RadialBloom } from "../../ui/bio/RadialBloom";
+import { FlatHeader } from "../../ui/bio/FlatHeader";
 import { Spinner } from "../../ui/Spinner";
 import { LoadFailed } from "../../ui/bio/LoadFailed";
 import { classifyNetError, type NetFailure } from "../../lib/netError";
@@ -197,7 +197,7 @@ export function CoachProfileScreen({ onBack }: { onBack: () => void }) {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <Header onBack={onBack} />
+          <FlatHeader title="Your profile" label="Coach" onBack={onBack} />
 
           {failed ? (
             <LoadFailed what="your coach profile" kind={failed} onRetry={() => void load()} />
@@ -365,45 +365,6 @@ export function CoachProfileScreen({ onBack }: { onBack: () => void }) {
   );
 }
 
-/**
- * The gym bundle's header: a bare chevron, the title, and the section label on
- * the same line.
- *
- * Deliberately not `ui/bio/ScreenHeader`, which puts a 21px title over the
- * label inside a 36px glass circle button. Seven screens already depend on that
- * treatment and their own designs specify it, so changing it to suit this
- * handoff would restyle all of them. Local for now; extract the moment a second
- * gym screen lands on it (A1–A5 all appear to share it).
- */
-function Header({ onBack }: { onBack: () => void }) {
-  return (
-    <View style={styles.header}>
-      <Pressable
-        onPress={() => {
-          pressHaptic();
-          onBack();
-        }}
-        hitSlop={12}
-        style={({ pressed }) => [pressed && styles.pressed]}
-        accessibilityRole="button"
-        accessibilityLabel="Back"
-      >
-        <Svg width={8} height={14} viewBox="0 0 8 14" fill="none">
-          <Path
-            d="M7 1L1.6 7L7 13"
-            stroke={bio.alpha(0.62)}
-            strokeWidth={1.6}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </Svg>
-      </Pressable>
-      <Text style={styles.headerTitle}>Your profile</Text>
-      <Text style={styles.headerLabel}>COACH</Text>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: bio.color.page },
   flex: { flex: 1 },
@@ -411,19 +372,6 @@ const styles = StyleSheet.create({
   content: { paddingHorizontal: 18 },
   pressed: { transform: [{ scale: 0.97 }] },
 
-  header: { flexDirection: "row", alignItems: "center", gap: 14 },
-  headerTitle: {
-    flex: 1,
-    fontFamily: fontFamily.semibold,
-    fontSize: 17,
-    color: bio.alpha(0.98),
-  },
-  headerLabel: {
-    fontFamily: fontFamily.semibold,
-    fontSize: 10,
-    letterSpacing: 1.6,
-    color: bio.alpha(0.38),
-  },
 
   lede: {
     fontFamily: fontFamily.regular,

@@ -1,33 +1,33 @@
 /**
- * Classes (§6) — the schedule, and taking a seat.
- *
- * Teal register: this is a training surface, not a clinical one, and the colour
- * is what keeps that legible next to §7's blue.
+ * Classes (§6) — the schedule, and taking a seat. Built to the A1 handoff.
  *
  * Three things this screen refuses to do.
  *
  * **It never decides whether a class is bookable.** `state` arrives computed by
- * the server, and the Book button keys off that alone. Working it out again
- * here from `seatsLeft` and the clock would produce a second answer that
- * disagrees with the one the write is actually checked against — which is how
- * you get a button that looks available and fails.
+ * the server and the Book button keys off that alone. Working it out again here
+ * from `seatsLeft` and the clock would produce a second answer that disagrees
+ * with the one the write is actually checked against — which is how you get a
+ * button that looks available and fails.
  *
- * **It never shows an empty state for a failed request.** "No classes this
- * week" and "we couldn't reach the server" are different claims, and only one
- * of them is true when the fetch threw.
+ * **It never shows an empty state for a failed request.** "Nothing scheduled"
+ * and "we couldn't reach the server" are different claims.
  *
  * **It never claims a booking it does not have.** After a booking or a
- * cancellation the schedule is re-read rather than patched locally: the seat
- * was claimed by a conditional update on the server, and the server is the only
+ * cancellation the schedule is re-read rather than patched locally: the seat was
+ * claimed by a conditional update on the server, and the server is the only
  * thing that knows whether it succeeded.
+ *
+ * One deviation from the handoff, noted where it happens: its failure state is
+ * a title and a Try again pill with no body line. That drops the distinction
+ * between "you're offline" and "our server broke", which CLAUDE.md requires the
+ * copy to make — so the body line is kept, styled to match the empty state.
  */
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { StaticBloom } from "../../ui/bio/StaticBloom";
-import { ScreenHeader } from "../../ui/bio/ScreenHeader";
+import { RadialBloom } from "../../ui/bio/RadialBloom";
+import { FlatHeader } from "../../ui/bio/FlatHeader";
 import { Spinner } from "../../ui/Spinner";
-import { LoadFailed } from "../../ui/bio/LoadFailed";
 import { classifyNetError, type NetFailure } from "../../lib/netError";
 import { bio, fontFamily } from "../../ui/theme";
 import { errorHaptic, pressHaptic, successHaptic } from "../../lib/haptics";
@@ -41,8 +41,13 @@ import {
   type Venue,
 } from "./gymApi";
 
-/** A week is the window people plan in, and the server's cap is fourteen days. */
-const DAYS = 7;
+/**
+ * Two weeks — the server's own cap, and what the empty copy promises.
+ *
+ * The empty state says "the next two weeks", so the query has to actually cover
+ * two weeks or that sentence is wrong.
+ */
+const DAYS = 14;
 
 export function GymScreen({
   onBack,
@@ -67,10 +72,9 @@ export function GymScreen({
   const load = useCallback(async () => {
     setFailed(null);
     try {
-      const rows = await fetchSchedule(undefined, DAYS, venueId ?? undefined);
-      setClasses(rows);
+      setClasses(await fetchSchedule(undefined, DAYS, venueId ?? undefined));
     } catch (e) {
-      // Left as null rather than [] — an empty list here would say "no classes"
+      // Left null rather than [] — an empty list here would say "no classes"
       // about a request that never arrived.
       setFailed(classifyNetError(e));
     }
@@ -81,8 +85,8 @@ export function GymScreen({
       try {
         setVenues(await fetchVenues());
       } catch {
-        // A venue filter is a convenience; losing it must not take the
-        // schedule down with it, so this failure is deliberately quiet.
+        // The venue filter is a convenience; losing it must not take the
+        // schedule down with it.
       }
     })();
   }, []);
@@ -96,22 +100,21 @@ export function GymScreen({
       if (busyId) return;
       setBusyId(c.id);
       setNotice(null);
-      const booking = c.yourBooking;
       try {
-        if (booking === "BOOKED") await cancelBooking(c.id);
+        if (c.yourBooking === "BOOKED") await cancelBooking(c.id);
         else await bookClass(c.id);
         successHaptic();
       } catch (e) {
         errorHaptic();
-        // The server's own message, because it distinguishes cases this screen
-        // deliberately does not model: full, cancelled, already started,
+        // The server's own message: it distinguishes cases this screen
+        // deliberately does not model — full, cancelled, already started,
         // already booked on another device.
         setNotice(e instanceof Error ? e.message : "That didn't go through.");
       } finally {
         setBusyId(null);
         // Re-read either way. A failed booking may still have changed what is
-        // true — somebody else took the seat — and a stale card would invite
-        // the same tap again.
+        // true — somebody else took the seat — and a stale card invites the
+        // same tap again.
         await load();
       }
     },
@@ -122,27 +125,30 @@ export function GymScreen({
 
   return (
     <View style={styles.root}>
-      <StaticBloom color={bio.color.teal} />
-      <ScrollView
-        contentContainerStyle={[
-          styles.content,
-          { paddingTop: insets.top + 6, paddingBottom: insets.bottom + 32 },
-        ]}
-        showsVerticalScrollIndicator={false}
-      >
-        <ScreenHeader title="Classes" label="Gym" onBack={onBack} />
+      <RadialBloom
+        color={bio.color.teal}
+        size={bio.gym.bloom.size}
+        left={bio.gym.bloom.left}
+        top={bio.gym.bloom.top}
+        alpha={bio.gym.bloom.alpha}
+      />
+      <View style={[styles.frame, { paddingTop: insets.top + 20 }]}>
+        <FlatHeader title="Classes" label="Gym" onBack={onBack} />
 
-        <View style={styles.actions}>
-          <ActionTile label="Check in" hint="You're here" onPress={onCheckIn} />
-          <ActionTile label="Coaches" hint="Find a trainer" onPress={onCoaches} />
-          <ActionTile label="History" hint="Your visits" onPress={onHistory} />
+        <View style={styles.tiles}>
+          <Tile label="Check in" hint="You're here" onPress={onCheckIn} />
+          <Tile label="Coaches" hint="Find a trainer" onPress={onCoaches} />
+          <Tile label="History" hint="Your visits" onPress={onHistory} />
         </View>
 
-        {venues.length > 1 ? (
+        {/* The handoff hides the venue filter while loading and on failure —
+            a filter over nothing is furniture. */}
+        {classes !== null && venues.length > 1 ? (
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.chips}
+            style={styles.chipRow}
           >
             <Chip label="All venues" on={venueId === null} onPress={() => setVenueId(null)} />
             {venues.map((v) => (
@@ -159,37 +165,64 @@ export function GymScreen({
         {notice ? <Text style={styles.notice}>{notice}</Text> : null}
 
         {failed ? (
-          <LoadFailed what="the schedule" kind={failed} onRetry={() => void load()} />
+          <View style={styles.centre}>
+            <Text style={styles.bigTitle}>Couldn't load the schedule</Text>
+            {/* Kept against the handoff: "offline" and "our end broke" are
+                different claims and only one is true. */}
+            <Text style={styles.bigBody}>
+              {failed === "offline"
+                ? "You look offline. Check your connection — nothing has been lost."
+                : "Something went wrong on our end. Nothing has been lost."}
+            </Text>
+            <Pressable
+              onPress={() => {
+                pressHaptic();
+                void load();
+              }}
+              style={({ pressed }) => [styles.retry, pressed && styles.pressed]}
+              accessibilityRole="button"
+              accessibilityLabel="Try loading the schedule again"
+            >
+              <Text style={styles.retryText}>Try again</Text>
+            </Pressable>
+          </View>
         ) : classes === null ? (
-          <View style={styles.loading}>
-            <Spinner tint={bio.color.text} />
+          <View style={styles.centre}>
+            <Spinner tint={bio.color.teal} />
           </View>
         ) : classes.length === 0 ? (
-          <View style={styles.empty}>
-            <Text style={styles.emptyTitle}>Nothing scheduled</Text>
-            <Text style={styles.emptyBody}>
+          <View style={styles.centre}>
+            <Text style={styles.bigTitle}>Nothing scheduled</Text>
+            <Text style={styles.bigBody}>
               {venueId
-                ? "No classes at this venue in the next week. Try All venues."
-                : "There are no classes in the next week yet."}
+                ? "No classes at this venue in the next two weeks."
+                : "No classes posted for the next two weeks."}
             </Text>
           </View>
         ) : (
-          days.map((day) => (
-            <View key={day.heading}>
-              <Text style={styles.dayHeading}>{day.heading.toUpperCase()}</Text>
-              {day.rows.map((c) => (
-                <ClassCard
-                  key={c.id}
-                  cls={c}
-                  busy={busyId === c.id}
-                  disabled={busyId !== null && busyId !== c.id}
-                  onAct={() => void act(c)}
-                />
-              ))}
-            </View>
-          ))
+          <ScrollView
+            contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 24 }]}
+            showsVerticalScrollIndicator={false}
+          >
+            {days.map((day) => (
+              <View key={day.heading}>
+                <Text style={styles.dayHeading}>{day.heading.toUpperCase()}</Text>
+                <View style={styles.cards}>
+                  {day.rows.map((c) => (
+                    <ClassCard
+                      key={c.id}
+                      cls={c}
+                      busy={busyId === c.id}
+                      disabled={busyId !== null && busyId !== c.id}
+                      onAct={() => void act(c)}
+                    />
+                  ))}
+                </View>
+              </View>
+            ))}
+          </ScrollView>
         )}
-      </ScrollView>
+      </View>
     </View>
   );
 }
@@ -207,15 +240,17 @@ function ClassCard({
 }) {
   const booked = cls.yourBooking === "BOOKED";
   const attended = cls.yourBooking === "ATTENDED";
+  const cancelled = cls.state === "CANCELLED";
   const reason = unbookableReason(cls.state);
   const seats = seatsLabel(cls.seatsLeft);
+
   // Cancelling is allowed right up to the start, so a booked seat on a class
-  // that is merely FULL still shows its button — "full" is not a reason you
-  // cannot leave.
+  // that is merely FULL keeps its button — "full" is not a reason you cannot
+  // leave.
   const canAct = booked ? cls.state !== "PAST" && cls.state !== "IN_PROGRESS" : reason === null;
 
   return (
-    <View style={[styles.card, cls.state === "CANCELLED" && styles.cardOff]}>
+    <View style={[styles.card, cancelled && styles.cardOff]}>
       <View style={styles.cardTop}>
         <Text style={styles.time}>{classRange(cls.startsAt, cls.durationMin)}</Text>
         {booked ? (
@@ -226,7 +261,7 @@ function ClassCard({
           <View style={styles.attendedChip}>
             <Text style={styles.attendedChipText}>ATTENDED</Text>
           </View>
-        ) : seats ? (
+        ) : seats && !cancelled ? (
           <Text style={[styles.seats, cls.seatsLeft === 0 && styles.seatsFull]}>{seats}</Text>
         ) : null}
       </View>
@@ -239,16 +274,14 @@ function ClassCard({
         {cls.coach ? ` · ${cls.coach}` : ""}
       </Text>
 
-      {cls.state === "CANCELLED" ? (
+      {cancelled ? (
+        // Why, not merely that. A cancellation with no reason is a
+        // notification rather than an explanation.
         <Text style={styles.cancelled}>
-          {/* Why, not just that. A cancellation with no reason is a
-              notification rather than an explanation. */}
           Cancelled{cls.cancelReason ? ` — ${cls.cancelReason}` : ""}
         </Text>
-      ) : null}
-
-      <View style={styles.cardBottom}>
-        {canAct ? (
+      ) : canAct ? (
+        <View style={styles.actionRow}>
           <Pressable
             onPress={() => {
               pressHaptic();
@@ -256,7 +289,7 @@ function ClassCard({
             }}
             disabled={busy || disabled}
             style={({ pressed }) => [
-              booked ? styles.cancelBtn : styles.bookBtn,
+              booked ? styles.ghostBtn : styles.bookBtn,
               pressed && styles.pressed,
               (busy || disabled) && styles.btnOff,
             ]}
@@ -264,29 +297,23 @@ function ClassCard({
             accessibilityLabel={booked ? `Cancel your place on ${cls.title}` : `Book ${cls.title}`}
             accessibilityState={{ disabled: busy || disabled }}
           >
-            <Text style={booked ? styles.cancelBtnText : styles.bookBtnText}>
+            <Text style={booked ? styles.ghostBtnText : styles.bookBtnText}>
               {busy ? "…" : booked ? "Cancel" : "Book"}
             </Text>
           </Pressable>
-        ) : reason && !booked && !attended ? (
-          // No button at all, and the reason in its place. A disabled control
-          // that can only fail is worse than no control.
+        </View>
+      ) : reason && !attended ? (
+        // No button at all, and the reason in its place. A disabled control
+        // that can only fail is worse than no control.
+        <View style={styles.reasonRow}>
           <Text style={styles.reason}>{reason}</Text>
-        ) : null}
-      </View>
+        </View>
+      ) : null}
     </View>
   );
 }
 
-function ActionTile({
-  label,
-  hint,
-  onPress,
-}: {
-  label: string;
-  hint: string;
-  onPress: () => void;
-}) {
+function Tile({ label, hint, onPress }: { label: string; hint: string; onPress: () => void }) {
   return (
     <Pressable
       onPress={() => {
@@ -326,128 +353,154 @@ function Chip({ label, on, onPress }: { label: string; on: boolean; onPress: () 
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: bio.color.page },
-  content: { paddingHorizontal: 20 },
+  frame: { flex: 1, paddingHorizontal: 18 },
+  pressed: { transform: [{ scale: 0.97 }] },
 
-  actions: { flexDirection: "row", gap: 10, marginTop: 14 },
+  tiles: { flexDirection: "row", gap: 8, marginTop: 14 },
   tile: {
     flex: 1,
     backgroundColor: bio.color.surface,
-    borderRadius: bio.radius.sm,
+    borderRadius: bio.gym.tile.radius,
     borderWidth: 1,
     borderColor: bio.color.hairline,
-    paddingVertical: 12,
-    paddingHorizontal: 12,
+    paddingVertical: bio.gym.tile.padV,
+    paddingHorizontal: bio.gym.tile.padH,
   },
-  tileLabel: {
-    fontFamily: fontFamily.semibold,
-    fontSize: 14,
-    color: bio.color.text,
-  },
-  tileHint: {
-    fontFamily: fontFamily.regular,
-    fontSize: 11,
-    color: bio.alpha(0.45),
-    marginTop: 2,
-  },
+  tileLabel: { fontFamily: fontFamily.semibold, fontSize: 13, color: bio.alpha(0.95) },
+  tileHint: { fontFamily: fontFamily.regular, fontSize: 11, color: bio.alpha(0.45), marginTop: 3 },
 
-  chips: { gap: 8, paddingVertical: 14, paddingRight: 20 },
+  chipRow: { flexGrow: 0, marginTop: 12 },
+  chips: { gap: 8, paddingRight: 18 },
   chip: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: bio.radius.pill,
+    paddingVertical: bio.gym.filterChip.padV,
+    paddingHorizontal: bio.gym.filterChip.padH,
+    borderRadius: bio.gym.filterChip.radius,
     borderWidth: 1,
-    borderColor: bio.color.hairline,
-    backgroundColor: bio.color.surface,
+    borderColor: bio.alpha(0.13),
   },
-  chipOn: { borderColor: bio.tealAlpha(0.55), backgroundColor: bio.tealAlpha(0.12) },
-  chipText: { fontFamily: fontFamily.medium, fontSize: 13, color: bio.alpha(0.6) },
-  chipTextOn: { color: bio.color.tealLt },
+  chipOn: { borderColor: bio.tealAlpha(0.38), backgroundColor: bio.tealAlpha(0.12) },
+  chipText: {
+    fontFamily: fontFamily.medium,
+    fontSize: bio.gym.filterChip.size,
+    color: bio.alpha(0.55),
+  },
+  chipTextOn: { fontFamily: fontFamily.semibold, color: bio.color.teal },
 
   dayHeading: {
     fontFamily: fontFamily.semibold,
-    fontSize: 11,
-    letterSpacing: 1.2,
-    color: bio.alpha(0.42),
-    marginTop: 22,
-    marginBottom: 10,
+    fontSize: 10.5,
+    letterSpacing: 1.6,
+    color: bio.alpha(0.38),
+    marginTop: 14,
+    marginBottom: 8,
   },
 
+  list: { paddingTop: 0 },
+  cards: { gap: bio.gym.card.gap },
   card: {
     backgroundColor: bio.color.surface,
-    borderRadius: bio.radius.card,
+    borderRadius: bio.gym.card.radius,
     borderWidth: 1,
     borderColor: bio.color.hairline,
-    padding: 16,
-    marginBottom: 10,
+    paddingVertical: bio.gym.card.padV,
+    paddingHorizontal: bio.gym.card.padH,
   },
   cardOff: { opacity: 0.6 },
   cardTop: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  time: { fontFamily: fontFamily.semibold, fontSize: 13, color: bio.color.tealLt },
-  seats: { fontFamily: fontFamily.medium, fontSize: 12, color: bio.color.amber },
-  seatsFull: { color: bio.alpha(0.45) },
+  time: {
+    fontFamily: fontFamily.semibold,
+    fontSize: 12.5,
+    color: bio.color.teal,
+    fontVariant: ["tabular-nums"],
+  },
+  seats: { fontFamily: fontFamily.semibold, fontSize: 12, color: bio.color.seatsLow },
+  seatsFull: { fontFamily: fontFamily.medium, color: bio.alpha(0.4) },
   bookedChip: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: bio.radius.pill,
-    backgroundColor: bio.tealAlpha(0.16),
+    paddingVertical: bio.gym.statusChip.padV,
+    paddingHorizontal: bio.gym.statusChip.padH,
+    borderRadius: bio.gym.statusChip.radius,
+    backgroundColor: bio.tealAlpha(0.13),
   },
   bookedChipText: {
-    fontFamily: fontFamily.semibold,
-    fontSize: 10,
-    letterSpacing: 0.8,
-    color: bio.color.tealLt,
+    fontFamily: fontFamily.bold,
+    fontSize: bio.gym.statusChip.size,
+    letterSpacing: 1.24,
+    color: bio.color.teal,
   },
   attendedChip: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: bio.radius.pill,
+    paddingVertical: bio.gym.statusChip.padV,
+    paddingHorizontal: bio.gym.statusChip.padH,
+    borderRadius: bio.gym.statusChip.radius,
     backgroundColor: bio.alpha(0.07),
   },
   attendedChipText: {
-    fontFamily: fontFamily.semibold,
-    fontSize: 10,
-    letterSpacing: 0.8,
+    fontFamily: fontFamily.bold,
+    fontSize: bio.gym.statusChip.size,
+    letterSpacing: 1.24,
     color: bio.alpha(0.5),
   },
 
-  title: { fontFamily: fontFamily.semibold, fontSize: 17, color: bio.color.text, marginTop: 8 },
-  meta: { fontFamily: fontFamily.regular, fontSize: 13, color: bio.alpha(0.5), marginTop: 3 },
-  cancelled: { fontFamily: fontFamily.regular, fontSize: 12, color: bio.color.coralLt, marginTop: 8 },
+  title: {
+    fontFamily: fontFamily.semibold,
+    fontSize: 17,
+    color: bio.alpha(0.97),
+    marginTop: 5,
+  },
+  meta: { fontFamily: fontFamily.regular, fontSize: 12.5, color: bio.alpha(0.45), marginTop: 3 },
+  cancelled: {
+    fontFamily: fontFamily.medium,
+    fontSize: 12.5,
+    color: bio.color.coral,
+    marginTop: 8,
+  },
 
-  cardBottom: { flexDirection: "row", justifyContent: "flex-end", marginTop: 12 },
+  actionRow: { flexDirection: "row", justifyContent: "flex-end", marginTop: 8 },
+  reasonRow: { flexDirection: "row", justifyContent: "flex-end", marginTop: 4 },
+  reason: { fontFamily: fontFamily.medium, fontSize: 12.5, color: bio.alpha(0.4) },
   bookBtn: {
-    paddingHorizontal: 20,
-    paddingVertical: 9,
-    borderRadius: bio.radius.pill,
-    backgroundColor: bio.color.tealDeep,
+    paddingVertical: bio.gym.rowBtn.padV,
+    paddingHorizontal: bio.gym.rowBtn.padHFilled,
+    borderRadius: bio.gym.rowBtn.radius,
+    backgroundColor: bio.color.teal,
   },
-  bookBtnText: { fontFamily: fontFamily.semibold, fontSize: 14, color: bio.color.onTeal },
-  cancelBtn: {
-    paddingHorizontal: 20,
-    paddingVertical: 9,
-    borderRadius: bio.radius.pill,
+  bookBtnText: {
+    fontFamily: fontFamily.bold,
+    fontSize: bio.gym.rowBtn.size,
+    color: bio.color.onTealSolid,
+  },
+  ghostBtn: {
+    paddingVertical: bio.gym.rowBtn.padV,
+    paddingHorizontal: bio.gym.rowBtn.padHGhost,
+    borderRadius: bio.gym.rowBtn.radius,
     borderWidth: 1,
-    borderColor: bio.color.border2,
+    borderColor: bio.alpha(0.18),
   },
-  cancelBtnText: { fontFamily: fontFamily.medium, fontSize: 14, color: bio.alpha(0.7) },
+  ghostBtnText: {
+    fontFamily: fontFamily.semibold,
+    fontSize: bio.gym.rowBtn.size,
+    color: bio.alpha(0.82),
+  },
   btnOff: { opacity: 0.45 },
-  pressed: { transform: [{ scale: 0.97 }] },
-  reason: { fontFamily: fontFamily.medium, fontSize: 13, color: bio.alpha(0.42) },
 
-  notice: {
+  notice: { fontFamily: fontFamily.regular, fontSize: 13, color: bio.color.coral, marginTop: 12 },
+
+  centre: { flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 34 },
+  bigTitle: { fontFamily: fontFamily.semibold, fontSize: 16.5, color: bio.alpha(0.9) },
+  bigBody: {
     fontFamily: fontFamily.regular,
     fontSize: 13,
-    color: bio.color.coralLt,
-    marginTop: 14,
+    lineHeight: 19.5,
+    color: bio.alpha(0.45),
+    marginTop: 8,
+    textAlign: "center",
   },
-  loading: { paddingVertical: 48, alignItems: "center" },
-  empty: { paddingVertical: 40 },
-  emptyTitle: { fontFamily: fontFamily.semibold, fontSize: 16, color: bio.color.text },
-  emptyBody: {
-    fontFamily: fontFamily.regular,
-    fontSize: 14,
-    color: bio.alpha(0.5),
-    marginTop: 6,
-    lineHeight: 20,
+  retry: {
+    marginTop: 18,
+    paddingVertical: 10,
+    paddingHorizontal: 26,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: bio.tealAlpha(0.42),
   },
+  retryText: { fontFamily: fontFamily.semibold, fontSize: 13, color: bio.color.teal },
 });
