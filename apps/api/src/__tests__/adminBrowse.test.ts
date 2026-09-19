@@ -150,6 +150,53 @@ describe("admin.members — the anti-enumeration bounds", () => {
   });
 });
 
+describe("what the trail hands back as meta", () => {
+  const row = (meta: unknown) => ({
+    id: "a",
+    actorId: ADMIN_ID,
+    subjectId: null,
+    action: "role.changed",
+    entity: null,
+    entityId: null,
+    meta,
+    createdAt: new Date(),
+  });
+
+  /**
+   * `sanitiseAuditMeta` is the only writer and permits a flat map of scalars,
+   * so that is what the read returns. Typing the column as Prisma's recursive
+   * `JsonValue` overstated what can be in there — and cost the mobile client a
+   * TS2589 once the router grew, because a recursive type through tRPC's
+   * serialization mapping exceeds TypeScript's instantiation limit.
+   */
+  it("passes scalars through untouched", async () => {
+    auditFindMany.mockResolvedValue([row({ kind: "PT", count: 3, created: true })]);
+    const res = await admin().auditLog({});
+    expect(res.entries[0]?.meta).toEqual({ kind: "PT", count: 3, created: true });
+  });
+
+  /**
+   * The trail is append-only, so a row written by an older or stranger version
+   * is a normal thing to meet. Nested values are dropped key by key rather than
+   * trusted or thrown over.
+   */
+  it("drops anything that is not a scalar, rather than trusting it", async () => {
+    auditFindMany.mockResolvedValue([
+      row({ kind: "PT", nested: { a: 1 }, list: [1, 2], nothing: null }),
+    ]);
+    const res = await admin().auditLog({});
+    expect(res.entries[0]?.meta).toEqual({ kind: "PT" });
+  });
+
+  it("returns null for an absent, empty, or wrongly-shaped meta", async () => {
+    for (const value of [null, {}, [1, 2, 3], "a string", 42]) {
+      auditFindMany.mockResolvedValue([row(value)]);
+      const res = await admin().auditLog({});
+      expect(res.entries[0]?.meta, JSON.stringify(value)).toBeNull();
+    }
+  });
+});
+
 describe("admin.auditLog", () => {
   it("orders newest first, with the id breaking ties", async () => {
     await admin().auditLog({});

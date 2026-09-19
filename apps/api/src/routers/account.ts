@@ -14,6 +14,7 @@
  * are unreachable because the foreign keys point to a non-existent user.
  */
 
+import { parsePlanItems } from "@pulse/shared";
 import { router, ownerProcedure } from "../trpc";
 import { prisma } from "../db";
 import { env } from "../env";
@@ -200,7 +201,18 @@ export const accountRouter = router({
       photos: photosWithUrls,
       notifications: { prefs: notificationPrefs, nudges: notificationNudges },
       staff: { profiles: staffProfiles, links: staffLinks, invites },
-      coaching: { trainingPlans: plans, sessionNotes: notes },
+      coaching: {
+        // `items` is a Json column. Narrowed through the same parser the rest of
+        // the app reads it with, for two reasons: an export is a document
+        // somebody may still be reading in five years, so emitting whatever
+        // happens to be in the column — including a shape a previous version
+        // wrote — hands them something they cannot interpret. And Prisma's
+        // `JsonValue` is recursive, which blew TypeScript's instantiation limit
+        // (TS2589) in the mobile client the moment it tried to derive this
+        // procedure's return type.
+        trainingPlans: plans.map((pl) => ({ ...pl, items: parsePlanItems(pl.items) })),
+        sessionNotes: notes,
+      },
     };
   }),
 });
