@@ -528,6 +528,8 @@ export const bio = {
     tealDeep: "#37B4A0",
     /** ink knocked out on a teal fill */
     onTeal: "#062018",
+    /** ink on the SOLID teal CTA of the §6 gym screens (A1–A6 handoff) */
+    onTealSolid: "#07251E",
     /** the sliding knob on a filled toggle track */
     knob: "#FFFFFF",
     /** plum the ＋ glyph is knocked out in, on the magenta FAB */
@@ -658,6 +660,26 @@ export const bio = {
     emptyFrame: { width: 190, height: 238, radius: 22 },
     /** floating add button on the gallery */
     fab: { size: 56, right: 20, bottom: 106 },
+  },
+  /**
+   * §6 gym (A1–A6 handoff). Its own block rather than reuse of `invite`: the
+   * switch is 44×26 there and 46×27 here, and the CTA is a flat solid fill
+   * rather than the staff gradient. Two pixels is not worth a shared token that
+   * is wrong for both.
+   */
+  gym: {
+    /** the full-width Save / primary CTA */
+    cta: { height: 46, radius: 999 },
+    /** the "list me in the directory" switch */
+    track: { width: 44, height: 26, radius: 999, pad: 2 },
+    knob: 22,
+    knobTravel: 18,
+    /** the static bloom behind every gym screen */
+    bloom: { size: 460, left: -150, top: -150, alpha: 0.08 },
+    /** the selectable specialty / filter chip */
+    chip: { padV: 6, padH: 13, radius: 999 },
+    /** filled input boxes (name, bio, booking link) */
+    input: { radius: 16, padV: 11, padH: 14 },
   },
   invite: {
     /** the code itself, on the reveal screen */
