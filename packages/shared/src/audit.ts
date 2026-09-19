@@ -42,6 +42,25 @@ export const AUDIT = {
   // connected to whom — so it is the one read in the system that watches itself.
   auditViewed: "audit.viewed",
   membersBrowsed: "members.browsed",
+  // §6. A class is a shared physical event, so the trail records who scheduled
+  // one and who called it off. A check-in is here for a different reason: "we
+  // recorded that you were in a room" is a claim about a person, and a claim
+  // about a person deserves a receipt they can read.
+  coachListed: "coach.listed",
+  coachUnlisted: "coach.unlisted",
+  classCreated: "class.created",
+  classCancelled: "class.cancelled",
+  bookingCreated: "booking.created",
+  bookingCancelled: "booking.cancelled",
+  gymCheckedIn: "gym.checked_in",
+  venueSaved: "venue.saved",
+  // Rotating a venue's secret invalidates every code on every display at that
+  // site at once, so it is recorded as its own act rather than as an edit.
+  venueSecretRotated: "venue.secret_rotated",
+  // §9. Its own action rather than folding into `staff.viewed_client`: a photo
+  // is a picture of somebody's body, and "who looked at those" is a question an
+  // access review has to be able to ask without decoding another action's meta.
+  staffViewedPhotos: "staff.viewed_photos",
 } as const;
 
 export type AuditAction = (typeof AUDIT)[keyof typeof AUDIT];
@@ -78,6 +97,16 @@ export const AUDIT_LABELS: Record<AuditAction, string> = {
   "treatment.expired": "A treatment approval lapsed",
   "audit.viewed": "Read the audit log",
   "members.browsed": "Searched members",
+  "coach.listed": "Listed themselves as a coach",
+  "coach.unlisted": "Removed themselves from the directory",
+  "class.created": "Scheduled a class",
+  "class.cancelled": "Cancelled a class",
+  "booking.created": "Booked a class",
+  "booking.cancelled": "Cancelled a booking",
+  "gym.checked_in": "Checked in at a venue",
+  "venue.saved": "Saved a venue",
+  "venue.secret_rotated": "Rotated a venue's check-in secret",
+  "staff.viewed_photos": "Viewed a client's progress photos",
 };
 
 /**

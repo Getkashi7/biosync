@@ -22,6 +22,7 @@ import { notificationsRouter } from "./routers/notifications";
 import { photosRouter } from "./routers/photos";
 import { treatmentsRouter } from "./routers/treatments";
 import { fitnessRouter } from "./routers/fitness";
+import { gymRouter } from "./routers/gym";
 
 export const appRouter = router({
   /** Liveness check — no auth. */
@@ -88,6 +89,9 @@ export const appRouter = router({
 
   /** IV therapy & treatments — suggestions are computed, approval is a practitioner act. */
   treatments: treatmentsRouter,
+
+  /** Gym — the coach directory, classes, bookings and check-in. Capacity is enforced by the write. */
+  gym: gymRouter,
 });
 
 export type AppRouter = typeof appRouter;

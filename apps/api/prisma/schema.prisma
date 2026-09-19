@@ -37,6 +37,10 @@ model User {
   fitnessSessions    FitnessSession[]
   treatmentRequests  TreatmentRequest[]  @relation("TreatmentClient")
   treatmentReviews   TreatmentRequest[]  @relation("TreatmentReviewer")
+  coachProfile       CoachProfile?
+  classesCoached     GymClass[]          @relation("ClassCoach")
+  classBookings      ClassBooking[]
+  gymVisits          GymVisit[]
 
   /// Serves the admin `recent` browse — newest members first, unfiltered.
   @@index([createdAt])
@@ -290,24 +294,24 @@ model Goal {
 /// so a leaked row on its own reveals no imagery. Reads go through short-lived
 /// signed URLs the API mints after checking link + consent.
 model Photo {
-  id          String           @id @default(uuid()) @db.Uuid
-  userId      String           @map("user_id") @db.Uuid
+  id               String           @id @default(uuid()) @db.Uuid
+  userId           String           @map("user_id") @db.Uuid
   /// Path inside the private bucket, "<userId>/<uuid>.<ext>".
-  storagePath String           @map("storage_path")
+  storagePath      String           @map("storage_path")
   /// The day the photo represents, in the user's own local clock. The timeline
   /// groups by this rather than upload time — a photo taken this morning and
   /// uploaded tonight belongs to this morning.
-  takenOn     DateTime         @map("taken_on") @db.Date
+  takenOn          DateTime         @map("taken_on") @db.Date
   /// Per-photo visibility, and the thing the lock chip on the thumbnail marks.
   /// Null means "follow my PHOTOS consent audience". A value here can only make
   /// one photo *more* private than the category default — it is intersected
   /// with the category consent, never used to widen past it, so a single photo
   /// can never be shared with someone the user hasn't consented to.
   audienceOverride ConsentAudience? @map("audience_override")
-  mimeType    String           @map("mime_type")
-  byteSize    Int              @map("byte_size")
-  createdAt   DateTime         @default(now()) @map("created_at")
-  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mimeType         String           @map("mime_type")
+  byteSize         Int              @map("byte_size")
+  createdAt        DateTime         @default(now()) @map("created_at")
+  user             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, takenOn])
   @@map("photos")
@@ -487,29 +491,205 @@ enum SessionFeedback {
 /// is first opened and then belong to the user: check-offs and feedback are
 /// theirs, so a regeneration must never silently discard them.
 model FitnessSession {
-  id        String           @id @default(uuid()) @db.Uuid
-  userId    String           @map("user_id") @db.Uuid
+  id          String           @id @default(uuid()) @db.Uuid
+  userId      String           @map("user_id") @db.Uuid
   /// The day this session is for, in the user's own local clock.
-  date      DateTime         @db.Date
+  date        DateTime         @db.Date
   /// "" on a rest day.
-  title     String
+  title       String
   /// PlannedExercise[] — name, sets, reps, target, and the check-off state.
-  items     Json
+  items       Json
   /// 0–100 planned load; tints the day on the week spine. 0 on a rest day.
-  intensity Int
+  intensity   Int
   /// The readiness this was built against, frozen at generation time so the
   /// rationale still makes sense tomorrow.
-  readiness Int?
+  readiness   Int?
   /// Why this session looks like this — restates the user's own score.
-  rationale String
-  rest      Boolean          @default(false)
-  completedAt DateTime?      @map("completed_at")
-  feedback  SessionFeedback?
-  createdAt DateTime         @default(now()) @map("created_at")
-  updatedAt DateTime         @updatedAt @map("updated_at")
-  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  rationale   String
+  rest        Boolean          @default(false)
+  completedAt DateTime?        @map("completed_at")
+  feedback    SessionFeedback?
+  createdAt   DateTime         @default(now()) @map("created_at")
+  updatedAt   DateTime         @updatedAt @map("updated_at")
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, date])
   @@index([userId, date])
   @@map("fitness_sessions")
+}
+
+/// A coach's PUBLIC identity — deliberately separate from StaffProfile.
+///
+/// StaffProfile is the PERMISSION record and holds `credential`, a professional
+/// registration number that must never reach a client. This is the
+/// ADVERTISEMENT record. Keeping them apart makes "never expose the credential"
+/// a property of which table you query rather than a select list someone has to
+/// get right at every call site.
+///
+/// They also have different actors and different cardinality: an admin grants a
+/// capability, a coach opts into being advertised, and a person who holds both
+/// PT and PRACTITIONER still has one bio and one photo.
+///
+/// `listed` never publishes anyone on its own — the directory query also
+/// requires a VERIFIED PT StaffProfile, so a suspension delists on the next read
+/// with no backfill job to forget.
+model CoachProfile {
+  id                   String    @id @default(uuid()) @db.Uuid
+  userId               String    @unique @map("user_id") @db.Uuid
+  displayName          String    @map("display_name")
+  /// Free text, checked for health claims at the boundary by `bioClaimFlags`.
+  bio                  String?
+  /// Slugs from COACH_SPECIALTIES in @pulse/shared — never free text. A public
+  /// directory of free-text specialties is an uncontrolled health-claim surface.
+  specialties          String[]
+  /// "<userId>/coach-<uuid>.<ext>" in the private bucket, served through a
+  /// short-lived signed URL. Under the user's OWN prefix on purpose, so
+  /// `deleteAllUserObjects` purges it with the rest of their account.
+  photoPath            String?   @map("photo_path")
+  /// The coach's own booking page. BIOSYNC takes no money — the same hand-off
+  /// posture as EXPO_PUBLIC_CLINIC_BOOKING_URL in §7.
+  bookingUrl           String?   @map("booking_url")
+  /// The coach's own opt-in. Necessary, never sufficient — see the header.
+  listed               Boolean   @default(false)
+  /// Connect, modelled now and onboarded later. A non-null account id does NOT
+  /// mean they can be paid: an account exists long before KYC completes, so
+  /// only `stripeChargesEnabled` may gate a payment action. Never returned to
+  /// a client.
+  stripeAccountId      String?   @unique @map("stripe_account_id")
+  stripeChargesEnabled Boolean   @default(false) @map("stripe_charges_enabled")
+  stripeOnboardedAt    DateTime? @map("stripe_onboarded_at")
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
+  user                 User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([listed])
+  @@map("coach_profiles")
+}
+
+/// A physical place classes happen in, and check-ins happen at.
+///
+/// Needed for a QR check-in to mean anything: a code encoding a CLASS can be
+/// screenshotted and reused from home, whereas a venue's rotating secret means
+/// "someone was in front of this display in the last minute".
+model Venue {
+  id            String     @id @default(uuid()) @db.Uuid
+  name          String
+  /// One line, for display. Not structured — nothing here geocodes.
+  address       String?
+  /// IANA zone. `GymClass.startsAt` is an instant; this is what turns it back
+  /// into a wall clock across BST/GMT and for someone browsing from abroad.
+  timezone      String     @default("Europe/London")
+  /// HMAC key behind the check-in display. Never selected by any read that
+  /// returns to a client — there is a guard test.
+  checkInSecret String     @map("check_in_secret")
+  active        Boolean    @default(true)
+  createdAt     DateTime   @default(now()) @map("created_at")
+  updatedAt     DateTime   @updatedAt @map("updated_at")
+  classes       GymClass[]
+  visits        GymVisit[]
+
+  @@map("venues")
+}
+
+/// A scheduled group class.
+///
+/// `startsAt` is a UTC instant, NOT a @db.Date — a deliberate deviation from
+/// §3's FitnessSession. A personal session is device-local because it is yours
+/// wherever you are; a class at 18:00 is 18:00 IN THE ROOM, and storing a date
+/// plus "HH:MM" breaks across a clock change and for anyone in another country.
+model GymClass {
+  id           String         @id @default(uuid()) @db.Uuid
+  venueId      String         @map("venue_id") @db.Uuid
+  /// Nullable with SetNull: the class still happened after the coach's account
+  /// is gone, and the people who attended it still have a record.
+  coachId      String?        @map("coach_id") @db.Uuid
+  title        String
+  description  String?
+  startsAt     DateTime       @map("starts_at")
+  /// Minutes, rather than an endsAt: moving a start time would otherwise need
+  /// two writes that can disagree.
+  durationMin  Int            @map("duration_min")
+  capacity     Int
+  /// Denormalised, and mutated ONLY by the conditional update inside the
+  /// booking transaction (`where: { seatsTaken: { lt: capacity } }`). That
+  /// compare-and-increment takes a row lock, which is what makes "capacity
+  /// cannot be exceeded" a property of the write rather than a check-then-write
+  /// race in a resolver.
+  seatsTaken   Int            @default(0) @map("seats_taken")
+  status       ClassStatus    @default(SCHEDULED)
+  /// Shown to everyone who had booked. A cancellation with no reason is a
+  /// notification, not an explanation.
+  cancelReason String?        @map("cancel_reason")
+  createdAt    DateTime       @default(now()) @map("created_at")
+  updatedAt    DateTime       @updatedAt @map("updated_at")
+  venue        Venue          @relation(fields: [venueId], references: [id], onDelete: Restrict)
+  coach        User?          @relation("ClassCoach", fields: [coachId], references: [id], onDelete: SetNull)
+  bookings     ClassBooking[]
+  visits       GymVisit[]
+
+  @@index([venueId, startsAt])
+  @@index([coachId, startsAt])
+  @@index([startsAt])
+  @@map("gym_classes")
+}
+
+model ClassBooking {
+  id          String        @id @default(uuid()) @db.Uuid
+  classId     String        @map("class_id") @db.Uuid
+  userId      String        @map("user_id") @db.Uuid
+  status      BookingStatus @default(BOOKED)
+  bookedAt    DateTime      @default(now()) @map("booked_at")
+  cancelledAt DateTime?     @map("cancelled_at")
+  /// Set by a check-in and by nothing else. Attendance is a fact about a body
+  /// being in a room — see the transition table in @pulse/shared.
+  attendedAt  DateTime?     @map("attended_at")
+  gymClass    GymClass      @relation(fields: [classId], references: [id], onDelete: Cascade)
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  /// The double-booking guard, in the DATABASE rather than in a resolver: a
+  /// lost race raises P2002 inside the transaction, which rolls the seat
+  /// increment back with it.
+  @@unique([classId, userId])
+  @@index([userId, bookedAt])
+  @@index([classId, status])
+  @@map("class_bookings")
+}
+
+/// Someone was at a venue.
+///
+/// `classId` is set only when the scan fell inside the window of a class they
+/// had ALREADY booked. A scan with no matching booking is still a real visit —
+/// they were there — and records a null class rather than inventing a booking.
+model GymVisit {
+  id          String        @id @default(uuid()) @db.Uuid
+  userId      String        @map("user_id") @db.Uuid
+  venueId     String        @map("venue_id") @db.Uuid
+  classId     String?       @map("class_id") @db.Uuid
+  source      CheckInSource
+  checkedInAt DateTime      @default(now()) @map("checked_in_at")
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  venue       Venue         @relation(fields: [venueId], references: [id], onDelete: Restrict)
+  gymClass    GymClass?     @relation(fields: [classId], references: [id], onDelete: SetNull)
+
+  @@index([userId, checkedInAt])
+  @@index([venueId, checkedInAt])
+  @@map("gym_visits")
+}
+
+enum ClassStatus {
+  SCHEDULED
+  CANCELLED
+}
+
+enum BookingStatus {
+  BOOKED
+  CANCELLED
+  ATTENDED
+  NO_SHOW
+}
+
+enum CheckInSource {
+  QR
+  MANUAL
+  STAFF
 }

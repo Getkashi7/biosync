@@ -45,6 +45,18 @@ export const photoListInput = z
 export type PhotoListInput = z.infer<typeof photoListInput>;
 
 /**
+ * A staff member reading one client's gallery.
+ *
+ * A smaller default than the owner's own list. This is a review surface, not a
+ * scroll-back-through-a-year one, and every returned row costs a signed URL.
+ */
+export const clientPhotoListInput = z.object({
+  clientId: z.string().uuid(),
+  limit: z.number().int().min(1).max(60).default(24),
+});
+export type ClientPhotoListInput = z.infer<typeof clientPhotoListInput>;
+
+/**
  * Who can actually see one photo.
  *
  * The override never widens: if the category consent is NONE the photo is

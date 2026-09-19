@@ -63,3 +63,19 @@ export const staffProcedure = protectedProcedure.use(({ ctx, next }) => {
   }
   return next();
 });
+
+/**
+ * A VERIFIED personal trainer, specifically.
+ *
+ * Narrower than `staffProcedure`: a practitioner is not a coach, and an ADMIN
+ * is deliberately not staff at all. A class is created by the person who will
+ * teach it — if a gym manager needs to schedule one, they are granted PT
+ * through the flow that already exists, which is the correct shape rather than
+ * a special case here.
+ */
+export const coachProcedure = protectedProcedure.use(({ ctx, next }) => {
+  if (!ctx.user.staff.some((s) => s.kind === "PT")) {
+    throw new TRPCError({ code: "FORBIDDEN" });
+  }
+  return next();
+});
