@@ -746,6 +746,8 @@ async function recordVisit(
 ): Promise<{
   id: string;
   venue: string;
+  /** When the visit was recorded — the ORIGINAL time when this is a duplicate. */
+  at: string;
   matchedClass: string | null;
   alreadyCheckedIn: boolean;
 }> {
@@ -755,12 +757,15 @@ async function recordVisit(
   const recent = await prisma.gymVisit.findFirst({
     where: { userId, venueId, checkedInAt: { gte: since } },
     orderBy: { checkedInAt: "desc" },
-    select: { id: true, gymClass: { select: { title: true } } },
+    select: { id: true, checkedInAt: true, gymClass: { select: { title: true } } },
   });
   if (recent) {
+    // The earlier visit's own time, not now: "your 06:54 check-in still stands"
+    // is only true if it reports 06:54.
     return {
       id: recent.id,
       venue: venueName,
+      at: recent.checkedInAt.toISOString(),
       matchedClass: recent.gymClass?.title ?? null,
       alreadyCheckedIn: true,
     };
@@ -809,6 +814,7 @@ async function recordVisit(
   return {
     id: visit.id,
     venue: venueName,
+    at: now.toISOString(),
     matchedClass: match?.title ?? null,
     alreadyCheckedIn: false,
   };

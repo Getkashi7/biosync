@@ -463,6 +463,8 @@ describe("check-in", () => {
     // The copy names the venue, because that is all we know.
     expect(res.matchedClass).toBeNull();
     expect(res.venue).toBe("Arch 12");
+    // And the time it was recorded, which the success screen prints.
+    expect(Number.isNaN(new Date(res.at).getTime())).toBe(false);
   });
 
   it("attaches to a class the member had already booked, and only then sets attendance", async () => {
@@ -495,11 +497,15 @@ describe("check-in", () => {
 
   // Scanning twice because the first beep was ambiguous is one visit.
   it("returns the earlier visit inside the dedupe window rather than writing another", async () => {
-    visitFindFirst.mockResolvedValue({ id: "v-earlier", gymClass: null });
+    const earlier = new Date("2026-09-16T06:54:00.000Z");
+    visitFindFirst.mockResolvedValue({ id: "v-earlier", checkedInAt: earlier, gymClass: null });
     const res = await member().gym.checkInManual({ venueId: VENUE });
     expect(res.alreadyCheckedIn).toBe(true);
     expect(res.id).toBe("v-earlier");
     expect(visitCreate).not.toHaveBeenCalled();
+    // The EARLIER visit's time, not now — "your 06:54 check-in still stands" is
+    // only true if it reports 06:54.
+    expect(res.at).toBe(earlier.toISOString());
   });
 
   it("accepts a token this venue is actually showing", async () => {
