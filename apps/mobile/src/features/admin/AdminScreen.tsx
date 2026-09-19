@@ -52,7 +52,16 @@ const KINDS: { key: StaffKind; label: string; scope: string }[] = [
 
 type Pending = { kind: StaffKind; action: "grant" | "revoke" } | null;
 
-export function AdminScreen({ onBack }: { onBack: () => void }) {
+type Nav = {
+  onBack: () => void;
+  /** The trail — the read that makes the promise at the foot of this screen true. */
+  onAuditLog: () => void;
+  onMembers: () => void;
+  onTrends: () => void;
+  onVenues: () => void;
+};
+
+export function AdminScreen({ onBack, onAuditLog, onMembers, onTrends, onVenues }: Nav) {
   const insets = useSafeAreaInsets();
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [statsFailed, setStatsFailed] = useState<NetFailure | null>(null);
@@ -152,6 +161,14 @@ export function AdminScreen({ onBack }: { onBack: () => void }) {
               <Stat value={stats.openInvites} label="INVITES" />
             </View>
           )}
+
+          <Text style={styles.section}>PLATFORM</Text>
+          <View style={styles.navCard}>
+            <NavRow label="Audit log" hint="Who did what, when" onPress={onAuditLog} first />
+            <NavRow label="Members" hint="Recent joins, and search" onPress={onMembers} />
+            <NavRow label="Trends" hint="Sign-ups, bookings, visits" onPress={onTrends} />
+            <NavRow label="Venues" hint="Places classes happen" onPress={onVenues} />
+          </View>
 
           <Text style={styles.section}>FIND AN ACCOUNT</Text>
           <View style={styles.searchRow}>
@@ -305,6 +322,38 @@ export function AdminScreen({ onBack }: { onBack: () => void }) {
   );
 }
 
+function NavRow({
+  label,
+  hint,
+  onPress,
+  first,
+}: {
+  label: string;
+  hint: string;
+  onPress: () => void;
+  first?: boolean;
+}) {
+  return (
+    <Pressable
+      onPress={() => {
+        pressHaptic();
+        onPress();
+      }}
+      style={({ pressed }) => [styles.navRow, !first && styles.navRowSep, pressed && styles.navRowOn]}
+      accessibilityRole="button"
+      accessibilityLabel={`${label} — ${hint}`}
+    >
+      <View style={styles.navText}>
+        <Text style={styles.navLabel}>{label}</Text>
+        <Text style={styles.navHint} numberOfLines={1}>
+          {hint}
+        </Text>
+      </View>
+      <Text style={styles.navChev}>›</Text>
+    </Pressable>
+  );
+}
+
 function Stat({ value, label }: { value: number; label: string }) {
   return (
     <View style={styles.stat}>
@@ -315,6 +364,27 @@ function Stat({ value, label }: { value: number; label: string }) {
 }
 
 const styles = StyleSheet.create({
+  navCard: {
+    backgroundColor: bio.color.surface,
+    borderRadius: bio.radius.card,
+    borderWidth: 1,
+    borderColor: bio.color.hairline,
+    overflow: "hidden",
+    marginBottom: 6,
+  },
+  navRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  navRowSep: { borderTopWidth: 1, borderTopColor: bio.color.hairline },
+  navRowOn: { backgroundColor: bio.alpha(0.03) },
+  navText: { flex: 1, minWidth: 0 },
+  navLabel: { fontFamily: fontFamily.medium, fontSize: 15, color: bio.color.text },
+  navHint: { fontFamily: fontFamily.regular, fontSize: 12, color: bio.alpha(0.42), marginTop: 2 },
+  navChev: { fontFamily: fontFamily.regular, fontSize: 20, color: bio.alpha(0.3) },
+
   root: { flex: 1, backgroundColor: bio.color.ink },
   flex: { flex: 1 },
   flexMin: { flex: 1, minWidth: 0 },

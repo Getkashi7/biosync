@@ -43,3 +43,21 @@ export async function savePlan(
 ): Promise<void> {
   await trpc.training.savePlan.mutate({ clientId, week, title, items });
 }
+
+export type ClientPhotos = Awaited<ReturnType<typeof trpc.photos.clientList.query>>;
+export type ClientPhoto = ClientPhotos["photos"][number];
+
+/**
+ * One client's progress photos, if they've shared them with you.
+ *
+ * **Loaded on demand, never on screen open.** The server audits this read under
+ * its own action, and a trail that records a photo view every time somebody
+ * glanced at a client's page says nothing about who actually looked. Tapping is
+ * the signal worth recording.
+ *
+ * `shared: false` means the consent isn't there — a different thing from an
+ * empty gallery, and the screen must not collapse the two.
+ */
+export async function fetchClientPhotos(clientId: string): Promise<ClientPhotos> {
+  return trpc.photos.clientList.query({ clientId });
+}

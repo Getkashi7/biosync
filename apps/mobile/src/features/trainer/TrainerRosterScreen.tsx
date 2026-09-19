@@ -38,6 +38,8 @@ export function TrainerRosterScreen({
   onOpenClient,
   onInvite,
   onReviewQueue,
+  onClasses,
+  onCoachProfile,
 }: {
   trainerName: string;
   onOpenClient: (id: string) => void;
@@ -49,6 +51,10 @@ export function TrainerRosterScreen({
    * so the surface simply is not part of their app.
    */
   onReviewQueue?: (() => void) | undefined;
+  /** §6 — only for a trainer, since a practitioner does not teach classes. */
+  onClasses?: (() => void) | undefined;
+  /** §6 — the directory entry, which is the coach's own decision to make. */
+  onCoachProfile?: (() => void) | undefined;
 }) {
   const insets = useSafeAreaInsets();
   const [clients, setClients] = useState<RosterClient[] | null>(null);
@@ -129,6 +135,38 @@ export function TrainerRosterScreen({
           >
             <View style={styles.reviewDot} />
             <Text style={styles.reviewLabel}>Treatment review queue</Text>
+            <Text style={styles.reviewChev}>›</Text>
+          </Pressable>
+        ) : null}
+
+        {onClasses ? (
+          <Pressable
+            onPress={() => {
+              pressHaptic();
+              onClasses();
+            }}
+            style={({ pressed }) => [styles.reviewRow, pressed && styles.pressed]}
+            accessibilityRole="button"
+            accessibilityLabel="Your classes"
+          >
+            <View style={styles.reviewDot} />
+            <Text style={styles.reviewLabel}>Your classes</Text>
+            <Text style={styles.reviewChev}>›</Text>
+          </Pressable>
+        ) : null}
+
+        {onCoachProfile ? (
+          <Pressable
+            onPress={() => {
+              pressHaptic();
+              onCoachProfile();
+            }}
+            style={({ pressed }) => [styles.reviewRow, pressed && styles.pressed]}
+            accessibilityRole="button"
+            accessibilityLabel="Your coach profile"
+          >
+            <View style={styles.reviewDot} />
+            <Text style={styles.reviewLabel}>Your coach profile</Text>
             <Text style={styles.reviewChev}>›</Text>
           </Pressable>
         ) : null}

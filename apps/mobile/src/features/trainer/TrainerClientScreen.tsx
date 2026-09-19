@@ -11,7 +11,7 @@
  * plainly and say when a day had none, rather than inventing a workout.
  */
 import { useCallback, useEffect, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Path } from "react-native-svg";
 import { Spinner } from "../../ui/Spinner";
@@ -21,7 +21,12 @@ import { StaticBloom } from "../../ui/bio/StaticBloom";
 import { bio, fontFamily } from "../../ui/theme";
 import { pressHaptic } from "../../lib/haptics";
 import { dayDiff, initials, monthShort, monthYear } from "../../lib/format";
-import { fetchClient, type ClientDetail } from "./trainerApi";
+import {
+  fetchClient,
+  fetchClientPhotos,
+  type ClientDetail,
+  type ClientPhotos,
+} from "./trainerApi";
 
 
 
@@ -44,6 +49,12 @@ export function TrainerClientScreen({
   const insets = useSafeAreaInsets();
   const [data, setData] = useState<ClientDetail | null>(null);
   const [failed, setFailed] = useState<NetFailure | null>(null);
+  // Photos load only when asked for — see `fetchClientPhotos`. `loading` is
+  // separate from `null` so a tap that failed does not look like a tap that
+  // returned nothing.
+  const [photos, setPhotos] = useState<ClientPhotos | null>(null);
+  const [photosLoading, setPhotosLoading] = useState(false);
+  const [photosFailed, setPhotosFailed] = useState(false);
 
   const load = useCallback(async () => {
     setFailed(null);
@@ -57,6 +68,19 @@ export function TrainerClientScreen({
   useEffect(() => {
     void load();
   }, [load, refreshKey]);
+
+  const openPhotos = useCallback(async () => {
+    if (photosLoading) return;
+    setPhotosLoading(true);
+    setPhotosFailed(false);
+    try {
+      setPhotos(await fetchClientPhotos(clientId));
+    } catch {
+      setPhotosFailed(true);
+    } finally {
+      setPhotosLoading(false);
+    }
+  }, [clientId, photosLoading]);
 
   if (data === null) {
     return (
@@ -75,6 +99,7 @@ export function TrainerClientScreen({
   }
 
   const seesActivity = data.visible.includes("ACTIVITY");
+  const seesPhotos = data.visible.includes("PHOTOS");
   const nothingShared = data.visible.length === 0;
 
   // This week, from the check-in dates we're permitted to see.
@@ -220,6 +245,77 @@ export function TrainerClientScreen({
           </>
         )}
 
+        {nothingShared ? null : (
+          <>
+            <Text style={styles.sectionLabel}>PROGRESS PHOTOS</Text>
+            {!seesPhotos ? (
+              // Said plainly. An absent section would read as "they have none".
+              <Text style={styles.quiet}>Not shared with you.</Text>
+            ) : photosFailed ? (
+              <Pressable
+                onPress={() => {
+                  pressHaptic();
+                  void openPhotos();
+                }}
+                style={({ pressed }) => [styles.photoBtn, pressed && styles.pressed]}
+                accessibilityRole="button"
+                accessibilityLabel="Try loading the photos again"
+              >
+                <Text style={styles.photoBtnText}>Couldn't load those — try again</Text>
+              </Pressable>
+            ) : photos === null ? (
+              // Behind a tap on purpose: the server records this read under its
+              // own audit action, and a row written every time somebody opened
+              // a client page would say nothing about who actually looked.
+              <Pressable
+                onPress={() => {
+                  pressHaptic();
+                  void openPhotos();
+                }}
+                disabled={photosLoading}
+                style={({ pressed }) => [styles.photoBtn, pressed && styles.pressed]}
+                accessibilityRole="button"
+                accessibilityLabel="View this client's progress photos"
+              >
+                <Text style={styles.photoBtnText}>
+                  {photosLoading ? "Opening…" : "View photos"}
+                </Text>
+              </Pressable>
+            ) : !photos.shared ? (
+              <Text style={styles.quiet}>Not shared with you.</Text>
+            ) : photos.photos.length === 0 ? (
+              // Consent is there and the gallery really is empty — a different
+              // sentence from the one above, and it has to read that way.
+              <Text style={styles.quiet}>Shared, but they haven't added any yet.</Text>
+            ) : (
+              <>
+                <View style={styles.photoGrid}>
+                  {photos.photos.map((ph) => (
+                    <View key={ph.id} style={styles.photoTile}>
+                      {ph.url ? (
+                        <Image
+                          source={{ uri: ph.url }}
+                          style={StyleSheet.absoluteFill}
+                          resizeMode="cover"
+                          accessibilityLabel={`Progress photo from ${ph.takenOn}`}
+                        />
+                      ) : (
+                        // A photo whose signed URL could not be minted is still
+                        // listed, as a tile that failed — not dropped.
+                        <Text style={styles.photoBroken}>—</Text>
+                      )}
+                      <Text style={styles.photoDate}>{ph.takenOn.slice(5)}</Text>
+                    </View>
+                  ))}
+                </View>
+                <Text style={styles.photoNote}>
+                  They chose to share these. Your view is recorded.
+                </Text>
+              </>
+            )}
+          </>
+        )}
+
         <View style={styles.sessionsHead}>
           <Text style={[styles.sectionLabel, styles.sectionLabelFlush]}>YOUR SESSIONS</Text>
           <Pressable
@@ -314,6 +410,49 @@ function NothingShared({ notShared }: { notShared: string[] }) {
 }
 
 const styles = StyleSheet.create({
+  photoBtn: {
+    alignSelf: "flex-start",
+    paddingHorizontal: 16,
+    paddingVertical: 9,
+    borderRadius: bio.radius.pill,
+    borderWidth: 1,
+    borderColor: bio.color.border2,
+    marginBottom: 4,
+  },
+  photoBtnText: { fontFamily: fontFamily.medium, fontSize: 13, color: bio.alpha(0.7) },
+  photoGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  photoTile: {
+    width: 88,
+    height: 118,
+    borderRadius: bio.radius.xs,
+    overflow: "hidden",
+    backgroundColor: bio.alpha(0.06),
+    alignItems: "center",
+    justifyContent: "flex-end",
+  },
+  photoBroken: {
+    position: "absolute",
+    top: "45%",
+    fontFamily: fontFamily.regular,
+    fontSize: 18,
+    color: bio.alpha(0.3),
+  },
+  photoDate: {
+    fontFamily: fontFamily.medium,
+    fontSize: 10,
+    color: bio.color.text,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    width: "100%",
+    textAlign: "center",
+    paddingVertical: 3,
+  },
+  photoNote: {
+    fontFamily: fontFamily.regular,
+    fontSize: 11,
+    color: bio.alpha(0.35),
+    marginTop: 8,
+  },
+
   root: { flex: 1, backgroundColor: bio.color.ink },
   flex: { flex: 1 },
   content: { paddingHorizontal: 20, flexGrow: 1 },

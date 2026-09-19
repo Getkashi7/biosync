@@ -180,3 +180,86 @@ say truthfully; none is a defect in the design, they are just decisions it could
   with a ~1 min cold start. Both are fine for closed testing and unacceptable once real people
   check in every morning. Render is a one-line fix (`plan: starter` in `render.yaml`); Supabase
   needs a paid tier. Decide before the store push.
+
+## From §6 (fitness & gym) and §10 (admin)
+
+- **No waitlist on a full class.** Cut deliberately, not forgotten. Promotion off a waitlist is
+  only useful if the person finds out — and there is no push, so they would discover the seat by
+  reopening the app, possibly after the class had run. Someone who believes they have a seat and
+  does not is the same class of lie as an empty state over a failed request. Full says "Full".
+  Building it means push first, then a `WAITLIST` booking status, a promotion path that is atomic
+  with the seat release in `cancelBooking`, and a hold window so a promoted seat is not taken back
+  before the person can see it.
+- **Stripe Connect onboarding and webhooks.** `CoachProfile` carries `stripeAccountId`,
+  `stripeChargesEnabled` and `stripeOnboardedAt`, and `coachPayments()` already refuses to treat a
+  non-null account id as payable — the schema is ready and the flow is not. It needs an onboarding
+  link, a return URL, and the two webhooks deferred with it: `account.updated` (which is the only
+  honest source for `chargesEnabled`) and `customer.subscription.*`. Webhooks need surgery on
+  `server.ts` to capture a **raw body** past `applyCors`, `withinBodyLimit`'s stream reader and the
+  adapter's JSON parse, plus an idempotency table keyed on `event.id`. Until then `payoutNote()`
+  returns null for CONNECT rather than a sentence that may be false.
+- **Coach photos are stored but never shown.** `CoachProfile.photoPath` exists and sits under the
+  user's own bucket prefix so account deletion purges it, but the directory returns no photo:
+  serving one needs a signed-URL read like `photos.ts`'s, and handing a raw storage path to a
+  client is exactly what that module exists to avoid. Add the signed read, then the upload.
+- **Classes have no price.** The money path is the coach's own link, and a price with no charge
+  path is a number we cannot honour. It arrives with Connect, not before.
+- **`seatsTaken` has no reconciliation job.** It is denormalised, and every path that moves it is
+  transactional with the booking — so it should not drift. "Should not" is not "cannot": a periodic
+  check against `count(bookings where status = BOOKED)` that *reports* rather than silently
+  corrects would catch a future code path that forgets the transaction. Reporting, because a job
+  that quietly rewrites the number would hide the bug it exists to find.
+- **No reminder for a booked class.** `NudgeType` has no `APPOINTMENT`, so a class you booked
+  yesterday morning tells you nothing this evening. Wants the device-side schedule in
+  `reminderSchedule.ts` to learn about instants rather than only times of day.
+- **`admin.trends` reads rows, not aggregates.** Four `findMany`s capped at 5,000 rows each,
+  bucketed in JS. That is the right trade at this size and the wrong one at ten times it; the
+  replacement is a `date_trunc` group-by per series — which needs the day boundary pushed into SQL
+  with the platform's zone, or the same BST bug this deliberately avoids.
+
+## From the §6/§10 mobile layer
+
+- **QR check-in has no scanner.** The server side is complete — `gym.checkInToken` signs a
+  rotating token, `gym.checkInScan` verifies the HMAC in constant time — but reading a code needs
+  `expo-camera`, a native module, and adding one means a new dev-client APK before anything works
+  on the device at all. `CheckInScreen` therefore offers the manual path only, recorded as
+  `MANUAL`, which the API keeps deliberately distinct from `QR`. Bundle the camera with the next
+  native build (push notifications want one too), then add the scan path and the venue-display
+  page that shows the token.
+- **Screens are built on the existing token system, not on a design handoff.** §6 and §10's mobile
+  layer follows the established registers — teal for the gym (a training surface), blue for admin
+  (platform, not care) — and reuses `ScreenHeader`, `StaticBloom`, `LoadFailed` and the card/chip
+  patterns already in the app. When the Claude Design bundles land, expect the same rebuild §7's
+  queue went through: the API, the shared rules and the tests are design-independent and will not
+  move; the layout, accents and interactions will.
+- **The photo add sheet still types its date.** `CoachClassesScreen` now uses
+  `@react-native-community/datetimepicker`, which turned out to be **already installed and already
+  in the native build** — `RemindersSheet` has used it since §12, so no rebuild was needed and the
+  earlier note here claiming one was simply wrong. The photo sheet can have the same treatment
+  whenever someone is in there.
+- **Trends reads are not cached.** `TrendsScreen` refetches all four series on every window
+  change. That is four `findMany`s per tap against a free-tier database. Fine at this size, worth a
+  short client-side cache before the admin screen is opened often.
+
+## From completing §9 and the account rights
+
+- **The data export is copy-and-share, not a file.** `ExportDataScreen` fetches `account.exportData`
+  and hands it over through the clipboard or the system share sheet. Writing an actual `.json` file
+  needs `expo-file-system` + `expo-sharing` — native modules, so a rebuild — and both current paths
+  genuinely transfer the data, so the file can wait for the batch that carries the camera. A very
+  large export may strain the clipboard; nobody's is large yet.
+- **Photo bytes are not backed up.** `.github/workflows/db-backup.yml` dumps Postgres, so `Photo`
+  rows survive and the images they point at do not. Backing up a Supabase storage bucket is its own
+  job (list objects, download, encrypt, upload) and its own decision about cost. Until then, a
+  restore gives someone their photo *records* back, which is not the same as their photos — and
+  `BACKUP.md` says so.
+- **`gym.coach` has no caller.** The single-coach read exists; the directory renders everything it
+  needs inline, so nothing fetches one coach on its own. Keep it for the profile page a coach card
+  will eventually open into, or delete it — but do not leave it half-wired.
+- **`admin.listStaff` has no caller either.** The Members browse shows verified capabilities inline,
+  which covers the common question. A dedicated staff list is a small screen away if it is wanted.
+- **Three superseded training procedures.** `training.myPlans` and `training.myNotes` were replaced
+  by `training.mine`, which returns both plus the trainer's name in one call; `training.notes` is
+  covered by `staff.client`, which already returns a trainer's own notes on a client. Nothing calls
+  any of the three. They are dead code rather than a missing screen — delete them with the next
+  round of tidying, once it is confirmed no older client build in the wild still calls them.

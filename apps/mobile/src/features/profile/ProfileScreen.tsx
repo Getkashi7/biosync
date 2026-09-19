@@ -27,6 +27,8 @@ function initialsOf(fullName: string | null, email: string): string {
 
 type Props = {
   onDeleteAccount: () => void;
+  /** Data portability — the other half of the right Delete account honours. */
+  onExportData: () => void;
   onReminders: () => void;
   onCoachPlan: () => void;
   onConsent: () => void;
@@ -41,6 +43,8 @@ type Props = {
   onTreatments: () => void;
   /** §3 training plan — the week built from readiness and goals */
   onFitness: () => void;
+  /** §6 gym — the class schedule, the coach directory, and checking in */
+  onGym: () => void;
   /** only present for ADMIN accounts — platform administration, not care */
   onAdmin?: (() => void) | undefined;
   refreshKey: number;
@@ -48,6 +52,7 @@ type Props = {
 
 export function ProfileScreen({
   onDeleteAccount,
+  onExportData,
   onReminders,
   onCoachPlan,
   onConsent,
@@ -57,6 +62,7 @@ export function ProfileScreen({
   onCareTeam,
   onTreatments,
   onFitness,
+  onGym,
   onAdmin,
   refreshKey,
 }: Props) {
@@ -236,6 +242,14 @@ export function ProfileScreen({
               <Text style={styles.chev}>›</Text>
             </View>
           </Pressable>
+          <View style={styles.sep} />
+          <Pressable style={styles.row} onPress={onGym} accessibilityRole="button">
+            <Text style={styles.rowLabel}>Gym</Text>
+            <View style={styles.rowVal}>
+              <Text style={styles.rowValTxt}>Classes &amp; coaches</Text>
+              <Text style={styles.chev}>›</Text>
+            </View>
+          </Pressable>
         </GlassSurface>
 
         {onTrainer ? (
@@ -303,6 +317,14 @@ export function ProfileScreen({
         <GlassSurface style={styles.card} soft>
           <Pressable style={styles.row} onPress={() => void signOut()} accessibilityRole="button">
             <Text style={styles.rowLabel}>Sign out</Text>
+          </Pressable>
+          <View style={styles.sep} />
+          <Pressable style={styles.row} onPress={onExportData} accessibilityRole="button">
+            <Text style={styles.rowLabel}>Download your data</Text>
+            <View style={styles.rowVal}>
+              <Text style={styles.rowValTxt}>Everything we hold</Text>
+              <Text style={styles.chev}>›</Text>
+            </View>
           </Pressable>
           <View style={styles.sep} />
           <Pressable style={styles.row} onPress={onDeleteAccount} accessibilityRole="button">

@@ -90,6 +90,11 @@ them forces a new native build and breaks the device dev flow. **These are not l
   API locks the Prisma query-engine DLL and the install dies with `EPERM`. If it must stay up, use
   `pnpm install --ignore-scripts`.
 - Inbound firewall rules for 8081/4000 already exist (network profile is Public).
+- **The database is backed up from CI, not from here** — `.github/workflows/db-backup.yml`, nightly,
+  `pg_dump` against the session URL, verified against its own table-of-contents, then encrypted
+  with `gpg --symmetric` before it is ever stored. It needs two repository secrets and a restore
+  drill; **`BACKUP.md` is the runbook, and reading it after something breaks is too late.** The
+  free Supabase tier has no backups of its own, so until a paid plan this is the only copy.
 
 ## Mobile (`apps/mobile`)
 
@@ -202,7 +207,8 @@ them forces a new native build and breaks the device dev flow. **These are not l
   `sync: false`, never filled in on the dashboard, and the only symptom was an opaque error when a
   user tapped "add photo". Three things now prevent that shape of bug:
   - `featureConfig()` in `src/env.ts` reports which optional subsystems this deploy can serve
-    (`photoStorage`, `aiCoach`, `accountErasure`). Add a feature here when it gains a credential.
+    (`photoStorage`, `aiCoach`, `accountErasure`, `payments`). Add a feature here when it gains a
+    credential.
   - `reportFeatureConfig()` prints the **user-visible consequence** at boot — "progress photos will
     fail to upload", not "SUPABASE_SERVICE_ROLE_KEY is unset", because the second sentence means
     nothing to whoever reads a deploy log.
@@ -265,10 +271,11 @@ the variable unset the button is absent and the card says the practitioner will 
 
 **`pnpm test` is DB-free and must stay that way.** Every API test mocks `../db`; the suite is
 verified to pass with an unreachable `DATABASE_URL`, so CI and offline work never depend on
-Supabase. The one real-database test is opt-in and excluded by default:
+Supabase. The real-database tests are opt-in and excluded by default:
 
 ```
 cd apps/api && RUN_DB_TESTS=1 pnpm exec vitest run src/__tests__/treatments.db.test.ts
+cd apps/api && RUN_DB_TESTS=1 pnpm exec vitest run src/__tests__/gym.db.test.ts
 ```
 
 It drives the whole §7 loop against the live database — request, queue, approve, decline,
@@ -276,6 +283,14 @@ withdraw — because a mocked Prisma can prove a query's *shape* but not that th
 transaction and its audit row actually commit together. It namespaces every row to a per-run
 uuid and deletes them (including audit rows, which have no FK and do not cascade). Raise its
 timeouts, not vitest's global ones: those numbers are about the pooler, not about slow code.
+
+`gym.db.test.ts` exists for the same reason and a different invariant: `gym.test.ts` proves the
+seat claim is a conditional update carrying `seatsTaken: { lt: capacity }`, but whether two
+people hitting Book in the same instant end up with one seat or two is a question about row locks
+in Postgres, and mocking cannot answer it. It races two real bookings against a real one-seat
+class. Same contract: namespaced rows, deleted in `afterAll` (visits before bookings before
+classes before the venue — `Venue` is `Restrict` from both, because a site that closes must not
+take last year's attendance with it).
 
 Note the deviation from `BIOSYNC_FEATURE_DESIGN_PROMPTS.md`, which describes §7 as "AI-surfaced".
 It is not, and must not become so: an LLM that invents a protocol name is one token away from

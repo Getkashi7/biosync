@@ -28,12 +28,17 @@ import { InviteListScreen } from "../invites/InviteListScreen";
 import { EnterCodeScreen } from "../invites/EnterCodeScreen";
 import { CareTeamScreen } from "../invites/CareTeamScreen";
 import { AdminScreen } from "../admin/AdminScreen";
+import { AuditLogScreen } from "../admin/AuditLogScreen";
+import { MembersScreen } from "../admin/MembersScreen";
+import { TrendsScreen } from "../admin/TrendsScreen";
+import { VenuesScreen } from "../admin/VenuesScreen";
 import { fetchCareTeam } from "../invites/invitesApi";
 import type { CreatedInvite, StaffKind } from "../invites/invitesApi";
 import { TimelineScreen } from "../timeline/TimelineScreen";
 import { NewGoalSheet } from "../goals/NewGoalSheet";
 import { createGoal, type NewGoal } from "../goals/goalsApi";
 import { ProfileScreen } from "../profile/ProfileScreen";
+import { ExportDataScreen } from "../profile/ExportDataScreen";
 import { DeleteAccountSheet } from "../profile/DeleteAccountSheet";
 import { CoachScreen } from "../coach/CoachScreen";
 import { PlanSheet } from "../coach/PlanSheet";
@@ -50,6 +55,12 @@ import { PhotoAddSheet } from "../photos/PhotoAddSheet";
 import { PhotoDetailScreen } from "../photos/PhotoDetailScreen";
 import { TreatmentsScreen } from "../treatments/TreatmentsScreen";
 import { FitnessScreen } from "../fitness/FitnessScreen";
+import { GymScreen } from "../gym/GymScreen";
+import { CoachesScreen } from "../gym/CoachesScreen";
+import { CheckInScreen } from "../gym/CheckInScreen";
+import { GymHistoryScreen } from "../gym/GymHistoryScreen";
+import { CoachClassesScreen } from "../gym/CoachClassesScreen";
+import { CoachProfileScreen } from "../gym/CoachProfileScreen";
 import { TreatmentOfferSheet } from "../treatments/TreatmentOfferSheet";
 import { fetchSuggestions, fetchRequests, type Suggestion } from "../treatments/treatmentsApi";
 import { shouldOffer, lastOfferAt, markOfferShown } from "../../lib/treatmentOffer";
@@ -103,7 +114,25 @@ type ConsentView = "none" | "centre" | "roles";
 type PhotosView = "none" | "gallery";
 
 /** The client's view of what a trainer shared, pushed from Profile. */
-type ProfileArea = "none" | "trainerFeed" | "careTeam" | "enterCode" | "admin" | "treatments" | "fitness";
+type ProfileArea =
+  | "none"
+  | "trainerFeed"
+  | "careTeam"
+  | "enterCode"
+  | "admin"
+  | "treatments"
+  | "fitness"
+  | "gym"
+  | "export";
+
+/**
+ * Where the gym area is. A pushed stack inside one ProfileArea rather than four
+ * more areas, so Back always returns to the schedule the person came from.
+ */
+type GymView = "schedule" | "coaches" | "checkin" | "history";
+
+/** Where the admin area is. Same shape as GymView, and for the same reason. */
+type AdminView = "home" | "audit" | "members" | "trends" | "venues";
 
 /** Where the staff invite flow is: the list, the create form, or a fresh code. */
 type InviteView = { step: "none" } | { step: "list" } | { step: "create" } | { step: "code"; invite: CreatedInvite; lockedTo?: string | undefined };
@@ -111,6 +140,14 @@ type InviteView = { step: "none" } | { step: "list" } | { step: "create" } | { s
 export function MainTabs() {
   const insets = useSafeAreaInsets();
   const [active, setActive] = useState<TabKey>("home");
+  const [gymView, setGymView] = useState<GymView>("schedule");
+  const [adminView, setAdminView] = useState<AdminView>("home");
+  // The coach's own class list, inside the professional shell.
+  const [coachClasses, setCoachClasses] = useState(false);
+  const [coachProfile, setCoachProfile] = useState(false);
+  // Bumped when a check-in lands, so the schedule re-reads rather than showing
+  // a class the person has since been marked as attending.
+  const [gymKey, setGymKey] = useState(0);
   const [sheet, setSheet] = useState<Sheet>("none");
   const [photosView, setPhotosView] = useState<PhotosView>("none");
   // Uploads still in flight, rendered as their own tiles in the grid so a photo
@@ -409,6 +446,10 @@ export function MainTabs() {
               setRefreshKey((k) => k + 1);
             }}
           />
+        ) : coachProfile ? (
+          <CoachProfileScreen onBack={() => setCoachProfile(false)} />
+        ) : coachClasses ? (
+          <CoachClassesScreen onBack={() => setCoachClasses(false)} />
         ) : reviewQueue ? (
           <ReviewQueueScreen onBack={() => setReviewQueue(false)} />
         ) : client ? (
@@ -425,6 +466,14 @@ export function MainTabs() {
             onOpenClient={setClient}
             onInvite={() => setInvite({ step: "list" })}
             onReviewQueue={canReviewTreatments ? () => setReviewQueue(true) : undefined}
+            // A practitioner is not a coach: classes belong to the PT
+            // capability, the same line `coachProcedure` draws server-side.
+            onClasses={
+              staffKinds.includes("PT") ? () => setCoachClasses(true) : undefined
+            }
+            onCoachProfile={
+              staffKinds.includes("PT") ? () => setCoachProfile(true) : undefined
+            }
           />
         )}
         {/*
@@ -433,7 +482,7 @@ export function MainTabs() {
           a bottom CTA — a floating tab bar would sit on top of "Save note" /
           "Assign plan". You leave those via Back, then the tab bar returns.
         */}
-        {keyboardUp || client || noteFor || planFor || reviewQueue || invite.step !== "none" ? null : (
+        {keyboardUp || client || noteFor || planFor || reviewQueue || coachClasses || coachProfile || invite.step !== "none" ? null : (
           <BioTabBar
             active={active}
             onSelect={(t) => {
@@ -446,6 +495,8 @@ export function MainTabs() {
               setNoteFor(null);
               setPlanFor(null);
               setReviewQueue(false);
+              setCoachClasses(false);
+              setCoachProfile(false);
               setActive(t);
             }}
             onLog={() => setSheet("chooser")}
@@ -460,7 +511,23 @@ export function MainTabs() {
     <View style={styles.page}>
       <StatusBar style="light" />
       {profileArea === "admin" ? (
-        <AdminScreen onBack={() => setProfileArea("none")} />
+        adminView === "audit" ? (
+          <AuditLogScreen onBack={() => setAdminView("home")} />
+        ) : adminView === "members" ? (
+          <MembersScreen onBack={() => setAdminView("home")} />
+        ) : adminView === "trends" ? (
+          <TrendsScreen onBack={() => setAdminView("home")} />
+        ) : adminView === "venues" ? (
+          <VenuesScreen onBack={() => setAdminView("home")} />
+        ) : (
+          <AdminScreen
+            onBack={() => setProfileArea("none")}
+            onAuditLog={() => setAdminView("audit")}
+            onMembers={() => setAdminView("members")}
+            onTrends={() => setAdminView("trends")}
+            onVenues={() => setAdminView("venues")}
+          />
+        )
       ) : profileArea === "enterCode" ? (
         <EnterCodeScreen
           onBack={() => setProfileArea("careTeam")}
@@ -484,6 +551,30 @@ export function MainTabs() {
             setSheet("newgoal");
           }}
         />
+      ) : profileArea === "gym" ? (
+        gymView === "coaches" ? (
+          <CoachesScreen onBack={() => setGymView("schedule")} />
+        ) : gymView === "checkin" ? (
+          <CheckInScreen
+            onBack={() => setGymView("schedule")}
+            onDone={() => {
+              setGymKey((k) => k + 1);
+              setGymView("schedule");
+            }}
+          />
+        ) : gymView === "history" ? (
+          <GymHistoryScreen onBack={() => setGymView("schedule")} />
+        ) : (
+          <GymScreen
+            key={gymKey}
+            onBack={() => setProfileArea("none")}
+            onCoaches={() => setGymView("coaches")}
+            onCheckIn={() => setGymView("checkin")}
+            onHistory={() => setGymView("history")}
+          />
+        )
+      ) : profileArea === "export" ? (
+        <ExportDataScreen onBack={() => setProfileArea("none")} />
       ) : profileArea === "treatments" ? (
         <TreatmentsScreen onBack={() => setProfileArea("none")} />
       ) : profileArea === "trainerFeed" ? (
@@ -595,6 +686,7 @@ export function MainTabs() {
       ) : active === "profile" ? (
         <ProfileScreen
           onDeleteAccount={() => setSheet("deleteaccount")}
+          onExportData={() => setProfileArea("export")}
           onReminders={() => setSheet("reminders")}
           onCoachPlan={() => setSheet("plan")}
           onConsent={() => setConsent("centre")}
@@ -606,7 +698,20 @@ export function MainTabs() {
           onCareTeam={() => setProfileArea("careTeam")}
           onTreatments={() => setProfileArea("treatments")}
           onFitness={() => setProfileArea("fitness")}
-          onAdmin={role === "ADMIN" ? () => setProfileArea("admin") : undefined}
+          onGym={() => {
+            // Always enters at the schedule, never wherever it was left.
+            setGymView("schedule");
+            setProfileArea("gym");
+          }}
+          onAdmin={
+            role === "ADMIN"
+              ? () => {
+                  // Always enters at the hub, never wherever it was left.
+                  setAdminView("home");
+                  setProfileArea("admin");
+                }
+              : undefined
+          }
           onTrainer={
             isStaff
               ? () => {
