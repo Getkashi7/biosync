@@ -1,0 +1,182 @@
+# Nightly encrypted backup of the Supabase database.
+#
+# Why this exists: point-in-time recovery is a paid Supabase feature. On the
+# free tier the honest position is that there is NO backup — a dropped table, a
+# bad migration or a deleted project takes every check-in, meal, photo row and
+# treatment decision with it, and there is nothing to restore from. For an app
+# whose entire value is a record of someone's body over time, that is the worst
+# single failure available to us.
+#
+# So this runs `pg_dump` on a schedule from CI rather than from a laptop, which
+# matters: a backup that only happens when someone remembers to run it is a
+# backup that stops happening in the first busy week.
+#
+# THE DUMP IS ENCRYPTED BEFORE IT IS EVER STORED. It contains health data —
+# daily logs, metrics, nutrition, treatment requests — and a GitHub artifact is
+# readable by anyone with repository access, which is a wider audience than
+# anyone consented to. `gpg --symmetric` with a passphrase in repository secrets
+# closes that: the artifact is useless to someone who can only download it.
+#
+# It also VERIFIES the dump rather than trusting the exit code. `pg_dump` can
+# succeed and produce something unusable — an empty schema, a partial transfer —
+# and a backup nobody has ever read back is not a backup. The verify step reads
+# the dump's own table-of-contents and fails the run if the tables that matter
+# are not in it.
+#
+# SETUP — two repository secrets (Settings → Secrets and variables → Actions):
+#
+#   BACKUP_DATABASE_URL   The SESSION connection string, port 5432 — the same
+#                         value as DIRECT_URL. NOT the pooled 6543 one:
+#                         transaction-mode pooling cannot hold a dump's
+#                         consistent snapshot, and pg_dump fails part way.
+#   BACKUP_PASSPHRASE     A long random passphrase. STORE IT SOMEWHERE ELSE TOO.
+#                         Losing it makes every backup in this repository
+#                         permanently unreadable, which is the same outcome as
+#                         having no backups at all.
+#
+# RESTORING: see BACKUP.md. Read it before you need it.
+
+name: Database backup
+
+on:
+  schedule:
+    # 03:17 UTC daily. Off the hour on purpose — GitHub's scheduler queues a
+    # crowd of jobs at :00 and a delayed backup is a skipped backup often enough
+    # to matter.
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+# One at a time. Two dumps of the same database racing gains nothing and doubles
+# the load on a free-tier instance.
+concurrency:
+  group: db-backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check the secrets are actually set
+        env:
+          URL: ${{ secrets.BACKUP_DATABASE_URL }}
+          PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          # Named individually, because "one of the secrets is missing" sends
+          # somebody to check both. Never echo the values themselves.
+          missing=0
+          if [ -z "$URL" ]; then echo "::error::BACKUP_DATABASE_URL is not set."; missing=1; fi
+          if [ -z "$PASSPHRASE" ]; then echo "::error::BACKUP_PASSPHRASE is not set."; missing=1; fi
+          if [ "$missing" = "1" ]; then
+            echo "::error::No backup was taken. See the header of this workflow for setup."
+            exit 1
+          fi
+          case "$URL" in
+            *:6543*)
+              echo "::error::BACKUP_DATABASE_URL points at the pooled port 6543. pg_dump needs the session connection on 5432 (the DIRECT_URL value)."
+              exit 1
+              ;;
+          esac
+
+      # Ubuntu's default client is older than Supabase's server, and pg_dump
+      # refuses to dump a newer server than itself. Pinning 17 from PGDG means
+      # this keeps working when Supabase upgrades underneath us.
+      - name: Install PostgreSQL 17 client
+        run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -fsSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
+            https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
+            | sudo tee /etc/apt/sources.list.d/pgdg.list > /dev/null
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq postgresql-client-17
+          pg_dump --version
+
+      - name: Dump the database
+        env:
+          # Read from the environment so the connection string — which contains
+          # the database password — never appears in a command line or a log.
+          PGCONNECT_TIMEOUT: "30"
+          BACKUP_DATABASE_URL: ${{ secrets.BACKUP_DATABASE_URL }}
+        run: |
+          set -euo pipefail
+          STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
+          echo "STAMP=$STAMP" >> "$GITHUB_ENV"
+          # --format=custom so `pg_restore` can read the table of contents, pick
+          # single tables, and restore in parallel. A plain .sql file can only be
+          # replayed whole, which is the wrong shape for "we lost one table".
+          # --no-owner/--no-privileges so it restores into a fresh project whose
+          # roles are not the ones it was dumped from.
+          pg_dump "$BACKUP_DATABASE_URL" \
+            --format=custom \
+            --no-owner \
+            --no-privileges \
+            --schema=public \
+            --file="biosync-$STAMP.dump"
+          ls -l "biosync-$STAMP.dump"
+
+      - name: Verify the dump is worth keeping
+        run: |
+          set -euo pipefail
+          DUMP="biosync-$STAMP.dump"
+
+          # A dump that succeeded and produced almost nothing is the failure mode
+          # this step exists for: it looks green and restores an empty app.
+          SIZE=$(stat -c%s "$DUMP")
+          if [ "$SIZE" -lt 20000 ]; then
+            echo "::error::Dump is only $SIZE bytes — that is too small to be this database."
+            exit 1
+          fi
+
+          pg_restore --list "$DUMP" > toc.txt
+
+          # The tables whose loss would be unrecoverable. Named explicitly rather
+          # than counted, because "at least 20 tables" would pass a dump that
+          # somehow held twenty empty ones and no daily logs.
+          for table in users daily_logs metrics meals photos treatment_requests audit_logs class_bookings gym_visits; do
+            if ! grep -qE "TABLE DATA public $table( |$)" toc.txt; then
+              echo "::error::No data section for '$table' in the dump."
+              exit 1
+            fi
+          done
+
+          echo "Verified $(grep -c 'TABLE DATA' toc.txt) tables, $SIZE bytes."
+
+      - name: Encrypt
+        env:
+          BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          # --batch with the passphrase on a file descriptor rather than the
+          # command line, so it is not visible in the runner's process list.
+          printf '%s' "$BACKUP_PASSPHRASE" | gpg --batch --yes \
+            --symmetric --cipher-algo AES256 \
+            --passphrase-fd 0 \
+            --output "biosync-$STAMP.dump.gpg" \
+            "biosync-$STAMP.dump"
+
+          # The plaintext must not survive into the upload step.
+          shred -u "biosync-$STAMP.dump" 2>/dev/null || rm -f "biosync-$STAMP.dump"
+          ls -l "biosync-$STAMP.dump.gpg"
+
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: biosync-db-${{ env.STAMP }}
+          path: biosync-${{ env.STAMP }}.dump.gpg
+          # Ninety days of nightlies. Long enough that a corruption introduced
+          # and noticed weeks later still has a clean copy behind it — the short
+          # window is what makes most backup schemes useless in practice.
+          retention-days: 90
+          if-no-files-found: error
+
+      - name: Say what happened
+        run: |
+          {
+            echo "### Backup taken"
+            echo ""
+            echo "- Artifact: \`biosync-db-$STAMP\`"
+            echo "- Kept for 90 days"
+            echo "- Encrypted with \`BACKUP_PASSPHRASE\` — see BACKUP.md to restore"
+          } >> "$GITHUB_STEP_SUMMARY"
