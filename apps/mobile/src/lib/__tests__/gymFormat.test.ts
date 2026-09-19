@@ -20,6 +20,7 @@ import {
   localDay,
   seatsLabel,
   unbookableReason,
+  ymdLabel,
   type ClassState,
 } from "../gymFormat";
 
@@ -137,5 +138,26 @@ describe("unbookableReason", () => {
   it("treats an unknown state as unavailable, never as open", () => {
     expect(unbookableReason("WAITLISTED" as ClassState)).toBe("Unavailable");
     expect(unbookableReason("" as ClassState)).toBe("Unavailable");
+  });
+});
+
+describe("ymdLabel", () => {
+  it("names the weekday and the month", () => {
+    expect(ymdLabel("2026-09-25")).toBe("Fri 25 Sep");
+  });
+
+  /**
+   * `new Date("2026-09-25")` is UTC midnight, which renders as the 24th for
+   * anyone west of Greenwich. A scheduling form that shows the wrong day is
+   * worse than one that shows a raw string.
+   */
+  it("does not shift the day for a western timezone", () => {
+    expect(ymdLabel("2026-01-01")).toBe("Thu 1 Jan");
+  });
+
+  it("hands back anything it cannot parse rather than inventing a date", () => {
+    for (const bad of ["", "nope", "2026-13-40", "2026-02-31", "2026-09"]) {
+      expect(ymdLabel(bad), bad).toBe(bad);
+    }
   });
 });

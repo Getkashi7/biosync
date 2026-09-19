@@ -1,6 +1,5 @@
 /**
- * A coach's own classes — scheduling one, calling one off, and seeing who's
- * coming.
+ * A coach's own classes (§6) — built to the A5 handoff.
  *
  * This lives in the professional shell, and it is the only way a class comes
  * into existence at all: a class is created by the person who will teach it,
@@ -17,6 +16,12 @@
  * record. A coach who is also somebody's linked trainer reads their data
  * through the staff surface, where a link and a consent are both checked — a
  * class list is not a way around that.
+ *
+ * One deviation from the handoff: it draws a flat list of cards with no day
+ * headings, but the query spans two weeks, so "18:00" alone does not say which
+ * evening. Day headings are kept, in A1's style — the same bundle already
+ * establishes them, and a scheduling screen that hides the day is worse than an
+ * extra label.
  */
 import { useCallback, useEffect, useState } from "react";
 import {
@@ -30,14 +35,13 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import DateTimePicker, { type DateTimePickerEvent } from "@react-native-community/datetimepicker";
-import { StaticBloom } from "../../ui/bio/StaticBloom";
-import { ScreenHeader } from "../../ui/bio/ScreenHeader";
+import { RadialBloom } from "../../ui/bio/RadialBloom";
+import { FlatHeader } from "../../ui/bio/FlatHeader";
 import { Spinner } from "../../ui/Spinner";
-import { LoadFailed } from "../../ui/bio/LoadFailed";
 import { classifyNetError, type NetFailure } from "../../lib/netError";
 import { bio, fontFamily } from "../../ui/theme";
 import { errorHaptic, pressHaptic, successHaptic } from "../../lib/haptics";
-import { classRange, groupByDay, localDay } from "../../lib/gymFormat";
+import { classRange, groupByDay, localDay, ymdLabel } from "../../lib/gymFormat";
 import {
   cancelClass,
   createClass,
@@ -80,8 +84,8 @@ export function CoachClassesScreen({ onBack }: { onBack: () => void }) {
   const [roster, setRoster] = useState<{ id: string; data: Roster | null } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // Which picker is open, if any. Android renders these as modals, so they are
-  // mounted on demand and dismissed by their own onChange.
+  // Android renders these as modals, so they mount on demand and dismiss
+  // through their own onChange.
   const [picker, setPicker] = useState<"date" | "time" | null>(null);
 
   const load = useCallback(async () => {
@@ -116,7 +120,7 @@ export function CoachClassesScreen({ onBack }: { onBack: () => void }) {
     if (draft.title.trim().length < 2) return setError("Give the class a name.");
 
     const startsAt = toInstant(draft.date, draft.time);
-    if (!startsAt) return setError("Use a date like 2026-09-20 and a time like 18:00.");
+    if (!startsAt) return setError("That date and time don't look right.");
 
     const durationMin = Number(draft.durationMin);
     const capacity = Number(draft.capacity);
@@ -184,334 +188,418 @@ export function CoachClassesScreen({ onBack }: { onBack: () => void }) {
 
   return (
     <View style={styles.root}>
-      <StaticBloom color={bio.color.teal} />
+      <RadialBloom
+        color={bio.color.teal}
+        size={bio.gym.bloom.size}
+        left={bio.gym.bloom.left}
+        top={bio.gym.bloom.top}
+        alpha={bio.gym.bloom.alpha}
+      />
       <KeyboardAvoidingView behavior="padding" style={styles.flex}>
-        <ScrollView
-          contentContainerStyle={[
-            styles.content,
-            { paddingTop: insets.top + 6, paddingBottom: insets.bottom + 40 },
-          ]}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
-          <ScreenHeader title="Your classes" label="Coach" onBack={onBack} />
-
-          {error ? <Text style={styles.error}>{error}</Text> : null}
-
-          {draft ? (
-            <View style={styles.form}>
-              <Text style={styles.formTitle}>New class</Text>
-
-              {venues.length === 0 ? (
-                <Text style={styles.noVenues}>
-                  No venues have been set up yet. An admin adds them — a class
-                  belongs to a place.
-                </Text>
-              ) : (
-                <>
-                  <Text style={styles.fieldLabel}>VENUE</Text>
-                  <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={styles.chips}
-                  >
-                    {venues.map((v) => (
-                      <Pressable
-                        key={v.id}
-                        onPress={() => {
-                          pressHaptic();
-                          setDraft({ ...draft, venueId: v.id });
-                        }}
-                        style={({ pressed }) => [
-                          styles.chip,
-                          draft.venueId === v.id && styles.chipOn,
-                          pressed && styles.pressed,
-                        ]}
-                        accessibilityRole="button"
-                        accessibilityState={{ selected: draft.venueId === v.id }}
-                        accessibilityLabel={v.name}
-                      >
-                        <Text
-                          style={[styles.chipText, draft.venueId === v.id && styles.chipTextOn]}
-                        >
-                          {v.name}
-                        </Text>
-                      </Pressable>
-                    ))}
-                  </ScrollView>
-                </>
-              )}
-
-              <Field
-                label="NAME"
-                value={draft.title}
-                onChange={(v) => setDraft({ ...draft, title: v })}
-                placeholder="Intervals"
-              />
-              <View style={styles.pair}>
-                <PickerField
-                  label="DATE"
-                  value={draft.date}
-                  onPress={() => {
-                    pressHaptic();
-                    setPicker("date");
-                  }}
-                />
-                <PickerField
-                  label="TIME"
-                  value={draft.time}
-                  onPress={() => {
-                    pressHaptic();
-                    setPicker("time");
-                  }}
-                />
-              </View>
-              <View style={styles.pair}>
-                <Field
-                  label="MINUTES"
-                  value={draft.durationMin}
-                  onChange={(v) => setDraft({ ...draft, durationMin: v })}
-                  placeholder="45"
-                  numeric
-                  half
-                />
-                <Field
-                  label="CAPACITY"
-                  value={draft.capacity}
-                  onChange={(v) => setDraft({ ...draft, capacity: v })}
-                  placeholder="12"
-                  numeric
-                  half
-                />
-              </View>
-              <Text style={styles.fieldHint}>
-                The time is the time in the room. Capacity is enforced when people
-                book, so the last seat can only be taken once.
-              </Text>
-
-              <View style={styles.formBtns}>
-                <Pressable
-                  onPress={() => {
-                    pressHaptic();
-                    setDraft(null);
-                    setError(null);
-                  }}
-                  style={({ pressed }) => [styles.ghostBtn, pressed && styles.pressed]}
-                  accessibilityRole="button"
-                  accessibilityLabel="Cancel"
-                >
-                  <Text style={styles.ghostBtnText}>Cancel</Text>
-                </Pressable>
-                <Pressable
-                  onPress={() => void save()}
-                  disabled={busy || venues.length === 0}
-                  style={({ pressed }) => [
-                    styles.primaryBtn,
-                    pressed && styles.pressed,
-                    (busy || venues.length === 0) && styles.btnOff,
-                  ]}
-                  accessibilityRole="button"
-                  accessibilityLabel="Schedule this class"
-                  accessibilityState={{ disabled: busy || venues.length === 0 }}
-                >
-                  <Text style={styles.primaryBtnText}>{busy ? "…" : "Schedule"}</Text>
-                </Pressable>
-              </View>
-
-              {picker ? (
-                <DateTimePicker
-                  mode={picker}
-                  display={picker === "date" ? "calendar" : "clock"}
-                  value={draftDate(draft)}
-                  minimumDate={picker === "date" ? new Date() : undefined}
-                  onChange={(e: DateTimePickerEvent, d?: Date) => {
-                    const which = picker;
-                    setPicker(null);
-                    // "dismissed" means they backed out — keep what was there
-                    // rather than writing today's date over their choice.
-                    if (e.type !== "set" || !d) return;
-                    setDraft(
-                      which === "date"
-                        ? { ...draft, date: localDay(d) }
-                        : {
-                            ...draft,
-                            time: `${String(d.getHours()).padStart(2, "0")}:${String(
-                              d.getMinutes(),
-                            ).padStart(2, "0")}`,
-                          },
-                    );
-                  }}
-                />
-              ) : null}
-            </View>
-          ) : (
-            <Pressable
-              onPress={() => {
-                pressHaptic();
-                setDraft({ ...BLANK, venueId: venues[0]?.id ?? "" });
-                setError(null);
-              }}
-              style={({ pressed }) => [styles.addBtn, pressed && styles.pressed]}
-              accessibilityRole="button"
-              accessibilityLabel="Schedule a class"
-            >
-              <Text style={styles.addBtnText}>Schedule a class</Text>
-            </Pressable>
-          )}
+        <View style={[styles.frame, { paddingTop: insets.top + 20 }]}>
+          <FlatHeader title="Your classes" label="Coach" onBack={onBack} />
 
           {failed ? (
-            <LoadFailed what="your classes" kind={failed} onRetry={() => void load()} />
-          ) : classes === null ? (
-            <View style={styles.loading}>
-              <Spinner tint={bio.color.text} />
-            </View>
-          ) : classes.length === 0 ? (
-            <View style={styles.empty}>
-              <Text style={styles.emptyTitle}>Nothing scheduled</Text>
-              <Text style={styles.emptyBody}>
-                Classes you schedule in the next two weeks show up here.
+            <View style={styles.centre}>
+              <Text style={styles.bigTitle}>Couldn't load your classes</Text>
+              <Text style={styles.bigBody}>
+                {failed === "offline"
+                  ? "You look offline. Check your connection — nothing has been lost."
+                  : "Something went wrong on our end. Nothing has been lost."}
               </Text>
+              <Pressable
+                onPress={() => {
+                  pressHaptic();
+                  void load();
+                }}
+                style={({ pressed }) => [styles.retry, pressed && styles.pressed]}
+                accessibilityRole="button"
+                accessibilityLabel="Try loading your classes again"
+              >
+                <Text style={styles.retryText}>Try again</Text>
+              </Pressable>
             </View>
           ) : (
-            days.map((day) => (
-              <View key={day.heading}>
-                <Text style={styles.dayHeading}>{day.heading.toUpperCase()}</Text>
-                {day.rows.map((c) => (
-                  <View key={c.id} style={[styles.card, c.state === "CANCELLED" && styles.cardOff]}>
-                    <View style={styles.cardTop}>
-                      <Text style={styles.time}>{classRange(c.startsAt, c.durationMin)}</Text>
-                      <Text style={styles.count}>
-                        {c.booked}/{c.capacity}
-                      </Text>
-                    </View>
-                    <Text style={styles.title} numberOfLines={2}>
-                      {c.title}
-                    </Text>
-                    <Text style={styles.meta}>{c.venue.name}</Text>
+            <ScrollView
+              contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+            >
+              {draft ? null : (
+                <Pressable
+                  onPress={() => {
+                    pressHaptic();
+                    setDraft({ ...BLANK, venueId: venues[0]?.id ?? "" });
+                    setError(null);
+                  }}
+                  style={({ pressed }) => [styles.scheduleBtn, pressed && styles.pressed]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Schedule a class"
+                >
+                  <Text style={styles.scheduleBtnText}>Schedule a class</Text>
+                </Pressable>
+              )}
 
-                    {c.state === "CANCELLED" ? (
-                      <Text style={styles.cancelled}>
-                        Cancelled{c.cancelReason ? ` — ${c.cancelReason}` : ""}
-                      </Text>
-                    ) : cancelling?.id === c.id ? (
-                      <View style={styles.confirm}>
-                        <Text style={styles.confirmTitle}>Why is it off?</Text>
-                        <TextInput
-                          value={cancelling.reason}
-                          onChangeText={(v) => setCancelling({ id: c.id, reason: v })}
-                          placeholder="Everyone who booked will see this"
-                          placeholderTextColor={bio.alpha(0.3)}
-                          style={styles.reasonInput}
-                          multiline
-                          selectionColor={bio.color.teal}
-                          accessibilityLabel="Reason for cancelling"
-                        />
-                        <View style={styles.formBtns}>
-                          <Pressable
-                            onPress={() => {
-                              pressHaptic();
-                              setCancelling(null);
-                              setError(null);
-                            }}
-                            style={({ pressed }) => [styles.ghostBtn, pressed && styles.pressed]}
-                            accessibilityRole="button"
-                            accessibilityLabel="Keep the class"
-                          >
-                            <Text style={styles.ghostBtnText}>Keep it</Text>
-                          </Pressable>
-                          <Pressable
-                            onPress={() => void confirmCancel()}
-                            disabled={busy || cancelling.reason.trim().length < MIN_REASON}
-                            style={({ pressed }) => [
-                              styles.dangerBtn,
-                              pressed && styles.pressed,
-                              (busy || cancelling.reason.trim().length < MIN_REASON) &&
-                                styles.btnOff,
+              {error ? <Text style={styles.error}>{error}</Text> : null}
+
+              {draft ? (
+                <View style={styles.form}>
+                  {venues.length === 0 ? (
+                    <Text style={styles.noVenues}>
+                      No venues have been set up yet. An admin adds them — a class belongs
+                      to a place.
+                    </Text>
+                  ) : (
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      contentContainerStyle={styles.chips}
+                      style={styles.chipRow}
+                    >
+                      {venues.map((v) => (
+                        <Pressable
+                          key={v.id}
+                          onPress={() => {
+                            pressHaptic();
+                            setDraft({ ...draft, venueId: v.id });
+                          }}
+                          style={({ pressed }) => [
+                            styles.chip,
+                            draft.venueId === v.id && styles.chipOn,
+                            pressed && styles.pressed,
+                          ]}
+                          accessibilityRole="button"
+                          accessibilityState={{ selected: draft.venueId === v.id }}
+                          accessibilityLabel={v.name}
+                        >
+                          <Text
+                            style={[
+                              styles.chipText,
+                              draft.venueId === v.id && styles.chipTextOn,
                             ]}
-                            accessibilityRole="button"
-                            accessibilityLabel="Confirm cancelling this class"
                           >
-                            <Text style={styles.dangerBtnText}>{busy ? "…" : "Cancel class"}</Text>
-                          </Pressable>
-                        </View>
-                      </View>
-                    ) : roster?.id === c.id ? (
-                      <View style={styles.roster}>
-                        {roster.data === null ? (
-                          <Spinner tint={bio.color.tealLt} />
-                        ) : roster.data.people.length === 0 ? (
-                          <Text style={styles.rosterNone}>Nobody booked yet.</Text>
-                        ) : (
-                          roster.data.people.map((p) => (
-                            <View key={p.id} style={styles.rosterRow}>
-                              <Text style={styles.rosterName} numberOfLines={1}>
-                                {p.name}
-                              </Text>
-                              <Text style={styles.rosterTag}>
-                                {p.attended ? "Attended" : p.status === "CANCELLED" ? "Cancelled" : "Booked"}
-                              </Text>
-                            </View>
-                          ))
-                        )}
-                        <Pressable
-                          onPress={() => {
-                            pressHaptic();
-                            setRoster(null);
-                          }}
-                          style={({ pressed }) => [styles.smallBtn, pressed && styles.pressed]}
-                          accessibilityRole="button"
-                          accessibilityLabel="Hide the roster"
-                        >
-                          <Text style={styles.smallBtnText}>Hide</Text>
+                            {v.name}
+                          </Text>
                         </Pressable>
-                      </View>
-                    ) : (
-                      <View style={styles.cardBtns}>
-                        <Pressable
-                          onPress={() => {
-                            pressHaptic();
-                            void openRoster(c.id);
-                          }}
-                          style={({ pressed }) => [styles.smallBtn, pressed && styles.pressed]}
-                          accessibilityRole="button"
-                          accessibilityLabel={`Who's coming to ${c.title}`}
-                        >
-                          <Text style={styles.smallBtnText}>Who's coming</Text>
-                        </Pressable>
-                        {c.state !== "PAST" ? (
-                          <Pressable
-                            onPress={() => {
-                              pressHaptic();
-                              setCancelling({ id: c.id, reason: "" });
-                              setError(null);
-                            }}
-                            style={({ pressed }) => [styles.smallBtn, pressed && styles.pressed]}
-                            accessibilityRole="button"
-                            accessibilityLabel={`Cancel ${c.title}`}
-                          >
-                            <Text style={styles.smallBtnText}>Cancel class</Text>
-                          </Pressable>
-                        ) : null}
-                      </View>
-                    )}
+                      ))}
+                    </ScrollView>
+                  )}
+
+                  <Text style={styles.fieldLabel}>NAME</Text>
+                  <TextInput
+                    value={draft.title}
+                    onChangeText={(v) => setDraft({ ...draft, title: v })}
+                    placeholder="Box fundamentals"
+                    placeholderTextColor={bio.alpha(0.3)}
+                    style={styles.input}
+                    autoCorrect={false}
+                    selectionColor={bio.color.teal}
+                    accessibilityLabel="Class name"
+                  />
+
+                  <View style={styles.pair}>
+                    <PickerField
+                      label="DATE"
+                      value={ymdLabel(draft.date)}
+                      onPress={() => {
+                        pressHaptic();
+                        setPicker("date");
+                      }}
+                    />
+                    <PickerField
+                      label="TIME"
+                      value={draft.time}
+                      numeric
+                      onPress={() => {
+                        pressHaptic();
+                        setPicker("time");
+                      }}
+                    />
                   </View>
-                ))}
-              </View>
-            ))
+
+                  <View style={styles.pair}>
+                    <BoxField
+                      label="MINUTES"
+                      value={draft.durationMin}
+                      onChange={(v) => setDraft({ ...draft, durationMin: v })}
+                    />
+                    <BoxField
+                      label="CAPACITY"
+                      value={draft.capacity}
+                      onChange={(v) => setDraft({ ...draft, capacity: v })}
+                    />
+                  </View>
+
+                  <Text style={styles.formHint}>
+                    Members at the venue see it as soon as you schedule it.
+                  </Text>
+
+                  <View style={styles.formBtns}>
+                    <Pressable
+                      onPress={() => {
+                        pressHaptic();
+                        setDraft(null);
+                        setError(null);
+                      }}
+                      style={({ pressed }) => [styles.ghostBtn, pressed && styles.pressed]}
+                      accessibilityRole="button"
+                      accessibilityLabel="Cancel"
+                    >
+                      <Text style={styles.ghostBtnText}>Cancel</Text>
+                    </Pressable>
+                    <Pressable
+                      onPress={() => void save()}
+                      disabled={busy || venues.length === 0}
+                      style={({ pressed }) => [
+                        styles.primaryBtn,
+                        pressed && styles.pressed,
+                        (busy || venues.length === 0) && styles.btnOff,
+                      ]}
+                      accessibilityRole="button"
+                      accessibilityLabel="Schedule this class"
+                      accessibilityState={{ disabled: busy || venues.length === 0 }}
+                    >
+                      <Text style={styles.primaryBtnText}>{busy ? "…" : "Schedule"}</Text>
+                    </Pressable>
+                  </View>
+
+                  {picker ? (
+                    <DateTimePicker
+                      mode={picker}
+                      display={picker === "date" ? "calendar" : "clock"}
+                      value={draftDate(draft)}
+                      minimumDate={picker === "date" ? new Date() : undefined}
+                      onChange={(e: DateTimePickerEvent, d?: Date) => {
+                        const which = picker;
+                        setPicker(null);
+                        // "dismissed" means they backed out — keep what was
+                        // there rather than writing today over their choice.
+                        if (e.type !== "set" || !d) return;
+                        setDraft(
+                          which === "date"
+                            ? { ...draft, date: localDay(d) }
+                            : {
+                                ...draft,
+                                time: `${String(d.getHours()).padStart(2, "0")}:${String(
+                                  d.getMinutes(),
+                                ).padStart(2, "0")}`,
+                              },
+                        );
+                      }}
+                    />
+                  ) : null}
+                </View>
+              ) : null}
+
+              {classes === null ? (
+                <View style={styles.loading}>
+                  <Spinner tint={bio.color.teal} />
+                </View>
+              ) : classes.length === 0 && !draft ? (
+                <View style={styles.centre}>
+                  <Text style={styles.bigTitle}>No classes scheduled</Text>
+                </View>
+              ) : (
+                days.map((day) => (
+                  <View key={day.heading}>
+                    <Text style={styles.dayHeading}>{day.heading.toUpperCase()}</Text>
+                    {day.rows.map((c, i) => (
+                      <View
+                        key={c.id}
+                        style={[
+                          styles.card,
+                          i === 0 ? styles.cardFirst : styles.cardNext,
+                          c.state === "CANCELLED" && styles.cardOff,
+                        ]}
+                      >
+                        <View style={styles.cardTop}>
+                          <Text style={styles.time}>
+                            {classRange(c.startsAt, c.durationMin)}
+                          </Text>
+                          <Text style={styles.count}>
+                            {c.booked}/{c.capacity}
+                          </Text>
+                        </View>
+                        <Text style={styles.title} numberOfLines={2}>
+                          {c.title}
+                        </Text>
+                        <Text style={styles.venue} numberOfLines={1}>
+                          {c.venue.name}
+                        </Text>
+
+                        {c.state === "CANCELLED" ? (
+                          <Text style={styles.cancelled}>
+                            Cancelled{c.cancelReason ? ` — ${c.cancelReason}` : ""}
+                          </Text>
+                        ) : cancelling?.id === c.id ? (
+                          <>
+                            <Text style={styles.whyTitle}>Why is it off?</Text>
+                            <TextInput
+                              value={cancelling.reason}
+                              onChangeText={(v) => setCancelling({ id: c.id, reason: v })}
+                              placeholder="Everyone who booked will see this"
+                              placeholderTextColor={bio.alpha(0.35)}
+                              style={styles.reasonInput}
+                              multiline
+                              selectionColor={bio.color.teal}
+                              accessibilityLabel="Reason for cancelling"
+                            />
+                            <View style={styles.formBtns}>
+                              <Pressable
+                                onPress={() => {
+                                  pressHaptic();
+                                  setCancelling(null);
+                                  setError(null);
+                                }}
+                                style={({ pressed }) => [
+                                  styles.ghostBtn,
+                                  pressed && styles.pressed,
+                                ]}
+                                accessibilityRole="button"
+                                accessibilityLabel="Keep the class"
+                              >
+                                <Text style={styles.ghostBtnText}>Keep it</Text>
+                              </Pressable>
+                              <Pressable
+                                onPress={() => void confirmCancel()}
+                                disabled={
+                                  busy || cancelling.reason.trim().length < MIN_REASON
+                                }
+                                style={({ pressed }) => [
+                                  styles.dangerBtn,
+                                  pressed && styles.pressed,
+                                  (busy || cancelling.reason.trim().length < MIN_REASON) &&
+                                    styles.btnOff,
+                                ]}
+                                accessibilityRole="button"
+                                accessibilityLabel="Confirm cancelling this class"
+                              >
+                                <Text style={styles.dangerBtnText}>
+                                  {busy ? "…" : "Cancel class"}
+                                </Text>
+                              </Pressable>
+                            </View>
+                          </>
+                        ) : roster?.id === c.id ? (
+                          <>
+                            <View style={styles.roster}>
+                              {roster.data === null ? (
+                                <View style={styles.rosterLoading}>
+                                  <Spinner tint={bio.color.teal} />
+                                </View>
+                              ) : roster.data.people.length === 0 ? (
+                                <Text style={styles.rosterNone}>Nobody booked yet.</Text>
+                              ) : (
+                                roster.data.people.map((pn, k) => (
+                                  <View
+                                    key={pn.id}
+                                    style={[
+                                      styles.rosterRow,
+                                      k === (roster.data?.people.length ?? 0) - 1 &&
+                                        styles.rosterRowLast,
+                                    ]}
+                                  >
+                                    <Text style={styles.rosterName} numberOfLines={1}>
+                                      {pn.name}
+                                    </Text>
+                                    <Text
+                                      style={
+                                        pn.attended
+                                          ? styles.tagAttended
+                                          : pn.status === "CANCELLED"
+                                            ? styles.tagCancelled
+                                            : styles.tag
+                                      }
+                                    >
+                                      {pn.attended
+                                        ? "Attended"
+                                        : pn.status === "CANCELLED"
+                                          ? "Cancelled"
+                                          : "Booked"}
+                                    </Text>
+                                  </View>
+                                ))
+                              )}
+                            </View>
+                            <View style={styles.hideRow}>
+                              <Pressable
+                                onPress={() => {
+                                  pressHaptic();
+                                  setRoster(null);
+                                }}
+                                style={({ pressed }) => [
+                                  styles.cardBtn,
+                                  pressed && styles.pressed,
+                                ]}
+                                accessibilityRole="button"
+                                accessibilityLabel="Hide the roster"
+                              >
+                                <Text style={styles.cardBtnText}>Hide</Text>
+                              </Pressable>
+                            </View>
+                          </>
+                        ) : (
+                          <View style={styles.cardBtns}>
+                            <Pressable
+                              onPress={() => {
+                                pressHaptic();
+                                void openRoster(c.id);
+                              }}
+                              style={({ pressed }) => [styles.cardBtn, pressed && styles.pressed]}
+                              accessibilityRole="button"
+                              accessibilityLabel={`Who's coming to ${c.title}`}
+                            >
+                              <Text style={styles.cardBtnText}>Who's coming</Text>
+                            </Pressable>
+                            {c.state !== "PAST" ? (
+                              <Pressable
+                                onPress={() => {
+                                  pressHaptic();
+                                  setCancelling({ id: c.id, reason: "" });
+                                  setError(null);
+                                }}
+                                style={({ pressed }) => [
+                                  styles.cardBtn,
+                                  pressed && styles.pressed,
+                                ]}
+                                accessibilityRole="button"
+                                accessibilityLabel={`Cancel ${c.title}`}
+                              >
+                                <Text style={styles.cardBtnText}>Cancel class</Text>
+                              </Pressable>
+                            ) : null}
+                          </View>
+                        )}
+                      </View>
+                    ))}
+                  </View>
+                ))
+              )}
+            </ScrollView>
           )}
-        </ScrollView>
+        </View>
       </KeyboardAvoidingView>
     </View>
   );
 }
 
 /**
+ * The draft's date and time as a Date, for seeding a picker.
+ *
+ * Falls back to now rather than to an Invalid Date, which a picker renders as
+ * 1970 and which the coach then has to scroll out of.
+ */
+function draftDate(draft: Draft): Date {
+  const iso = toInstant(draft.date, draft.time);
+  return iso ? new Date(iso) : new Date();
+}
+
+/**
  * A local `YYYY-MM-DD` plus `HH:MM` as an instant.
  *
- * Built through the Date constructor's local-time form on purpose: a class at
- * 18:00 is 18:00 in the room, so the coach's own clock is the right frame to
- * read the form in. Returns null rather than an Invalid Date, which would post
- * a class to the epoch.
+ * Built through the Date constructor's local form on purpose: a class at 18:00
+ * is 18:00 in the room, so the coach's own clock is the right frame. Returns
+ * null rather than an Invalid Date, which would post a class to the epoch.
  */
 function toInstant(date: string, time: string): string | null {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date.trim())) return null;
@@ -521,73 +609,54 @@ function toInstant(date: string, time: string): string | null {
   if (hh === undefined || mm === undefined || hh > 23 || mm > 59) return null;
   const at = new Date(y ?? 0, (m ?? 1) - 1, d ?? 1, hh, mm, 0, 0);
   if (Number.isNaN(at.getTime())) return null;
-  // Round-trip the date so 2026-02-31 is refused rather than rolling into March.
+  // Round-trip, so 2026-02-31 is refused rather than rolling into March.
   if (at.getMonth() !== (m ?? 1) - 1 || at.getDate() !== d) return null;
   return at.toISOString();
-}
-
-/**
- * The draft's date and time as a Date, for seeding a picker.
- *
- * Falls back to now rather than to an Invalid Date, which a picker renders as
- * 1970 and which a user then has to scroll out of.
- */
-function draftDate(draft: Draft): Date {
-  const iso = toInstant(draft.date, draft.time);
-  return iso ? new Date(iso) : new Date();
 }
 
 function PickerField({
   label,
   value,
+  numeric,
   onPress,
 }: {
   label: string;
   value: string;
+  numeric?: boolean;
   onPress: () => void;
 }) {
   return (
-    <View style={[styles.field, styles.fieldHalf]}>
-      <Text style={styles.fieldLabel}>{label}</Text>
+    <View style={styles.half}>
+      <Text style={styles.fieldLabelTight}>{label}</Text>
       <Pressable
         onPress={onPress}
         style={({ pressed }) => [styles.pickerBtn, pressed && styles.pressed]}
         accessibilityRole="button"
         accessibilityLabel={`${label}: ${value}. Tap to change.`}
       >
-        <Text style={styles.pickerValue}>{value}</Text>
+        <Text style={[styles.pickerValue, numeric && styles.tabular]}>{value}</Text>
       </Pressable>
     </View>
   );
 }
 
-function Field({
+function BoxField({
   label,
   value,
   onChange,
-  placeholder,
-  numeric,
-  half,
 }: {
   label: string;
   value: string;
   onChange: (v: string) => void;
-  placeholder: string;
-  numeric?: boolean;
-  half?: boolean;
 }) {
   return (
-    <View style={[styles.field, half && styles.fieldHalf]}>
-      <Text style={styles.fieldLabel}>{label}</Text>
+    <View style={styles.half}>
+      <Text style={styles.fieldLabelTight}>{label}</Text>
       <TextInput
         value={value}
         onChangeText={onChange}
-        placeholder={placeholder}
-        placeholderTextColor={bio.alpha(0.3)}
-        style={styles.fieldInput}
-        autoCapitalize={numeric ? "none" : "sentences"}
-        autoCorrect={false}
-        keyboardType={numeric ? "number-pad" : "default"}
+        style={[styles.input, styles.inputTight, styles.tabular]}
+        keyboardType="number-pad"
         selectionColor={bio.color.teal}
         accessibilityLabel={label}
       />
@@ -598,188 +667,239 @@ function Field({
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: bio.color.page },
   flex: { flex: 1 },
-  content: { paddingHorizontal: 20 },
+  frame: { flex: 1, paddingHorizontal: 18 },
   pressed: { transform: [{ scale: 0.97 }] },
+  tabular: { fontVariant: ["tabular-nums"] },
 
-  error: { fontFamily: fontFamily.regular, fontSize: 13, color: bio.color.coralLt, marginTop: 14 },
-
-  addBtn: {
+  scheduleBtn: {
     marginTop: 16,
-    marginBottom: 12,
-    paddingVertical: 13,
-    borderRadius: bio.radius.pill,
+    height: 46,
+    borderRadius: 999,
     borderWidth: 1,
     borderColor: bio.tealAlpha(0.45),
-    backgroundColor: bio.tealAlpha(0.12),
     alignItems: "center",
+    justifyContent: "center",
   },
-  addBtnText: { fontFamily: fontFamily.semibold, fontSize: 14, color: bio.color.tealLt },
+  scheduleBtnText: { fontFamily: fontFamily.semibold, fontSize: 14, color: bio.color.teal },
+
+  error: { fontFamily: fontFamily.regular, fontSize: 13, color: bio.color.coral, marginTop: 14 },
 
   form: {
     marginTop: 16,
-    marginBottom: 20,
     backgroundColor: bio.color.surface,
-    borderRadius: bio.radius.card,
+    borderRadius: bio.gym.card.radius,
     borderWidth: 1,
     borderColor: bio.color.hairline,
-    padding: 16,
-  },
-  formTitle: {
-    fontFamily: fontFamily.semibold,
-    fontSize: 16,
-    color: bio.color.text,
-    marginBottom: 14,
+    padding: 18,
   },
   noVenues: {
     fontFamily: fontFamily.regular,
     fontSize: 13,
+    lineHeight: 19.5,
     color: bio.color.amberLt,
-    marginBottom: 14,
-    lineHeight: 19,
   },
-  chips: { gap: 8, paddingBottom: 14, paddingRight: 8 },
+  chipRow: { flexGrow: 0 },
+  chips: { gap: 8, paddingRight: 8 },
   chip: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: bio.radius.pill,
+    paddingVertical: bio.gym.filterChip.padV,
+    paddingHorizontal: bio.gym.filterChip.padH,
+    borderRadius: bio.gym.filterChip.radius,
     borderWidth: 1,
-    borderColor: bio.color.hairline,
+    borderColor: bio.alpha(0.13),
   },
-  chipOn: { borderColor: bio.tealAlpha(0.55), backgroundColor: bio.tealAlpha(0.12) },
-  chipText: { fontFamily: fontFamily.medium, fontSize: 13, color: bio.alpha(0.6) },
-  chipTextOn: { color: bio.color.tealLt },
+  chipOn: { borderColor: bio.tealAlpha(0.38), backgroundColor: bio.tealAlpha(0.12) },
+  chipText: {
+    fontFamily: fontFamily.medium,
+    fontSize: bio.gym.filterChip.size,
+    color: bio.alpha(0.55),
+  },
+  chipTextOn: { fontFamily: fontFamily.semibold, color: bio.color.teal },
 
-  pair: { flexDirection: "row", gap: 12 },
-  field: { marginBottom: 12 },
-  fieldHalf: { flex: 1 },
   fieldLabel: {
     fontFamily: fontFamily.semibold,
     fontSize: 10,
-    letterSpacing: 1.1,
+    letterSpacing: 1.5,
     color: bio.alpha(0.38),
-    marginBottom: 5,
+    marginTop: 18,
   },
-  fieldInput: {
+  fieldLabelTight: {
+    fontFamily: fontFamily.semibold,
+    fontSize: 10,
+    letterSpacing: 1.5,
+    color: bio.alpha(0.38),
+  },
+  input: {
+    marginTop: 8,
+    backgroundColor: bio.alpha(0.05),
+    borderWidth: 1,
+    borderColor: bio.alpha(0.08),
+    borderRadius: bio.gym.input.radius,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
     fontFamily: fontFamily.regular,
-    fontSize: 15,
-    color: bio.color.text,
-    borderBottomWidth: 1,
-    borderBottomColor: bio.alpha(0.13),
-    paddingVertical: 8,
+    fontSize: 14,
+    color: bio.alpha(0.94),
   },
+  inputTight: { marginTop: 8 },
+
+  pair: { flexDirection: "row", gap: 16, marginTop: 18 },
+  half: { flex: 1 },
   pickerBtn: {
+    marginTop: 6,
+    paddingVertical: 9,
     borderBottomWidth: 1,
-    borderBottomColor: bio.alpha(0.13),
-    paddingVertical: 10,
+    borderBottomColor: bio.alpha(0.2),
   },
-  pickerValue: { fontFamily: fontFamily.regular, fontSize: 15, color: bio.color.text },
-  fieldHint: {
+  pickerValue: { fontFamily: fontFamily.semibold, fontSize: 15, color: bio.alpha(0.94) },
+
+  formHint: {
     fontFamily: fontFamily.regular,
-    fontSize: 11,
+    fontSize: 12,
+    lineHeight: 18,
     color: bio.alpha(0.33),
-    lineHeight: 16,
-    marginBottom: 14,
+    marginTop: 16,
   },
-  formBtns: { flexDirection: "row", gap: 10, marginTop: 4 },
+  formBtns: { flexDirection: "row", justifyContent: "flex-end", gap: 10, marginTop: 18 },
+  ghostBtn: {
+    paddingVertical: 9,
+    paddingHorizontal: 20,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: bio.alpha(0.18),
+  },
+  ghostBtnText: { fontFamily: fontFamily.semibold, fontSize: 13, color: bio.alpha(0.82) },
+  primaryBtn: {
+    paddingVertical: 9,
+    paddingHorizontal: 24,
+    borderRadius: 999,
+    backgroundColor: bio.color.teal,
+  },
+  primaryBtnText: { fontFamily: fontFamily.bold, fontSize: 13, color: bio.color.onTealSolid },
+  dangerBtn: {
+    paddingVertical: 9,
+    paddingHorizontal: 22,
+    borderRadius: 999,
+    backgroundColor: bio.color.coral,
+  },
+  dangerBtnText: { fontFamily: fontFamily.bold, fontSize: 13, color: bio.color.onCoral },
+  btnOff: { opacity: 0.45 },
 
   dayHeading: {
     fontFamily: fontFamily.semibold,
-    fontSize: 11,
-    letterSpacing: 1.2,
-    color: bio.alpha(0.42),
+    fontSize: 10.5,
+    letterSpacing: 1.6,
+    color: bio.alpha(0.38),
     marginTop: 20,
-    marginBottom: 10,
+    marginBottom: 2,
   },
 
   card: {
     backgroundColor: bio.color.surface,
-    borderRadius: bio.radius.card,
+    borderRadius: bio.gym.card.radius,
     borderWidth: 1,
     borderColor: bio.color.hairline,
-    padding: 16,
-    marginBottom: 10,
+    paddingVertical: 15,
+    paddingHorizontal: 16,
   },
+  cardFirst: { marginTop: 14 },
+  cardNext: { marginTop: 10 },
   cardOff: { opacity: 0.6 },
   cardTop: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  time: { fontFamily: fontFamily.semibold, fontSize: 13, color: bio.color.tealLt },
-  count: { fontFamily: fontFamily.medium, fontSize: 13, color: bio.alpha(0.5) },
-  title: { fontFamily: fontFamily.semibold, fontSize: 17, color: bio.color.text, marginTop: 8 },
-  meta: { fontFamily: fontFamily.regular, fontSize: 13, color: bio.alpha(0.45), marginTop: 3 },
-  cancelled: { fontFamily: fontFamily.regular, fontSize: 12, color: bio.color.coralLt, marginTop: 10 },
+  time: {
+    fontFamily: fontFamily.semibold,
+    fontSize: 12.5,
+    color: bio.color.teal,
+    fontVariant: ["tabular-nums"],
+  },
+  count: {
+    fontFamily: fontFamily.semibold,
+    fontSize: 13,
+    color: bio.alpha(0.7),
+    fontVariant: ["tabular-nums"],
+  },
+  title: { fontFamily: fontFamily.semibold, fontSize: 17, color: bio.alpha(0.97), marginTop: 6 },
+  venue: { fontFamily: fontFamily.regular, fontSize: 12.5, color: bio.alpha(0.45), marginTop: 3 },
+  cancelled: {
+    fontFamily: fontFamily.medium,
+    fontSize: 12.5,
+    color: bio.color.coral,
+    marginTop: 10,
+  },
 
   cardBtns: { flexDirection: "row", gap: 8, marginTop: 14 },
-  smallBtn: {
+  hideRow: { flexDirection: "row", marginTop: 8 },
+  cardBtn: {
+    paddingVertical: 7,
     paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: bio.radius.pill,
+    borderRadius: 999,
     borderWidth: 1,
-    borderColor: bio.color.border2,
-    alignSelf: "flex-start",
+    borderColor: bio.alpha(0.18),
   },
-  smallBtnText: { fontFamily: fontFamily.medium, fontSize: 13, color: bio.alpha(0.7) },
+  cardBtnText: { fontFamily: fontFamily.semibold, fontSize: 12.5, color: bio.alpha(0.82) },
 
-  confirm: { marginTop: 14 },
-  confirmTitle: { fontFamily: fontFamily.semibold, fontSize: 14, color: bio.color.text },
+  whyTitle: {
+    fontFamily: fontFamily.semibold,
+    fontSize: 15,
+    color: bio.alpha(0.94),
+    marginTop: 16,
+  },
   reasonInput: {
-    fontFamily: fontFamily.regular,
-    fontSize: 14,
-    color: bio.color.text,
+    marginTop: 10,
+    backgroundColor: bio.alpha(0.05),
     borderWidth: 1,
-    borderColor: bio.color.hairline,
-    borderRadius: bio.radius.xs,
-    padding: 10,
-    marginTop: 8,
-    minHeight: 60,
+    borderColor: bio.alpha(0.08),
+    borderRadius: bio.gym.input.radius,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    height: 88,
+    fontFamily: fontFamily.regular,
+    fontSize: 13.5,
+    color: bio.alpha(0.94),
     textAlignVertical: "top",
   },
-  dangerBtn: {
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: bio.radius.pill,
-    backgroundColor: bio.coralAlpha(0.16),
-    borderWidth: 1,
-    borderColor: bio.coralAlpha(0.45),
-  },
-  dangerBtnText: { fontFamily: fontFamily.semibold, fontSize: 14, color: bio.color.coralLt },
-  primaryBtn: {
-    paddingHorizontal: 22,
-    paddingVertical: 10,
-    borderRadius: bio.radius.pill,
-    backgroundColor: bio.color.tealDeep,
-  },
-  primaryBtnText: { fontFamily: fontFamily.semibold, fontSize: 14, color: bio.color.onTeal },
-  ghostBtn: {
-    paddingHorizontal: 22,
-    paddingVertical: 10,
-    borderRadius: bio.radius.pill,
-    borderWidth: 1,
-    borderColor: bio.color.border2,
-  },
-  ghostBtnText: { fontFamily: fontFamily.medium, fontSize: 14, color: bio.alpha(0.65) },
-  btnOff: { opacity: 0.45 },
 
-  roster: { marginTop: 14 },
+  roster: { marginTop: 12, borderTopWidth: 1, borderTopColor: bio.alpha(0.07) },
+  rosterLoading: { paddingVertical: 16, alignItems: "center" },
   rosterRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     gap: 10,
-    paddingVertical: 9,
+    paddingVertical: 11,
+    paddingHorizontal: 2,
     borderBottomWidth: 1,
-    borderBottomColor: bio.color.hairline,
+    borderBottomColor: bio.alpha(0.07),
   },
-  rosterName: { fontFamily: fontFamily.regular, fontSize: 14, color: bio.color.text, flex: 1 },
-  rosterTag: { fontFamily: fontFamily.regular, fontSize: 12, color: bio.alpha(0.45) },
-  rosterNone: { fontFamily: fontFamily.regular, fontSize: 13, color: bio.alpha(0.4) },
-
-  loading: { paddingVertical: 48, alignItems: "center" },
-  empty: { paddingVertical: 32 },
-  emptyTitle: { fontFamily: fontFamily.semibold, fontSize: 16, color: bio.color.text },
-  emptyBody: {
+  rosterRowLast: { borderBottomWidth: 0 },
+  rosterName: { fontFamily: fontFamily.regular, fontSize: 14, color: bio.alpha(0.9), flex: 1 },
+  rosterNone: {
     fontFamily: fontFamily.regular,
-    fontSize: 14,
-    color: bio.alpha(0.5),
-    marginTop: 6,
-    lineHeight: 20,
+    fontSize: 13,
+    color: bio.alpha(0.45),
+    paddingVertical: 12,
   },
+  tag: { fontFamily: fontFamily.medium, fontSize: 12.5, color: bio.alpha(0.5) },
+  tagAttended: { fontFamily: fontFamily.semibold, fontSize: 12.5, color: bio.color.teal },
+  tagCancelled: { fontFamily: fontFamily.medium, fontSize: 12.5, color: bio.color.coral },
+
+  loading: { paddingVertical: 60, alignItems: "center" },
+  centre: { flex: 1, alignItems: "center", justifyContent: "center", paddingVertical: 80 },
+  bigTitle: { fontFamily: fontFamily.semibold, fontSize: 16.5, color: bio.alpha(0.9) },
+  bigBody: {
+    fontFamily: fontFamily.regular,
+    fontSize: 13,
+    lineHeight: 19.5,
+    color: bio.alpha(0.45),
+    marginTop: 8,
+    textAlign: "center",
+  },
+  retry: {
+    marginTop: 18,
+    paddingVertical: 10,
+    paddingHorizontal: 26,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: bio.tealAlpha(0.42),
+  },
+  retryText: { fontFamily: fontFamily.semibold, fontSize: 13, color: bio.color.teal },
 });

@@ -530,6 +530,8 @@ export const bio = {
     onTeal: "#062018",
     /** ink on the SOLID teal CTA of the §6 gym screens (A1–A6 handoff) */
     onTealSolid: "#07251E",
+    /** ink knocked out on a solid coral fill — the destructive CTA (A5) */
+    onCoral: "#210B08",
     /**
      * "3 left" on a nearly-full class (A1).
      *

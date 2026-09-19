@@ -42,6 +42,22 @@ export function daysAgo(n: number, today: string = localDay()): string {
   return at.toISOString().slice(0, 10);
 }
 
+/**
+ * "Fri 25 Sep" from a `YYYY-MM-DD`, for a form that has picked a day.
+ *
+ * Built through the local Date constructor rather than `new Date(ymd)`, which
+ * parses a bare date as UTC midnight and therefore shows the previous day to
+ * anyone west of Greenwich.
+ */
+export function ymdLabel(ymd: string): string {
+  const parts = ymd.split("-").map(Number);
+  const [y, m, d] = parts;
+  if (parts.length !== 3 || !y || !m || !d) return ymd;
+  const at = new Date(y, m - 1, d);
+  if (Number.isNaN(at.getTime()) || at.getMonth() !== m - 1) return ymd;
+  return `${DAY_NAMES[at.getDay()]} ${at.getDate()} ${MONTH_NAMES[at.getMonth()]}`;
+}
+
 /** "18:00", in the device's zone. A class at 18:00 is 18:00 in the room. */
 export function classTime(iso: string): string {
   const d = new Date(iso);
