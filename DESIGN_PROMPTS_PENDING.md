@@ -107,6 +107,16 @@ become eight, and it must fit one screen with no scroll.
 Rows are flat on the canvas with a hairline between, no card. Label left, optional short value at
 45% right, chevron at 30%.
 
+**Five rows that are on this screen today and must NOT appear.** They are leaving, and a design
+that helpfully keeps them defeats the point:
+
+- `Training` and `Gym` — the Train tab reaches both now.
+- `Coach plan` — a today-action, so it belongs on Home, not in a settings list.
+- `Journal` — parked here only because the timeline lost its tab slot to Train. It moves to Home.
+  Eight rows already fills the screen; a ninth makes it scroll, and the no-scroll rule is what
+  forces the cut.
+- `Privacy policy` — folded inside **Who sees what**.
+
 States: **member** · **member + staff/admin** (the extra row) · and one frame showing the whole
 screen at 390×844 with the tab bar, proving no scroll.
 
