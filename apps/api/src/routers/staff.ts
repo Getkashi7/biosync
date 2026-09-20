@@ -14,7 +14,7 @@
  * which staff member looked at whose record — and, per `sanitiseAuditMeta`,
  * that record never contains the health values themselves.
  */
-import { StaffKind, StaffLinkStatus } from "@prisma/client";
+import { MetricType, StaffKind, StaffLinkStatus } from "@prisma/client";
 import { z } from "zod";
 import {
   AUDIT,
@@ -33,6 +33,22 @@ import { TRPCError } from "@trpc/server";
 
 
 /** Prisma's StaffKind → the staff role the access rules speak in. */
+type VitalRow = { type: MetricType; value: number; recordedAt: Date };
+
+/**
+ * The most recent reading of each type, newest first.
+ *
+ * Returns only what is actually there: a client who has logged sleep but never
+ * a resting heart rate gets one tile, not one tile and a dash. A placeholder
+ * for a reading that was never taken looks like a missing value rather than an
+ * absent habit.
+ */
+function latestPerType(rows: readonly VitalRow[]): VitalRow[] {
+  const seen = new Map<MetricType, VitalRow>();
+  for (const r of rows) if (!seen.has(r.type)) seen.set(r.type, r);
+  return [...seen.values()];
+}
+
 function asStaffRole(kind: StaffKind): StaffRole {
   return kind === StaffKind.PT ? "PT" : "PRACTITIONER";
 }
@@ -193,7 +209,7 @@ export const staffRouter = router({
     // queried when permitted — a category the client hasn't shared is never read
     // from the database at all — and the audit write runs concurrently so it
     // adds durability, not latency.
-    const [activity, biometrics, goals, sessions] = await Promise.all([
+    const [activity, biometrics, vitals, goals, sessions] = await Promise.all([
       visible.includes("ACTIVITY")
         ? prisma.dailyLog.findMany({
             where: { userId: input.clientId },
@@ -208,6 +224,26 @@ export const staffRouter = router({
             orderBy: { date: "desc" },
             take: 14,
             select: { date: true, score: true },
+          })
+        : Promise.resolve([]),
+      /**
+       * The two readings the client screen puts on tiles.
+       *
+       * Gated on BIOMETRICS like the readiness scores above, and never read at
+       * all without it — a category the client has not shared is not queried,
+       * which is the same discipline the rest of this resolver keeps. Narrowed
+       * to the two types actually rendered rather than every metric they own:
+       * a staff surface should read what it shows and nothing more.
+       */
+      visible.includes("BIOMETRICS")
+        ? prisma.metric.findMany({
+            where: {
+              userId: input.clientId,
+              type: { in: [MetricType.RESTING_HR, MetricType.SLEEP_HOURS] },
+            },
+            orderBy: { recordedAt: "desc" },
+            take: 40,
+            select: { type: true, value: true, recordedAt: true },
           })
         : Promise.resolve([]),
       // Training goals ride with ACTIVITY — what the client trains for, not a
@@ -250,6 +286,9 @@ export const staffRouter = router({
       goals,
       activity,
       biometrics,
+      // Latest per type. `take: 40` over a desc ordering is enough to hold the
+      // most recent of each without a second query per type.
+      vitals: latestPerType(vitals),
       sessions,
     };
   }),
