@@ -12,7 +12,7 @@ import { LoadFailed } from "../../ui/bio/LoadFailed";
 import { classifyNetError, type NetFailure } from "../../lib/netError";
 import { GradientButton } from "../../ui/GradientButton";
 import { formatTime } from "../../lib/date";
-import { selectionHaptic } from "../../lib/haptics";
+import { pressHaptic, selectionHaptic } from "../../lib/haptics";
 import { ENERGY_WORDS, MOOD_WORDS } from "../../lib/ratings";
 import { METRIC_META, FALLBACK_META } from "../../lib/metricMeta";
 import { bio, fontFamily } from "../../ui/theme";
@@ -62,7 +62,16 @@ function journal(days: TimelineDay[]): JEntry[] {
   return out;
 }
 
-export function TimelineScreen({ onLog, refreshKey }: { onLog: () => void; refreshKey: number }) {
+export function TimelineScreen({
+  onLog,
+  refreshKey,
+  onBack,
+}: {
+  onLog: () => void;
+  refreshKey: number;
+  /** Absent while this is a tab root; present once it is pushed. */
+  onBack?: (() => void) | undefined;
+}) {
   const insets = useSafeAreaInsets();
   const [days, setDays] = useState<TimelineDay[] | null>(null);
   const [bento, setBento] = useState<BentoData | null>(null);
@@ -130,6 +139,21 @@ export function TimelineScreen({ onLog, refreshKey }: { onLog: () => void; refre
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} tintColor={bio.color.text} />}
       >
         <View style={styles.header}>
+          {/* Only when pushed. As a tab root there was nothing to go back to. */}
+          {onBack ? (
+            <Pressable
+              onPress={() => {
+                pressHaptic();
+                onBack();
+              }}
+              hitSlop={16}
+              style={({ pressed }) => [styles.back, pressed && styles.backPressed]}
+              accessibilityRole="button"
+              accessibilityLabel="Back"
+            >
+              <Text style={styles.backChev}>‹</Text>
+            </Pressable>
+          ) : null}
           <Text style={styles.title}>Metrics</Text>
           <View style={styles.toggle}>
             {(["day", "week"] as const).map((r) => {
@@ -238,8 +262,11 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: 18,
   },
-  header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 18 },
-  title: { fontFamily: fontFamily.bold, fontSize: 24, letterSpacing: -0.24, color: bio.color.text },
+  header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 18, gap: 12 },
+  back: { marginRight: -4 },
+  backPressed: { transform: [{ scale: 0.97 }] },
+  backChev: { fontFamily: fontFamily.regular, fontSize: 26, lineHeight: 28, color: bio.alpha(0.62) },
+  title: { flex: 1, fontFamily: fontFamily.bold, fontSize: 24, letterSpacing: -0.24, color: bio.color.text },
   toggle: { flexDirection: "row", padding: 4, borderRadius: 999, backgroundColor: "rgba(255,255,255,0.05)", borderWidth: 1, borderColor: bio.color.border2, gap: 6 },
   tog: { paddingVertical: 6, paddingHorizontal: 14, borderRadius: 999 },
   togOn: { backgroundColor: "rgba(255,255,255,0.12)" },

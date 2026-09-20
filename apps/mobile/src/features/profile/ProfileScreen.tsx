@@ -41,8 +41,8 @@ type Props = {
   onCareTeam: () => void;
   /** §7 treatments — suggestions and the requests awaiting a practitioner */
   onTreatments: () => void;
-  /** §3 training plan — the week built from readiness and goals */
-  onFitness: () => void;
+  /** the check-in timeline, which lost its tab slot to Train */
+  onJournal: () => void;
   /** §6 gym — the class schedule, the coach directory, and checking in */
   onGym: () => void;
   /** only present for ADMIN accounts — platform administration, not care */
@@ -61,7 +61,7 @@ export function ProfileScreen({
   onTrainerFeed,
   onCareTeam,
   onTreatments,
-  onFitness,
+  onJournal,
   onGym,
   onAdmin,
   refreshKey,
@@ -235,10 +235,10 @@ export function ProfileScreen({
             </View>
           </Pressable>
           <View style={styles.sep} />
-          <Pressable style={styles.row} onPress={onFitness} accessibilityRole="button">
-            <Text style={styles.rowLabel}>Training</Text>
+          <Pressable style={styles.row} onPress={onJournal} accessibilityRole="button">
+            <Text style={styles.rowLabel}>Journal</Text>
             <View style={styles.rowVal}>
-              <Text style={styles.rowValTxt}>Your week</Text>
+              <Text style={styles.rowValTxt}>Your history</Text>
               <Text style={styles.chev}>›</Text>
             </View>
           </Pressable>

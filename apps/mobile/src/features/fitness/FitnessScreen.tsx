@@ -43,7 +43,17 @@ const FEEDBACK: { value: SessionFeedback; label: string }[] = [
   { value: "TOO_EASY", label: "Too easy" },
 ];
 
-export function FitnessScreen({ onBack, onSetGoal }: { onBack: () => void; onSetGoal: () => void }) {
+export function FitnessScreen({
+  onBack,
+  onSetGoal,
+  onGym,
+}: {
+  /** Absent when this is the Train tab's root — a root has nothing to go back to. */
+  onBack?: (() => void) | undefined;
+  onSetGoal: () => void;
+  /** Present as a tab root: the one row through to classes and coaches. */
+  onGym?: (() => void) | undefined;
+}) {
   const insets = useSafeAreaInsets();
   const today = todayLocal();
   const [week, setWeek] = useState<Week | null>(null);
@@ -168,25 +178,27 @@ export function FitnessScreen({ onBack, onSetGoal }: { onBack: () => void; onSet
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.header}>
-          <Pressable
-            onPress={() => {
-              pressHaptic();
-              onBack();
-            }}
-            style={({ pressed }) => [styles.backBtn, pressed && styles.pressed]}
-            accessibilityRole="button"
-            accessibilityLabel="Back"
-          >
-            <Svg width={10} height={10} viewBox="0 0 10 10" fill="none">
-              <Path
-                d="M6.5 1 L2.5 5 L6.5 9"
-                stroke={bio.alpha(0.8)}
-                strokeWidth={1.6}
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </Svg>
-          </Pressable>
+          {onBack ? (
+            <Pressable
+              onPress={() => {
+                pressHaptic();
+                onBack();
+              }}
+              style={({ pressed }) => [styles.backBtn, pressed && styles.pressed]}
+              accessibilityRole="button"
+              accessibilityLabel="Back"
+            >
+              <Svg width={10} height={10} viewBox="0 0 10 10" fill="none">
+                <Path
+                  d="M6.5 1 L2.5 5 L6.5 9"
+                  stroke={bio.alpha(0.8)}
+                  strokeWidth={1.6}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </Svg>
+            </Pressable>
+          ) : null}
           <View style={styles.flex}>
             <Text style={styles.title}>Training</Text>
             <Text style={styles.subtitle}>
@@ -195,6 +207,22 @@ export function FitnessScreen({ onBack, onSetGoal }: { onBack: () => void; onSet
           </View>
         </View>
         {body()}
+        {/* The one row through to §6. A placeholder for N3's hub, which puts
+            today's classes on this screen rather than a tap away. */}
+        {onGym ? (
+          <Pressable
+            onPress={() => {
+              pressHaptic();
+              onGym();
+            }}
+            style={({ pressed }) => [styles.gymRow, pressed && styles.pressed]}
+            accessibilityRole="button"
+            accessibilityLabel="Classes and coaches"
+          >
+            <Text style={styles.gymLabel}>Classes &amp; coaches</Text>
+            <Text style={styles.gymChev}>›</Text>
+          </Pressable>
+        ) : null}
       </ScrollView>
     </View>
   );
@@ -397,6 +425,17 @@ function NoGoal({ onSetGoal }: { onSetGoal: () => void }) {
 }
 
 const styles = StyleSheet.create({
+  gymRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 22,
+    paddingVertical: 16,
+    borderTopWidth: 1,
+    borderTopColor: bio.color.hairline,
+  },
+  gymLabel: { flex: 1, fontFamily: fontFamily.semibold, fontSize: 16, color: bio.color.text },
+  gymChev: { fontFamily: fontFamily.regular, fontSize: 20, color: bio.alpha(0.3) },
+
   root: { flex: 1, backgroundColor: bio.color.ink },
   flex: { flex: 1 },
   content: { paddingHorizontal: 20, flexGrow: 1 },

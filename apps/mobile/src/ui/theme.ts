@@ -504,6 +504,14 @@ export const bio = {
     rosePaleText: "#F6E9F2",
     /** primary text on dark */
     text: "#F4F2F8",
+    /**
+     * Pure white — the active tab label and glyph in N1.
+     *
+     * Its own token rather than `text`: the bar's active state is a full-white
+     * against a 40% inactive, and the off-white body colour reads as a third,
+     * muddier state between them.
+     */
+    white: "#FFFFFF",
     /** aurora accents — one hue per metric family */
     violet: "#A78BFA",
     teal: "#5ED4C0",

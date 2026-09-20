@@ -121,7 +121,7 @@ type ProfileArea =
   | "enterCode"
   | "admin"
   | "treatments"
-  | "fitness"
+  | "journal"
   | "gym"
   | "export";
 
@@ -543,13 +543,13 @@ export function MainTabs() {
           onEnterCode={() => setProfileArea("enterCode")}
           refreshKey={teamKey}
         />
-      ) : profileArea === "fitness" ? (
-        <FitnessScreen
+      ) : profileArea === "journal" ? (
+        // Temporary home. The timeline lost its tab slot to Train; N2 decides
+        // where it actually belongs, and this keeps it reachable until then.
+        <TimelineScreen
           onBack={() => setProfileArea("none")}
-          onSetGoal={() => {
-            setProfileArea("none");
-            setSheet("newgoal");
-          }}
+          onLog={() => setSheet("chooser")}
+          refreshKey={refreshKey}
         />
       ) : profileArea === "gym" ? (
         gymView === "coaches" ? (
@@ -697,7 +697,7 @@ export function MainTabs() {
           onTrainerFeed={() => setProfileArea("trainerFeed")}
           onCareTeam={() => setProfileArea("careTeam")}
           onTreatments={() => setProfileArea("treatments")}
-          onFitness={() => setProfileArea("fitness")}
+          onJournal={() => setProfileArea("journal")}
           onGym={() => {
             // Always enters at the schedule, never wherever it was left.
             setGymView("schedule");
@@ -723,8 +723,16 @@ export function MainTabs() {
           }
           refreshKey={refreshKey}
         />
-      ) : active === "calendar" ? (
-        <TimelineScreen onLog={() => setSheet("chooser")} refreshKey={refreshKey} />
+      ) : active === "train" ? (
+        // The smaller first cut of the Train tab: its root is the training
+        // week. N3's hub (the week over today's classes) lands on top of this.
+        <FitnessScreen
+          onSetGoal={() => setSheet("newgoal")}
+          onGym={() => {
+            setGymView("schedule");
+            setProfileArea("gym");
+          }}
+        />
       ) : (
         <Placeholder title={TITLES[active]} subtitle="Coming soon." />
       )}
@@ -737,6 +745,14 @@ export function MainTabs() {
             setSupplements("none");
             setConsent("none");
             setProfileArea("none");
+            // These three were missing, and their branches outrank the tab
+            // branches — so tapping a tab from the photo gallery, a photo or a
+            // comparison did nothing at all. The real fix is the route-stack
+            // refactor, where clearing is structural; until then the list is
+            // complete.
+            setPhotosView("none");
+            setOpenPhoto(null);
+            setComparing(null);
             setActive(t);
           }}
           onLog={() =>
@@ -827,10 +843,10 @@ export function MainTabs() {
 
 const TITLES: Record<TabKey, string> = {
   home: "Home",
-  calendar: "Journal",
+  train: "Train",
   log: "Log",
-  chat: "Chat",
-  profile: "Profile",
+  chat: "Ask",
+  profile: "You",
 };
 
 const styles = StyleSheet.create({
