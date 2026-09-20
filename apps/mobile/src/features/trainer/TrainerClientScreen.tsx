@@ -12,6 +12,7 @@
  */
 import { useCallback, useEffect, useState } from "react";
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Path } from "react-native-svg";
 import { Spinner } from "../../ui/Spinner";
@@ -21,10 +22,12 @@ import { StaticBloom } from "../../ui/bio/StaticBloom";
 import { bio, fontFamily } from "../../ui/theme";
 import { pressHaptic } from "../../lib/haptics";
 import { dayDiff, initials, monthShort, monthYear } from "../../lib/format";
+import { tilePhotoDate } from "../../lib/photoFormat";
 import {
   fetchClient,
   fetchClientPhotos,
   type ClientDetail,
+  type ClientPhoto,
   type ClientPhotos,
 } from "./trainerApi";
 
@@ -37,12 +40,18 @@ export function TrainerClientScreen({
   onBack,
   onAddNote,
   onBuildPlan,
+  onOpenPhoto,
+  onCompare,
   refreshKey = 0,
 }: {
   clientId: string;
   onBack: () => void;
   onAddNote: (clientName: string) => void;
   onBuildPlan: (clientName: string) => void;
+  /** 9D — a single photo, full-bleed and read-only. */
+  onOpenPhoto: (photo: ClientPhoto, clientName: string) => void;
+  /** 9E — the earliest and latest side by side. */
+  onCompare: (earlier: ClientPhoto, later: ClientPhoto, clientName: string) => void;
   /** bumped after a note is saved so the sessions list refetches */
   refreshKey?: number;
 }) {
@@ -247,7 +256,28 @@ export function TrainerClientScreen({
 
         {nothingShared ? null : (
           <>
-            <Text style={styles.sectionLabel}>PROGRESS PHOTOS</Text>
+            <View style={styles.photoHead}>
+              <Text style={[styles.sectionLabel, styles.sectionLabelFlush]}>PROGRESS PHOTOS</Text>
+              {/* Only once there are two to compare — one photo has nothing to
+                  be compared against, and an inert link is worse than none. */}
+              {photos?.shared && photos.photos.length > 1 ? (
+                <Pressable
+                  onPress={() => {
+                    pressHaptic();
+                    const list = photos.photos;
+                    const later = list[0];
+                    const earlier = list[list.length - 1];
+                    // Earliest against latest — the widest span they shared,
+                    // and what 9E draws. There is no picker in the bundle.
+                    if (earlier && later) onCompare(earlier, later, data.name);
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Compare the earliest and latest photo"
+                >
+                  <Text style={styles.compareLink}>Compare</Text>
+                </Pressable>
+              ) : null}
+            </View>
             {!seesPhotos ? (
               // Said plainly. An absent section would read as "they have none".
               <Text style={styles.quiet}>Not shared with you.</Text>
@@ -289,25 +319,50 @@ export function TrainerClientScreen({
               <Text style={styles.quiet}>Shared, but they haven't added any yet.</Text>
             ) : (
               <>
-                <View style={styles.photoGrid}>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  style={styles.stripRow}
+                  contentContainerStyle={styles.strip}
+                >
                   {photos.photos.map((ph) => (
-                    <View key={ph.id} style={styles.photoTile}>
+                    <Pressable
+                      key={ph.id}
+                      onPress={() => {
+                        pressHaptic();
+                        onOpenPhoto(ph, data.name);
+                      }}
+                      style={({ pressed }) => [
+                        styles.photoTile,
+                        !ph.url && styles.photoTileEmpty,
+                        pressed && styles.pressed,
+                      ]}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Progress photo from ${ph.takenOn}`}
+                    >
                       {ph.url ? (
-                        <Image
-                          source={{ uri: ph.url }}
-                          style={StyleSheet.absoluteFill}
-                          resizeMode="cover"
-                          accessibilityLabel={`Progress photo from ${ph.takenOn}`}
-                        />
-                      ) : (
-                        // A photo whose signed URL could not be minted is still
-                        // listed, as a tile that failed — not dropped.
-                        <Text style={styles.photoBroken}>—</Text>
-                      )}
-                      <Text style={styles.photoDate}>{ph.takenOn.slice(5)}</Text>
-                    </View>
+                        <>
+                          <Image
+                            source={{ uri: ph.url }}
+                            style={StyleSheet.absoluteFill}
+                            resizeMode="cover"
+                          />
+                          {/* A scrim, so the date stays legible on a light photo. */}
+                          <LinearGradient
+                            colors={["rgba(7,7,12,0)", "rgba(7,7,12,0.78)"]}
+                            style={styles.photoScrim}
+                            pointerEvents="none"
+                          />
+                        </>
+                      ) : null}
+                      {/* A photo whose signed URL could not be minted keeps its
+                          place, as a tile that failed — it is not dropped. */}
+                      <Text style={[styles.photoDate, !ph.url && styles.photoDateDim]}>
+                        {tilePhotoDate(ph.takenOn)}
+                      </Text>
+                    </Pressable>
                   ))}
-                </View>
+                </ScrollView>
                 <Text style={styles.photoNote}>
                   They chose to share these. Your view is recorded.
                 </Text>
@@ -420,32 +475,32 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   photoBtnText: { fontFamily: fontFamily.medium, fontSize: 13, color: bio.alpha(0.7) },
-  photoGrid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  photoTile: {
-    width: 88,
-    height: 118,
-    borderRadius: bio.radius.xs,
-    overflow: "hidden",
-    backgroundColor: bio.alpha(0.06),
+  photoHead: {
+    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "flex-end",
+    justifyContent: "space-between",
   },
-  photoBroken: {
-    position: "absolute",
-    top: "45%",
-    fontFamily: fontFamily.regular,
-    fontSize: 18,
-    color: bio.alpha(0.3),
+  compareLink: { fontFamily: fontFamily.semibold, fontSize: 12.5, color: bio.color.teal },
+  stripRow: { flexGrow: 0, marginTop: 9 },
+  strip: { gap: 8 },
+  photoTile: {
+    width: 111,
+    height: 137,
+    borderRadius: 16,
+    overflow: "hidden",
+    backgroundColor: bio.alpha(0.05),
   },
+  photoTileEmpty: { borderWidth: 1, borderColor: bio.color.hairline },
+  photoScrim: { position: "absolute", left: 0, right: 0, bottom: 0, height: 44 },
   photoDate: {
-    fontFamily: fontFamily.medium,
-    fontSize: 10,
-    color: bio.color.text,
-    backgroundColor: "rgba(0,0,0,0.45)",
-    width: "100%",
-    textAlign: "center",
-    paddingVertical: 3,
+    position: "absolute",
+    left: 10,
+    bottom: 9,
+    fontFamily: fontFamily.dot,
+    fontSize: 11,
+    color: bio.alpha(0.92),
   },
+  photoDateDim: { color: bio.alpha(0.6) },
   photoNote: {
     fontFamily: fontFamily.regular,
     fontSize: 11,

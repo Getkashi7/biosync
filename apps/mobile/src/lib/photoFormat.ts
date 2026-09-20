@@ -44,6 +44,21 @@ export function fullPhotoDate(iso: string): string {
 }
 
 /**
+ * Whole weeks between two `YYYY-MM-DD` dates, for the compare view's readout.
+ *
+ * Parsed as UTC on both sides so the answer cannot change with the reader's
+ * timezone, and rounded rather than floored: 76 days is much nearer eleven
+ * weeks than ten, and the number sits under the words "weeks apart" where
+ * "about" is already implied. Order does not matter.
+ */
+export function weeksApart(a: string, b: string): number | null {
+  const at = Date.parse(`${a}T00:00:00.000Z`);
+  const bt = Date.parse(`${b}T00:00:00.000Z`);
+  if (Number.isNaN(at) || Number.isNaN(bt)) return null;
+  return Math.round(Math.abs(at - bt) / (7 * 86_400_000));
+}
+
+/**
  * Whether the thumbnail carries the lock chip: this photo's visibility differs
  * from the gallery-wide default, so the chip means "this one is different"
  * rather than decorating every tile.

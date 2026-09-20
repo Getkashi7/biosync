@@ -74,6 +74,9 @@ import { RolesScreen } from "../consent/RolesScreen";
 import { MyTrainerScreen } from "../mytrainer/MyTrainerScreen";
 import { TrainerRosterScreen } from "../trainer/TrainerRosterScreen";
 import { TrainerClientScreen } from "../trainer/TrainerClientScreen";
+import { ClientPhotoViewer } from "../trainer/ClientPhotoViewer";
+import { ClientPhotoCompare } from "../trainer/ClientPhotoCompare";
+import type { ClientPhoto } from "../trainer/trainerApi";
 import { SessionNoteScreen } from "../trainer/SessionNoteScreen";
 import { PlanBuilderScreen } from "../trainer/PlanBuilderScreen";
 import { RemindersSheet } from "../reminders/RemindersSheet";
@@ -145,6 +148,14 @@ export function MainTabs() {
   // The coach's own class list, inside the professional shell.
   const [coachClasses, setCoachClasses] = useState(false);
   const [coachProfile, setCoachProfile] = useState(false);
+  // A client's photo, opened from their detail screen. Carries the name so the
+  // viewer can caption it without a second fetch.
+  const [clientPhoto, setClientPhoto] = useState<{ photo: ClientPhoto; name: string } | null>(null);
+  const [clientCompare, setClientCompare] = useState<{
+    earlier: ClientPhoto;
+    later: ClientPhoto;
+    name: string;
+  } | null>(null);
   // Bumped when a check-in lands, so the schedule re-reads rather than showing
   // a class the person has since been marked as attending.
   const [gymKey, setGymKey] = useState(0);
@@ -452,12 +463,27 @@ export function MainTabs() {
           <CoachClassesScreen onBack={() => setCoachClasses(false)} />
         ) : reviewQueue ? (
           <ReviewQueueScreen onBack={() => setReviewQueue(false)} />
+        ) : clientCompare ? (
+          <ClientPhotoCompare
+            earlier={clientCompare.earlier}
+            later={clientCompare.later}
+            clientName={clientCompare.name}
+            onBack={() => setClientCompare(null)}
+          />
+        ) : clientPhoto ? (
+          <ClientPhotoViewer
+            photo={clientPhoto.photo}
+            clientName={clientPhoto.name}
+            onBack={() => setClientPhoto(null)}
+          />
         ) : client ? (
           <TrainerClientScreen
             clientId={client}
             onBack={() => setClient(null)}
             onAddNote={(name) => setNoteFor({ id: client, name })}
             onBuildPlan={(name) => setPlanFor({ id: client, name })}
+            onOpenPhoto={(photo, name) => setClientPhoto({ photo, name })}
+            onCompare={(earlier, later, name) => setClientCompare({ earlier, later, name })}
             refreshKey={refreshKey}
           />
         ) : (
@@ -482,7 +508,16 @@ export function MainTabs() {
           a bottom CTA — a floating tab bar would sit on top of "Save note" /
           "Assign plan". You leave those via Back, then the tab bar returns.
         */}
-        {keyboardUp || client || noteFor || planFor || reviewQueue || coachClasses || coachProfile || invite.step !== "none" ? null : (
+        {keyboardUp ||
+        client ||
+        clientPhoto ||
+        clientCompare ||
+        noteFor ||
+        planFor ||
+        reviewQueue ||
+        coachClasses ||
+        coachProfile ||
+        invite.step !== "none" ? null : (
           <BioTabBar
             active={active}
             onSelect={(t) => {
@@ -497,6 +532,8 @@ export function MainTabs() {
               setReviewQueue(false);
               setCoachClasses(false);
               setCoachProfile(false);
+              setClientPhoto(null);
+              setClientCompare(null);
               setActive(t);
             }}
             onLog={() => setSheet("chooser")}

@@ -11,6 +11,7 @@ import {
   photoMonthHeading,
   tilePhotoDate,
   todayIso,
+  weeksApart,
 } from "../photoFormat";
 
 describe("date formatting", () => {
@@ -86,5 +87,31 @@ describe("todayIso", () => {
 
   it("zero-pads month and day", () => {
     expect(todayIso(new Date(2026, 0, 5, 12, 0, 0))).toBe("2026-01-05");
+  });
+});
+
+describe("weeksApart", () => {
+  it("counts whole weeks between two dates", () => {
+    expect(weeksApart("2026-06-12", "2026-08-28")).toBe(11);
+    expect(weeksApart("2026-08-21", "2026-08-28")).toBe(1);
+    expect(weeksApart("2026-08-28", "2026-08-28")).toBe(0);
+  });
+
+  it("does not care which came first", () => {
+    expect(weeksApart("2026-08-28", "2026-06-12")).toBe(11);
+  });
+
+  /**
+   * Rounded, not floored. 76 days is much nearer eleven weeks than ten, and the
+   * number sits under the words "weeks apart" where "about" is already implied.
+   */
+  it("rounds to the nearest week rather than truncating", () => {
+    expect(weeksApart("2026-01-01", "2026-01-05")).toBe(1);
+    expect(weeksApart("2026-01-01", "2026-01-04")).toBe(0);
+  });
+
+  it("returns null for a date it cannot parse, rather than a wrong number", () => {
+    expect(weeksApart("", "2026-08-28")).toBeNull();
+    expect(weeksApart("not-a-date", "2026-08-28")).toBeNull();
   });
 });
