@@ -12,6 +12,7 @@ import {
   CHECKIN_WINDOW_SECONDS,
   CHECKIN_WINDOW_SKEW,
   MAX_SCHEDULE_DAYS,
+  MAX_WINDOW_DAYS,
   bookingStatus,
   buildCheckInToken,
   canBook,
@@ -23,6 +24,7 @@ import {
   dayWindow,
   expectedCheckInPayloads,
   parseCheckInToken,
+  scheduleInput,
   seatsLeft,
   type BookingActor,
   type BookingStatus,
@@ -214,6 +216,27 @@ describe("dayWindow", () => {
   it("clamps an absurd span rather than querying a decade", () => {
     const w = dayWindow("2026-09-16", 9999);
     const days = (w.lt.getTime() - w.gte.getTime()) / 86_400_000;
-    expect(days).toBe(MAX_SCHEDULE_DAYS);
+    expect(days).toBe(MAX_WINDOW_DAYS);
+  });
+
+  /**
+   * The regression that sent this file looking. The timeline is validated up to
+   * 60 days and asks for 30; clamping it to the *schedule's* 14 turned "the
+   * last 30 days" into a fortnight that ended sixteen days ago, so a check-in
+   * made today was never in range. A span a caller is allowed to ask for must
+   * come back whole.
+   */
+  it("gives a 30-day caller 30 whole days", () => {
+    const w = dayWindow("2026-08-22", 30);
+    const days = (w.lt.getTime() - w.gte.getTime()) / 86_400_000;
+    expect(days).toBe(30);
+    expect(w.lt.toISOString()).toBe("2026-09-21T00:00:00.000Z");
+  });
+
+  it("still holds the schedule to its own 14 via its input schema", () => {
+    expect(MAX_SCHEDULE_DAYS).toBe(14);
+    const venueId = "3f2504e0-4f89-11d3-9a0c-0305e82c3301";
+    expect(scheduleInput.parse({ venueId, from: "2026-09-16" }).days).toBe(7);
+    expect(() => scheduleInput.parse({ venueId, from: "2026-09-16", days: 30 })).toThrow();
   });
 });

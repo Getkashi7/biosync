@@ -43,6 +43,24 @@ describe("localDay / daysAgo", () => {
   it("steps back across a leap day", () => {
     expect(daysAgo(1, "2024-03-01")).toBe("2024-02-29");
   });
+
+  /**
+   * The history window's arithmetic, pinned here because getting it wrong is
+   * invisible until someone checks in and their own visit is missing.
+   *
+   * `gym.timeline` spans `[from, from + days)`, so an N-day window that is
+   * meant to include today starts `N - 1` days back. Starting it N days back
+   * ends it at midnight this morning and drops today entirely — which is what
+   * `fetchGymTimeline` did until 2026-09-20.
+   */
+  it("starts an N-day window that includes today at N-1 days back", () => {
+    const today = "2026-09-20";
+    const from = daysAgo(30 - 1, today);
+    expect(from).toBe("2026-08-22");
+    // The exclusive end is `from + 30` — the day after today, so all of today
+    // is inside the window.
+    expect(daysAgo(-30, from)).toBe("2026-09-21");
+  });
 });
 
 describe("class times", () => {

@@ -48,6 +48,15 @@ export const CHECKIN_LATE_MINUTES = 15;
 export const CHECKIN_DEDUPE_MINUTES = 90;
 /** The longest schedule a client may ask for in one call. */
 export const MAX_SCHEDULE_DAYS = 14;
+/**
+ * The widest span `dayWindow` will build, for any caller.
+ *
+ * This is a sanity bound, **not** a product rule — each input's Zod schema
+ * carries its own, tighter one (`MAX_SCHEDULE_DAYS` for the schedule,
+ * 60 for the timeline). It exists only so a nonsense `days` cannot ask
+ * Postgres for a decade.
+ */
+export const MAX_WINDOW_DAYS = 60;
 /** Rooms have limits; so does a number someone can type into a form. */
 export const MAX_CLASS_CAPACITY = 200;
 export const CHECKIN_TOKEN_PREFIX = "BIOSYNC1";
@@ -229,13 +238,21 @@ export function classForCheckIn<T extends { id: string; startsAt: Date; duration
  * The venue's UTC offset is passed in rather than computed: shared never
  * touches `Intl`, the same way it never touches crypto. The API derives the
  * offset from `Venue.timezone`.
+ *
+ * **The clamp is `MAX_WINDOW_DAYS`, not `MAX_SCHEDULE_DAYS`.** It used to be
+ * the latter, which meant the gym timeline — validated up to 60 days and asked
+ * for 30 — silently received a 14-day window, so "the last 30 days" was really
+ * a fortnight ending sixteen days ago and a check-in made today never appeared
+ * in it. A shared helper must not enforce one caller's product rule on another;
+ * each input's schema already carries its own bound, and this is only here so a
+ * nonsense span cannot query a decade.
  */
 export function dayWindow(
   from: string,
   days: number,
   offsetMinutes = 0,
 ): { gte: Date; lt: Date } {
-  const span = Math.max(1, Math.min(MAX_SCHEDULE_DAYS, days));
+  const span = Math.max(1, Math.min(MAX_WINDOW_DAYS, days));
   const startUtc = new Date(`${from}T00:00:00.000Z`).getTime();
   const endUtc = new Date(`${addDays(from, span)}T00:00:00.000Z`).getTime();
   const shift = offsetMinutes * 60_000;

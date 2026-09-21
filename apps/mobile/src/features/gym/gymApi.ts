@@ -67,9 +67,17 @@ export async function fetchMyBookings(): Promise<Booking[]> {
   return res.bookings;
 }
 
-/** Visits, for the gym history. Thirty days back by default. */
+/**
+ * Visits, for the gym history. Thirty days back by default, **including today**.
+ *
+ * The window is `[from, from + days)`, so `from` is `days - 1` back, not
+ * `days`. Asking from `daysAgo(30)` for 30 days ends the window at midnight
+ * *this morning* — which silently hid every check-in made today, the ones a
+ * person is most likely to be looking for. Caught on device on 2026-09-20:
+ * checked in at 23:17, and the screen said "no check-ins in the last 30 days".
+ */
 export async function fetchGymTimeline(days = 30): Promise<Visit[]> {
-  const from = daysAgo(days);
+  const from = daysAgo(days - 1);
   const res = await trpc.gym.timeline.query({ from, days });
   return res.visits;
 }
