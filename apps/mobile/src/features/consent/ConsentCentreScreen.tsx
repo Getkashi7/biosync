@@ -9,7 +9,10 @@
  * it feels instant, reverting if the server rejects it).
  */
 import { useCallback, useEffect, useState } from "react";
-import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Linking, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
+
+/** The public policy, served by the API so it can change without a build. */
+const PRIVACY_URL = "https://biosync-api.onrender.com/privacy";
 import Animated, { Easing, interpolate, useAnimatedStyle, useSharedValue, withRepeat, withTiming } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
@@ -41,9 +44,12 @@ const AUDIENCES: { value: ConsentAudience; label: string }[] = [
 export function ConsentCentreScreen({
   onBack,
   onOpenRoles,
+  onAccessRecord,
 }: {
   onBack: () => void;
   onOpenRoles: () => void;
+  /** 9F from the client's side — every time a provider opened these records. */
+  onAccessRecord: () => void;
 }) {
   const insets = useSafeAreaInsets();
   const [rows, setRows] = useState<ConsentRow[] | null>(null);
@@ -187,6 +193,38 @@ export function ConsentCentreScreen({
               accessibilityRole="button"
             >
               <Text style={styles.rolesLinkText}>What each role sees</Text>
+              <Svg width={8} height={8} viewBox="0 0 9 9" fill="none">
+                <Path d="M2 1 L6 4.5 L2 8" stroke={bio.color.violetLt} strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" />
+              </Svg>
+            </Pressable>
+
+            {/* The other half of a consent control: having said who may look,
+                the person can see who did. */}
+            <Pressable
+              onPress={() => {
+                pressHaptic();
+                onAccessRecord();
+              }}
+              style={({ pressed }) => [styles.rolesLink, pressed && styles.pressed]}
+              accessibilityRole="button"
+            >
+              <Text style={styles.rolesLinkText}>Who has looked</Text>
+              <Svg width={8} height={8} viewBox="0 0 9 9" fill="none">
+                <Path d="M2 1 L6 4.5 L2 8" stroke={bio.color.violetLt} strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" />
+              </Svg>
+            </Pressable>
+
+            {/* Folded in from You by N2: the policy belongs next to the
+                controls it describes, not in a settings list. */}
+            <Pressable
+              onPress={() => {
+                pressHaptic();
+                void Linking.openURL(PRIVACY_URL);
+              }}
+              style={({ pressed }) => [styles.rolesLink, pressed && styles.pressed]}
+              accessibilityRole="link"
+            >
+              <Text style={styles.rolesLinkText}>Privacy policy</Text>
               <Svg width={8} height={8} viewBox="0 0 9 9" fill="none">
                 <Path d="M2 1 L6 4.5 L2 8" stroke={bio.color.violetLt} strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" />
               </Svg>

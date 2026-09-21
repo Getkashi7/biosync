@@ -42,6 +42,7 @@ export function TrainerClientScreen({
   onBuildPlan,
   onOpenPhoto,
   onCompare,
+  onAccessRecord,
   refreshKey = 0,
 }: {
   clientId: string;
@@ -52,6 +53,8 @@ export function TrainerClientScreen({
   onOpenPhoto: (photo: ClientPhoto, clientName: string) => void;
   /** 9E — the earliest and latest side by side. */
   onCompare: (earlier: ClientPhoto, later: ClientPhoto, clientName: string) => void;
+  /** 9F — this provider's own reads of this client. */
+  onAccessRecord: () => void;
   /** bumped after a note is saved so the sessions list refetches */
   refreshKey?: number;
 }) {
@@ -363,8 +366,21 @@ export function TrainerClientScreen({
                     </Pressable>
                   ))}
                 </ScrollView>
+                {/* "Your view is recorded" is a claim, so it opens the record
+                    it refers to — 9F has no entry drawn, and this sentence is
+                    the one place that already points at it. */}
                 <Text style={styles.photoNote}>
-                  They chose to share these. Your view is recorded.
+                  They chose to share these.{" "}
+                  <Text
+                    style={styles.photoNoteLink}
+                    onPress={() => {
+                      pressHaptic();
+                      onAccessRecord();
+                    }}
+                    accessibilityRole="link"
+                  >
+                    Your view is recorded.
+                  </Text>
                 </Text>
               </>
             )}
@@ -507,6 +523,7 @@ const styles = StyleSheet.create({
     color: bio.alpha(0.35),
     marginTop: 8,
   },
+  photoNoteLink: { color: bio.color.teal },
 
   root: { flex: 1, backgroundColor: bio.color.ink },
   flex: { flex: 1 },

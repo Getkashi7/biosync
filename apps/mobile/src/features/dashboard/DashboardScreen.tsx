@@ -15,6 +15,7 @@ import { LoadFailed } from "../../ui/bio/LoadFailed";
 import { classifyNetError, type NetFailure } from "../../lib/netError";
 import { ENERGY_WORDS } from "../../lib/ratings";
 import { bio, fontFamily } from "../../ui/theme";
+import { FlatRow, FlatSection } from "../../ui/bio/FlatRow";
 import { useAuth } from "../auth/AuthProvider";
 import { fetchDashboard, type DashboardData, type ReadinessToday } from "./dashboardApi";
 import { fetchTrends, type Trends } from "./trendsApi";
@@ -48,10 +49,14 @@ function look(score: number | null): { status: string; accent: string; rgb: stri
 type Props = {
   onQuickLog: () => void;
   onCheckin: () => void;
+  /** Moved here from You by N2 — building today's plan is a today-action. */
+  onCoachPlan: () => void;
+  /** The check-in history, moved here from You by N2. */
+  onJournal: () => void;
   refreshKey: number;
 };
 
-export function DashboardScreen({ onQuickLog, onCheckin, refreshKey }: Props) {
+export function DashboardScreen({ onQuickLog, onCheckin, onCoachPlan, onJournal, refreshKey }: Props) {
   const insets = useSafeAreaInsets();
   const { session } = useAuth();
   const [data, setData] = useState<DashboardData | null>(null);
@@ -122,6 +127,15 @@ export function DashboardScreen({ onQuickLog, onCheckin, refreshKey }: Props) {
         ) : readiness ? (
           <Ready readiness={readiness} trends={trends} onCheckin={onCheckin} onQuickLog={onQuickLog} />
         ) : null}
+
+        {/* Outside the readiness branch on purpose: a failed readiness load
+            must not take the way to your own journal down with it. */}
+        <View style={styles.shortcuts}>
+          <FlatSection>
+            <FlatRow label="Coach plan" value="Build today's" onPress={onCoachPlan} />
+            <FlatRow label="Journal" onPress={onJournal} />
+          </FlatSection>
+        </View>
       </ScrollView>
     </View>
   );
@@ -216,6 +230,8 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: bio.color.ink2 },
   flex: { flex: 1 },
   content: { paddingHorizontal: 24, flexGrow: 1 },
+  // The page already pads 24; FlatSection brings N2's own gutter, so undo one.
+  shortcuts: { marginHorizontal: -bio.flat.gutter, marginTop: 24 },
   fill: { flexGrow: 1, alignItems: "center", justifyContent: "center", paddingVertical: 80 },
   header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   greeting: { fontFamily: fontFamily.bold, fontSize: 22, letterSpacing: -0.22, color: bio.color.text },

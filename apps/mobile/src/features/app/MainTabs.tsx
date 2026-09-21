@@ -9,11 +9,12 @@
  * refreshKey when a logging sheet closes so the dashboard refetches.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AppState, Keyboard, StyleSheet, View } from "react-native";
+import { AppState, BackHandler, Keyboard, StyleSheet, View } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { BioTabBar } from "../../ui/bio/BioTabBar";
 import type { TabKey } from "../../ui/TabBarIcons";
+import { backTarget, type BackState } from "../../lib/backTarget";
 import { bio } from "../../ui/theme";
 import { Placeholder } from "./Placeholder";
 import { LogChooser } from "./LogChooser";
@@ -38,6 +39,7 @@ import { TimelineScreen } from "../timeline/TimelineScreen";
 import { NewGoalSheet } from "../goals/NewGoalSheet";
 import { createGoal, type NewGoal } from "../goals/goalsApi";
 import { ProfileScreen } from "../profile/ProfileScreen";
+import { PreferencesScreen } from "../profile/PreferencesScreen";
 import { ExportDataScreen } from "../profile/ExportDataScreen";
 import { DeleteAccountSheet } from "../profile/DeleteAccountSheet";
 import { CoachScreen } from "../coach/CoachScreen";
@@ -76,6 +78,7 @@ import { TrainerRosterScreen } from "../trainer/TrainerRosterScreen";
 import { TrainerClientScreen } from "../trainer/TrainerClientScreen";
 import { ClientPhotoViewer } from "../trainer/ClientPhotoViewer";
 import { ClientPhotoCompare } from "../trainer/ClientPhotoCompare";
+import { AccessRecordScreen } from "../trainer/AccessRecordScreen";
 import type { ClientPhoto } from "../trainer/trainerApi";
 import { SessionNoteScreen } from "../trainer/SessionNoteScreen";
 import { PlanBuilderScreen } from "../trainer/PlanBuilderScreen";
@@ -111,7 +114,7 @@ type NutritionView = "none" | "today" | "log";
 type SupplementView = "none" | "stack" | "doses" | "suggestions";
 
 /** The trust layer, pushed from Profile. */
-type ConsentView = "none" | "centre" | "roles";
+type ConsentView = "none" | "centre" | "roles" | "access";
 
 /** Progress photos, pushed from Profile. */
 type PhotosView = "none" | "gallery";
@@ -126,7 +129,8 @@ type ProfileArea =
   | "treatments"
   | "journal"
   | "gym"
-  | "export";
+  | "export"
+  | "preferences";
 
 /**
  * Where the gym area is. A pushed stack inside one ProfileArea rather than four
@@ -151,6 +155,8 @@ export function MainTabs() {
   // A client's photo, opened from their detail screen. Carries the name so the
   // viewer can caption it without a second fetch.
   const [clientPhoto, setClientPhoto] = useState<{ photo: ClientPhoto; name: string } | null>(null);
+  /** 9F — the client whose access record is open, pushed from their screen. */
+  const [accessFor, setAccessFor] = useState<string | null>(null);
   const [clientCompare, setClientCompare] = useState<{
     earlier: ClientPhoto;
     later: ClientPhoto;
@@ -379,6 +385,165 @@ export function MainTabs() {
    */
   const canReviewTreatments = staffKinds.includes("PRACTITIONER");
 
+  /**
+   * Android's hardware Back.
+   *
+   * There was none until now, so Back from any pushed screen fell through to
+   * expo-router at the stack root and closed the app — press it on the photo
+   * gallery and you were on the launcher, with the gallery still "open" as far
+   * as this component knew.
+   *
+   * The ordering lives in `lib/backTarget.ts`, which is pure and tested over
+   * every branch; this only maps the action onto the setter that the matching
+   * screen's own `onBack` already calls, so the chevron and the hardware
+   * button cannot disagree. Returning false hands the press to Android, which
+   * is what should happen at a tab root.
+   *
+   * Declared before the early returns above so the hook order never changes.
+   */
+  useEffect(() => {
+    const snapshot = (): BackState => ({
+      shell: intent === "professional" && isStaff ? "professional" : "consumer",
+      sheetOpen: sheet !== "none",
+      photoAdd,
+      offer: offer !== null,
+      inviteStep: invite.step,
+      planFor: planFor !== null,
+      noteFor: noteFor !== null,
+      coachProfile,
+      coachClasses,
+      reviewQueue,
+      clientCompare: clientCompare !== null,
+      clientPhoto: clientPhoto !== null,
+      accessRecord: accessFor !== null,
+      client: client !== null,
+      profileArea,
+      adminView,
+      gymView,
+      comparing: comparing !== null,
+      openPhoto: openPhoto !== null,
+      photosView,
+      consent,
+      supplements,
+      nutrition,
+    });
+
+    const sub = BackHandler.addEventListener("hardwareBackPress", () => {
+      switch (backTarget(snapshot())) {
+        case "closeSheet":
+          setSheet("none");
+          return true;
+        case "closePhotoAdd":
+          setPhotoAdd(false);
+          return true;
+        case "closeOffer":
+          setOffer(null);
+          return true;
+        case "inviteToList":
+          setInvite({ step: "list" });
+          return true;
+        case "inviteClose":
+          setInvite({ step: "none" });
+          return true;
+        case "clearPlanFor":
+          setPlanFor(null);
+          return true;
+        case "clearNoteFor":
+          setNoteFor(null);
+          return true;
+        case "clearCoachProfile":
+          setCoachProfile(false);
+          return true;
+        case "clearCoachClasses":
+          setCoachClasses(false);
+          return true;
+        case "clearReviewQueue":
+          setReviewQueue(false);
+          return true;
+        case "clearClientCompare":
+          setClientCompare(null);
+          return true;
+        case "clearClientPhoto":
+          setClientPhoto(null);
+          return true;
+        case "clearAccessRecord":
+          setAccessFor(null);
+          return true;
+        case "clearClient":
+          setClient(null);
+          return true;
+        case "adminToHub":
+          setAdminView("home");
+          return true;
+        case "profileAreaCareTeam":
+          setProfileArea("careTeam");
+          return true;
+        case "gymToSchedule":
+          setGymView("schedule");
+          return true;
+        case "profileAreaNone":
+          setProfileArea("none");
+          return true;
+        case "clearComparing":
+          setComparing(null);
+          return true;
+        case "clearOpenPhoto":
+          setOpenPhoto(null);
+          return true;
+        case "photosNone":
+          setPhotosView("none");
+          return true;
+        case "consentNone":
+          setConsent("none");
+          return true;
+        case "consentCentre":
+          setConsent("centre");
+          return true;
+        case "supplementsNone":
+          setSupplements("none");
+          return true;
+        case "supplementsStack":
+          setSupplements("stack");
+          return true;
+        case "nutritionNone":
+          setNutrition("none");
+          return true;
+        case "nutritionToday":
+          setNutrition("today");
+          return true;
+        case "exit":
+          // Android's own behaviour at a tab root.
+          return false;
+      }
+    });
+    return () => sub.remove();
+  }, [
+    intent,
+    isStaff,
+    sheet,
+    photoAdd,
+    offer,
+    invite.step,
+    planFor,
+    noteFor,
+    coachProfile,
+    coachClasses,
+    reviewQueue,
+    clientCompare,
+    clientPhoto,
+    accessFor,
+    client,
+    profileArea,
+    adminView,
+    gymView,
+    comparing,
+    openPhoto,
+    photosView,
+    consent,
+    supplements,
+    nutrition,
+  ]);
+
   // Wait for all three before rendering, so we never flash the wrong shell —
   // or the welcome at someone who dismissed it on a previous launch.
   if (staff === null || intent === null || welcomed === null) return <View style={styles.page} />;
@@ -463,6 +628,11 @@ export function MainTabs() {
           <CoachClassesScreen onBack={() => setCoachClasses(false)} />
         ) : reviewQueue ? (
           <ReviewQueueScreen onBack={() => setReviewQueue(false)} />
+        ) : accessFor ? (
+          <AccessRecordScreen
+            mode={{ kind: "staff", clientId: accessFor }}
+            onBack={() => setAccessFor(null)}
+          />
         ) : clientCompare ? (
           <ClientPhotoCompare
             earlier={clientCompare.earlier}
@@ -484,6 +654,7 @@ export function MainTabs() {
             onBuildPlan={(name) => setPlanFor({ id: client, name })}
             onOpenPhoto={(photo, name) => setClientPhoto({ photo, name })}
             onCompare={(earlier, later, name) => setClientCompare({ earlier, later, name })}
+            onAccessRecord={() => setAccessFor(client)}
             refreshKey={refreshKey}
           />
         ) : (
@@ -512,6 +683,7 @@ export function MainTabs() {
         client ||
         clientPhoto ||
         clientCompare ||
+        accessFor ||
         noteFor ||
         planFor ||
         reviewQueue ||
@@ -534,6 +706,7 @@ export function MainTabs() {
               setCoachProfile(false);
               setClientPhoto(null);
               setClientCompare(null);
+              setAccessFor(null);
               setActive(t);
             }}
             onLog={() => setSheet("chooser")}
@@ -578,6 +751,7 @@ export function MainTabs() {
         <CareTeamScreen
           onBack={() => setProfileArea("none")}
           onEnterCode={() => setProfileArea("enterCode")}
+          onTrainerFeed={() => setProfileArea("trainerFeed")}
           refreshKey={teamKey}
         />
       ) : profileArea === "journal" ? (
@@ -612,10 +786,16 @@ export function MainTabs() {
         )
       ) : profileArea === "export" ? (
         <ExportDataScreen onBack={() => setProfileArea("none")} />
+      ) : profileArea === "preferences" ? (
+        <PreferencesScreen
+          onBack={() => setProfileArea("none")}
+          onReminders={() => setSheet("reminders")}
+          refreshKey={refreshKey}
+        />
       ) : profileArea === "treatments" ? (
         <TreatmentsScreen onBack={() => setProfileArea("none")} />
       ) : profileArea === "trainerFeed" ? (
-        <MyTrainerScreen onBack={() => setProfileArea("none")} />
+        <MyTrainerScreen onBack={() => setProfileArea("careTeam")} />
       ) : comparing ? (
         <PhotoCompareScreen photos={comparing} unit={unitPref} onBack={() => setComparing(null)} />
       ) : openPhoto ? (
@@ -674,7 +854,13 @@ export function MainTabs() {
           refreshKey={photosKey}
         />
       ) : consent === "centre" ? (
-        <ConsentCentreScreen onBack={() => setConsent("none")} onOpenRoles={() => setConsent("roles")} />
+        <ConsentCentreScreen
+          onBack={() => setConsent("none")}
+          onOpenRoles={() => setConsent("roles")}
+          onAccessRecord={() => setConsent("access")}
+        />
+      ) : consent === "access" ? (
+        <AccessRecordScreen mode={{ kind: "mine" }} onBack={() => setConsent("centre")} />
       ) : consent === "roles" ? (
         <RolesScreen onBack={() => setConsent("centre")} />
       ) : supplements === "stack" ? (
@@ -716,49 +902,52 @@ export function MainTabs() {
         <DashboardScreen
           onQuickLog={() => setSheet("quicklog")}
           onCheckin={() => setSheet("checkin")}
+          onCoachPlan={() => setSheet("plan")}
+          onJournal={() => setProfileArea("journal")}
           refreshKey={refreshKey}
         />
       ) : active === "chat" ? (
         <CoachScreen />
       ) : active === "profile" ? (
         <ProfileScreen
-          onDeleteAccount={() => setSheet("deleteaccount")}
-          onExportData={() => setProfileArea("export")}
-          onReminders={() => setSheet("reminders")}
-          onCoachPlan={() => setSheet("plan")}
-          onConsent={() => setConsent("centre")}
+          onTreatments={() => setProfileArea("treatments")}
           onPhotos={() => {
             setPhotosKey((k) => k + 1);
             setPhotosView("gallery");
           }}
-          onTrainerFeed={() => setProfileArea("trainerFeed")}
           onCareTeam={() => setProfileArea("careTeam")}
-          onTreatments={() => setProfileArea("treatments")}
-          onJournal={() => setProfileArea("journal")}
-          onGym={() => {
-            // Always enters at the schedule, never wherever it was left.
-            setGymView("schedule");
-            setProfileArea("gym");
-          }}
-          onAdmin={
-            role === "ADMIN"
-              ? () => {
-                  // Always enters at the hub, never wherever it was left.
-                  setAdminView("home");
-                  setProfileArea("admin");
-                }
-              : undefined
-          }
-          onTrainer={
-            isStaff
-              ? () => {
-                  // switching shells persists, so a restart lands in the same place
-                  void setAppIntent("professional");
-                  setIntent("professional");
-                }
-              : undefined
-          }
-          refreshKey={refreshKey}
+          onPreferences={() => setProfileArea("preferences")}
+          onConsent={() => setConsent("centre")}
+          switchTo={[
+            ...(isStaff
+              ? [
+                  {
+                    // The roster is a PT's "Coach" side and a practitioner's
+                    // clinic; name the one this account actually is.
+                    label: staffKinds.includes("PT") ? "Coach" : "Practitioner",
+                    go: () => {
+                      // switching shells persists, so a restart lands in the same place
+                      void setAppIntent("professional");
+                      setIntent("professional");
+                    },
+                  },
+                ]
+              : []),
+            ...(role === "ADMIN"
+              ? [
+                  {
+                    label: "Admin",
+                    go: () => {
+                      // Always enters at the hub, never wherever it was left.
+                      setAdminView("home");
+                      setProfileArea("admin");
+                    },
+                  },
+                ]
+              : []),
+          ]}
+          onExportData={() => setProfileArea("export")}
+          onDeleteAccount={() => setSheet("deleteaccount")}
         />
       ) : active === "train" ? (
         // The smaller first cut of the Train tab: its root is the training

@@ -19,10 +19,17 @@ import { bio, fontFamily } from "../../ui/theme";
 import { errorHaptic, pressHaptic, successHaptic } from "../../lib/haptics";
 import { dateLabel, initials } from "../../lib/format";
 import { disconnectStaff, fetchCareTeam, kindNoun, type CareTeamMember } from "./invitesApi";
+import { fetchTrainerFeed } from "../mytrainer/myTrainerApi";
+import { FlatRow } from "../../ui/bio/FlatRow";
 
 type Props = {
   onBack: () => void;
   onEnterCode: () => void;
+  /**
+   * What a trainer has shared — moved here from You by N2, next to the people
+   * who wrote it. Shown only once something has been shared.
+   */
+  onTrainerFeed: () => void;
   /** bumped by the parent after a successful connection */
   refreshKey?: number;
 };
@@ -54,7 +61,13 @@ const BLOBS = [
   },
 ];
 
-export function CareTeamScreen({ onBack, onEnterCode, refreshKey = 0 }: Props) {
+export function CareTeamScreen({ onBack, onEnterCode, onTrainerFeed, refreshKey = 0 }: Props) {
+  const [hasFeed, setHasFeed] = useState(false);
+  useEffect(() => {
+    void fetchTrainerFeed()
+      .then((f) => setHasFeed(f.plans.length > 0 || f.notes.length > 0))
+      .catch(() => {});
+  }, [refreshKey]);
   const insets = useSafeAreaInsets();
   const [team, setTeam] = useState<CareTeamMember[] | null>(null);
   const [failed, setFailed] = useState<NetFailure | null>(null);
@@ -197,6 +210,11 @@ export function CareTeamScreen({ onBack, onEnterCode, refreshKey = 0 }: Props) {
                 </View>
               </View>
             ))}
+            {hasFeed ? (
+              <View style={styles.feed}>
+                <FlatRow label="From your trainer" value="Plans & notes" onPress={onTrainerFeed} />
+              </View>
+            ) : null}
           </View>
         )}
       </ScrollView>
@@ -266,6 +284,7 @@ const styles = StyleSheet.create({
   ledeBold: { fontFamily: fontFamily.semibold, color: bio.alpha(0.85) },
 
   list: { gap: 10, marginTop: 20 },
+  feed: { marginTop: 6, borderTopWidth: 1, borderTopColor: bio.color.hairline },
   card: {
     borderRadius: 20,
     backgroundColor: bio.color.glassHi,

@@ -679,6 +679,39 @@ export const bio = {
     fab: { size: 56, right: 20, bottom: 106 },
   },
   /**
+   * The flat settings list, from the N2 (You) handoff. Rows sit straight on the
+   * canvas with a hairline between them — no card, no blur, no glass — and the
+   * weight comes from the type. Used by You, Preferences and Home's shortcuts.
+   */
+  flat: {
+    gutter: 24,
+    rowHeight: 57,
+    row: { fontFamily: fontFamily.semibold, fontSize: 16.5, letterSpacing: -0.165 },
+    value: { fontFamily: fontFamily.medium, fontSize: 13.5 },
+    section: { fontFamily: fontFamily.semibold, fontSize: 10, letterSpacing: 1.5 },
+    sectionPad: { top: 12, bottom: 6 },
+    chevron: { width: 8, height: 14, stroke: 1.7 },
+    title: { fontFamily: fontFamily.bold, fontSize: 28, letterSpacing: -0.56 },
+    /** the one-row identity that replaced the 84pt breathing avatar */
+    avatar: 46,
+    initials: { fontFamily: fontFamily.semibold, fontSize: 15, letterSpacing: 0.3 },
+    name: { fontFamily: fontFamily.semibold, fontSize: 17, letterSpacing: -0.17 },
+    email: { fontFamily: fontFamily.regular, fontSize: 13.5 },
+    /** the violet wash top-left, 8% at its centre */
+    bloom: { size: 420, left: -150, top: -190, alpha: 0.08 },
+  },
+  /** The 9F access record's timeline. */
+  record: {
+    rail: 10,
+    dot: 7,
+    dotTop: 5,
+    gap: 13,
+    rowPad: 20,
+    what: { fontFamily: fontFamily.medium, fontSize: 13.5 },
+    when: { fontFamily: fontFamily.dot, fontSize: 10, letterSpacing: 0.6 },
+    line: { fontFamily: fontFamily.light, fontSize: 12.5, lineHeight: 19.4 },
+  },
+  /**
    * §6 gym (A1–A6 handoff). Its own block rather than reuse of `invite`: the
    * switch is 44×26 there and 46×27 here, and the CTA is a flat solid fill
    * rather than the staff gradient. Two pixels is not worth a shared token that
