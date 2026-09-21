@@ -122,6 +122,28 @@ export function auditLabel(action: string): string {
 }
 
 /** What a sanitised `meta` may hold — scalars only, no nesting. */
+/**
+ * The access record (9F): which audit rows count as a care provider **looking**
+ * at someone's data, and what each is called on that record.
+ *
+ * Only reads the server actually logs. The 9F handoff also drew "Photo compare"
+ * and "Biometrics" — but a comparison is drawn from photos already fetched, and
+ * biometrics arrive inside the client-profile read, whose row stores a category
+ * *count* rather than names. Listing either would mean inventing an event the
+ * trail cannot back, on the one screen whose whole claim is that it is the
+ * record. So it says what was logged, and no more.
+ */
+export const ACCESS_LABELS: Readonly<Record<string, string>> = {
+  [AUDIT.staffViewedClient]: "Profile",
+  [AUDIT.staffViewedPhotos]: "Progress photos",
+};
+
+export const ACCESS_ACTIONS: readonly string[] = Object.keys(ACCESS_LABELS);
+
+/** How many rows an access record returns. */
+// ponytail: newest 100, no paging — add a cursor when a real client passes it.
+export const ACCESS_RECORD_LIMIT = 100;
+
 export type AuditMeta = Record<string, string | number | boolean>;
 
 export type AuditEntry = {

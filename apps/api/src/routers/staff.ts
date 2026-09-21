@@ -17,6 +17,9 @@
 import { MetricType, StaffKind, StaffLinkStatus } from "@prisma/client";
 import { z } from "zod";
 import {
+  ACCESS_ACTIONS,
+  ACCESS_LABELS,
+  ACCESS_RECORD_LIMIT,
   AUDIT,
   CONSENT_COPY,
   ROLE_CEILING,
@@ -29,6 +32,7 @@ import { router, staffProcedure } from "../trpc";
 import { staffKinds } from "../context";
 import { prisma } from "../db";
 import { recordAudit } from "../lib/audit";
+import { assertLinked } from "../lib/staffLink";
 import { TRPCError } from "@trpc/server";
 
 
@@ -292,4 +296,42 @@ export const staffRouter = router({
       sessions,
     };
   }),
+
+  /**
+   * 9F — this staff member's own reads of one client, newest first.
+   *
+   * Scoped to the caller as actor: a practitioner sees what *they* looked at,
+   * never a colleague's. The client sees every provider's rows through
+   * `account.accessRecord`, which is what makes "Sarah sees the same record"
+   * true rather than a line of copy. Gated on an active link like every other
+   * client read, so it cannot be used to probe for accounts.
+   */
+  accessRecord: staffProcedure
+    .input(z.object({ clientId: z.string().uuid() }))
+    .query(async ({ ctx, input }) => {
+      await assertLinked(ctx.user.id, staffKinds(ctx.user), input.clientId);
+      const [client, rows] = await Promise.all([
+        prisma.user.findUnique({
+          where: { id: input.clientId },
+          select: { fullName: true, email: true },
+        }),
+        prisma.auditLog.findMany({
+          where: {
+            actorId: ctx.user.id,
+            subjectId: input.clientId,
+            action: { in: [...ACCESS_ACTIONS] },
+          },
+          orderBy: { createdAt: "desc" },
+          take: ACCESS_RECORD_LIMIT,
+          select: { action: true, createdAt: true },
+        }),
+      ]);
+      return {
+        clientName: client?.fullName ?? client?.email ?? "",
+        events: rows.map((r) => ({
+          what: ACCESS_LABELS[r.action] ?? r.action,
+          at: r.createdAt.toISOString(),
+        })),
+      };
+    }),
 });

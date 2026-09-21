@@ -97,7 +97,15 @@ export {
   INVITE_TTL_HOURS,
 } from "./invites";
 export type { InviteKind, InviteCreateInput, InviteCodeInput, InviteState } from "./invites";
-export { AUDIT, AUDIT_LABELS, auditLabel, sanitiseAuditMeta } from "./audit";
+export {
+  ACCESS_ACTIONS,
+  ACCESS_LABELS,
+  ACCESS_RECORD_LIMIT,
+  AUDIT,
+  AUDIT_LABELS,
+  auditLabel,
+  sanitiseAuditMeta,
+} from "./audit";
 export type { AuditAction, AuditMeta, AuditEntry } from "./audit";
 export type {
   SupplementTiming,

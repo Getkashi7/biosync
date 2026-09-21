@@ -14,7 +14,7 @@
  * are unreachable because the foreign keys point to a non-existent user.
  */
 
-import { parsePlanItems } from "@pulse/shared";
+import { ACCESS_ACTIONS, ACCESS_LABELS, ACCESS_RECORD_LIMIT, parsePlanItems } from "@pulse/shared";
 import { router, ownerProcedure } from "../trpc";
 import { prisma } from "../db";
 import { env } from "../env";
@@ -213,6 +213,40 @@ export const accountRouter = router({
         trainingPlans: plans.map((pl) => ({ ...pl, items: parsePlanItems(pl.items) })),
         sessionNotes: notes,
       },
+    };
+  }),
+
+  /**
+   * 9F from the client's side — every time a care provider opened this
+   * person's records, and who.
+   *
+   * `subjectId` comes from the session, never input: this is the one list of
+   * who has looked at you, and it must not be possible to ask for anyone
+   * else's. Rows outlive the link on purpose — disconnecting a trainer does not
+   * erase the fact that they looked.
+   */
+  accessRecord: ownerProcedure.query(async ({ ctx }) => {
+    const rows = await prisma.auditLog.findMany({
+      where: { subjectId: ctx.user.id, action: { in: [...ACCESS_ACTIONS] } },
+      orderBy: { createdAt: "desc" },
+      take: ACCESS_RECORD_LIMIT,
+      select: { actorId: true, action: true, createdAt: true },
+    });
+    // The audit table has no foreign key (rows must survive the account that
+    // wrote them), so names are resolved separately.
+    const actors = await prisma.user.findMany({
+      where: { id: { in: [...new Set(rows.map((r) => r.actorId))] } },
+      select: { id: true, fullName: true, email: true },
+    });
+    const nameOf = new Map(actors.map((a) => [a.id, a.fullName ?? a.email]));
+    return {
+      events: rows.map((r) => ({
+        // Named plainly rather than hidden: an account that has since been
+        // deleted still looked, and the record should still say so.
+        who: nameOf.get(r.actorId) ?? "A former care provider",
+        what: ACCESS_LABELS[r.action] ?? r.action,
+        at: r.createdAt.toISOString(),
+      })),
     };
   }),
 });
