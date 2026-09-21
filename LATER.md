@@ -263,3 +263,13 @@ say truthfully; none is a defect in the design, they are just decisions it could
   covered by `staff.client`, which already returns a trainer's own notes on a client. Nothing calls
   any of the three. They are dead code rather than a missing screen — delete them with the next
   round of tidying, once it is confirmed no older client build in the wild still calls them.
+
+## From the device walkthrough on 2026-09-20
+
+- **The photo grid downloads full-resolution originals.** `PhotosGalleryScreen` renders each tile
+  from the same signed URL the full-screen viewer uses, so a phone camera's 4–6 MB original is
+  fetched and downscaled into a 140pt square — on the S23 over 5G, about twenty seconds per tile.
+  The honesty half is done: a tile now shows a spinner until `onLoadEnd`, so the wait no longer
+  looks like a failed photo. The speed half is not: ask Supabase for a resized render
+  (`/render/image/...?width=`) in `createSignedReadUrl` when the caller wants a thumbnail. Worth
+  doing before anyone has a gallery of more than a handful.

@@ -91,3 +91,36 @@ export function todayIso(now: Date = new Date()): string {
   const d = String(now.getDate()).padStart(2, "0");
   return `${y}-${m}-${d}`;
 }
+
+/**
+ * The effective audience of one photo — mirrors `effectivePhotoAudience` in
+ * `@pulse/shared`'s `photos.ts`, which is the rule the API actually enforces.
+ *
+ * An override may **narrow** and never widen. Anything other than "hidden" or
+ * the category's own audience resolves to hidden, so a photo can never be more
+ * visible than the Photos consent allows.
+ */
+export function effectiveAudience(
+  override: PhotoAudience | null,
+  category: PhotoAudience,
+): PhotoAudience {
+  if (category === "NONE") return "NONE";
+  if (override === null) return category;
+  if (override === "NONE") return "NONE";
+  return override === category ? override : "NONE";
+}
+
+/**
+ * Whether offering this audience on a single photo can do anything at all.
+ *
+ * The direct consequence of the rule above: only "hidden" and the gallery's own
+ * default have an effect. The photo sheet greys out the rest, because it used
+ * to offer all three and then claim the pick had "overridden your default" when
+ * the server would resolve it to hidden and no trainer would ever see it.
+ */
+export function audienceReachable(
+  value: PhotoAudience,
+  galleryDefault: PhotoAudience,
+): boolean {
+  return effectiveAudience(value, galleryDefault) === value;
+}

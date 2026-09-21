@@ -19,7 +19,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import Svg, { Path } from "react-native-svg";
 import { bio, fontFamily } from "../../ui/theme";
 import { pressHaptic, selectionHaptic } from "../../lib/haptics";
-import { fullPhotoDate } from "../../lib/photoFormat";
+import { audienceReachable, fullPhotoDate } from "../../lib/photoFormat";
 import { deletePhoto, setPhotoVisibility, type ConsentAudience, type Photo } from "./photosApi";
 import { fetchWeightOn } from "./photoMetrics";
 
@@ -34,6 +34,7 @@ const AUDIENCE_WORD: Record<ConsentAudience, string> = {
   TRAINER: "My trainer",
   PRACTITIONER: "My practitioner",
 };
+
 
 export function PhotoDetailScreen({
   photo,
@@ -149,16 +150,27 @@ export function PhotoDetailScreen({
           <View style={styles.segment} accessibilityRole="radiogroup" accessibilityLabel="Who can see this photo">
             {AUDIENCES.map((a) => {
               const on = audience === a.value;
+              // A per-photo override may only narrow, so the rest are dead
+              // controls — greyed rather than offered and silently ignored.
+              const can = audienceReachable(a.value, galleryDefault);
               return (
                 <Pressable
                   key={a.value}
                   onPress={() => void applyAudience(a.value)}
-                  style={[styles.segCell, on && styles.segCellOn]}
+                  disabled={!can}
+                  style={[styles.segCell, on && styles.segCellOn, !can && styles.segCellOff]}
                   accessibilityRole="radio"
-                  accessibilityState={{ selected: on }}
-                  accessibilityLabel={a.label}
+                  accessibilityState={{ selected: on, disabled: !can }}
+                  accessibilityLabel={
+                    can
+                      ? a.label
+                      : `${a.label} — unavailable until Progress photos is shared with them`
+                  }
                 >
-                  <Text style={[styles.segText, on && styles.segTextOn]} numberOfLines={1}>
+                  <Text
+                    style={[styles.segText, on && styles.segTextOn, !can && styles.segTextOff]}
+                    numberOfLines={1}
+                  >
                     {a.label}
                   </Text>
                 </Pressable>
@@ -187,6 +199,16 @@ export function PhotoDetailScreen({
                 : `Your Photos default — ${AUDIENCE_WORD[galleryDefault].toLowerCase()} can see it.`}
             </Text>
           )}
+
+          {/*
+            Why two of the three are greyed out. Said once, plainly, rather than
+            leaving someone to tap a dead control and wonder.
+          */}
+          <Text style={styles.defaultNote}>
+            {galleryDefault === "NONE"
+              ? "Progress photos are off for everyone in Who sees what, so this photo stays private whichever you pick."
+              : `A single photo can only be made more private, never less — to share with anyone else, change Progress photos in Who sees what.`}
+          </Text>
 
           {error ? <Text style={styles.error}>{error}</Text> : null}
 
@@ -323,6 +345,8 @@ const styles = StyleSheet.create({
   },
   segCellOn: { backgroundColor: bio.violetAlpha(0.17), borderColor: bio.violetAlpha(0.55) },
   segText: { fontFamily: fontFamily.semibold, fontSize: 10.5, color: bio.alpha(0.55) },
+  segCellOff: { opacity: 0.38 },
+  segTextOff: { color: bio.alpha(0.4) },
   segTextOn: { color: bio.color.violetChip },
 
   overrideRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12, marginTop: 10 },

@@ -12,7 +12,16 @@
  *   default**, so it means "this one is different", not decoration.
  */
 import { useCallback, useEffect, useState } from "react";
-import { Image, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
+import {
+  ActivityIndicator,
+  Image,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import Svg, { Circle, Path, Rect } from "react-native-svg";
@@ -266,6 +275,7 @@ function PhotoTile({
   locked: boolean;
   onPress: () => void;
 }) {
+  const [loaded, setLoaded] = useState(false);
   return (
     <Pressable
       onPress={() => {
@@ -281,7 +291,18 @@ function PhotoTile({
           rather than a hole in the grid. */}
       <LinearGradient colors={tint} start={{ x: 0.2, y: 0 }} end={{ x: 0.8, y: 1 }} style={StyleSheet.absoluteFill} />
       {photo.url ? (
-        <Image source={{ uri: photo.url }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+        <Image
+          source={{ uri: photo.url }}
+          style={StyleSheet.absoluteFill}
+          resizeMode="cover"
+          onLoadEnd={() => setLoaded(true)}
+        />
+      ) : null}
+      {/* The grid pulls the full-resolution original, so a phone-camera photo
+          can take many seconds to paint — during which the tinted placeholder
+          is indistinguishable from a photo that failed. Say which it is. */}
+      {photo.url && !loaded ? (
+        <ActivityIndicator style={StyleSheet.absoluteFill} color={bio.alpha(0.5)} />
       ) : null}
       <LinearGradient
         colors={["rgba(7,7,12,0)", "rgba(7,7,12,0.62)"]}

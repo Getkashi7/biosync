@@ -5,6 +5,8 @@
  */
 import { describe, it, expect } from "vitest";
 import {
+  audienceReachable,
+  effectiveAudience,
   fullPhotoDate,
   groupPhotosByMonth,
   photoHasOverride,
@@ -113,5 +115,60 @@ describe("weeksApart", () => {
   it("returns null for a date it cannot parse, rather than a wrong number", () => {
     expect(weeksApart("", "2026-08-28")).toBeNull();
     expect(weeksApart("not-a-date", "2026-08-28")).toBeNull();
+  });
+});
+
+/**
+ * The narrowing rule, mirrored from `effectivePhotoAudience` in @pulse/shared.
+ *
+ * The assertion that matters: an override can never make a photo *more* visible
+ * than the Photos consent allows. The sheet used to offer audiences it could
+ * not deliver and then tell the user it had "overridden your default" — a
+ * control claiming to grant access that grants none.
+ */
+describe("effectiveAudience / audienceReachable", () => {
+  it("never widens past the category", () => {
+    expect(effectiveAudience("TRAINER", "NONE")).toBe("NONE");
+    expect(effectiveAudience("PRACTITIONER", "NONE")).toBe("NONE");
+    expect(effectiveAudience("PRACTITIONER", "TRAINER")).toBe("NONE");
+    expect(effectiveAudience("TRAINER", "PRACTITIONER")).toBe("NONE");
+  });
+
+  it("inherits the category when there is no override", () => {
+    expect(effectiveAudience(null, "TRAINER")).toBe("TRAINER");
+    expect(effectiveAudience(null, "NONE")).toBe("NONE");
+  });
+
+  it("lets an override narrow to hidden", () => {
+    expect(effectiveAudience("NONE", "TRAINER")).toBe("NONE");
+    expect(effectiveAudience("NONE", "PRACTITIONER")).toBe("NONE");
+  });
+
+  it("keeps an override that matches the category", () => {
+    expect(effectiveAudience("TRAINER", "TRAINER")).toBe("TRAINER");
+    expect(effectiveAudience("PRACTITIONER", "PRACTITIONER")).toBe("PRACTITIONER");
+  });
+
+  /** Exactly the options the sheet may leave enabled. */
+  it("offers only hidden and the gallery default", () => {
+    expect(audienceReachable("NONE", "NONE")).toBe(true);
+    expect(audienceReachable("TRAINER", "NONE")).toBe(false);
+    expect(audienceReachable("PRACTITIONER", "NONE")).toBe(false);
+
+    expect(audienceReachable("NONE", "TRAINER")).toBe(true);
+    expect(audienceReachable("TRAINER", "TRAINER")).toBe(true);
+    expect(audienceReachable("PRACTITIONER", "TRAINER")).toBe(false);
+  });
+
+  /**
+   * The bug as a test: with photos off for everyone, nothing the sheet offers
+   * besides "only me" can be reached, so nothing may be presented as if it
+   * shares the photo.
+   */
+  it("leaves nothing but hidden reachable when photos are off", () => {
+    const reachableOnes = (["NONE", "TRAINER", "PRACTITIONER"] as const).filter((v) =>
+      audienceReachable(v, "NONE"),
+    );
+    expect(reachableOnes).toEqual(["NONE"]);
   });
 });
