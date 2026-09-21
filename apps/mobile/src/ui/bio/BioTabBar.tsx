@@ -37,9 +37,9 @@ import { bio, fontFamily, motion } from "../theme";
 /**
  * The glyphs, at the handoff's 20×20 viewBox and 1.9 stroke.
  *
- * Train is a kettlebell — the candidate N1 marks as recommended. It reads as
- * training rather than as a calendar or a chart, which is what the old
- * bar-chart glyph did when the slot meant "Trends".
+ * Train is N1's recommended "Barbell, angled" — a bar and two plates, drawn to
+ * the handoff's own coordinates. (An earlier cut drew a kettlebell that was in
+ * no candidate; this is the one the design picked.)
  */
 function Glyph({ tab, active }: { tab: TabKey; active: boolean }) {
   const c = active ? bio.color.white : bio.alpha(0.4);
@@ -60,8 +60,12 @@ function Glyph({ tab, active }: { tab: TabKey; active: boolean }) {
     case "train":
       return (
         <Svg width={20} height={20} viewBox="0 0 20 20" fill="none">
-          <Circle cx={10} cy={12} r={4} stroke={c} strokeWidth={sw} />
-          <Path d="M7.6 8.8C6.9 4.2 13.1 4.2 12.4 8.8" stroke={c} strokeWidth={sw} strokeLinecap="round" />
+          <Path
+            d="M5.15 12.8 14.85 7.2M3.4 9.77 6.9 15.83M13.1 4.17 16.6 10.23"
+            stroke={c}
+            strokeWidth={sw}
+            strokeLinecap="round"
+          />
         </Svg>
       );
     case "chat":
