@@ -49,11 +49,16 @@ export function AccessRecordScreen({
   );
   const [failed, setFailed] = useState<NetFailure | null>(null);
 
+  // Keyed on the values, not the `mode` object: callers pass it inline
+  // (`mode={{ kind: "mine" }}`), so it is a new object on every parent render,
+  // and depending on it re-fetched the whole record each time the shell did.
+  const clientId = mode.kind === "staff" ? mode.clientId : null;
+
   const load = useCallback(async () => {
     setFailed(null);
     try {
-      if (mode.kind === "staff") {
-        const res = await trpc.staff.accessRecord.query({ clientId: mode.clientId });
+      if (clientId) {
+        const res = await trpc.staff.accessRecord.query({ clientId });
         const first = res.clientName.trim().split(/\s+/)[0] || "Your client";
         setData({
           subtitle: res.clientName,
@@ -71,7 +76,7 @@ export function AccessRecordScreen({
     } catch (e) {
       setFailed(classifyNetError(e));
     }
-  }, [mode]);
+  }, [clientId]);
 
   useEffect(() => {
     void load();
