@@ -26,6 +26,12 @@
         "EXPO_PUBLIC_API_URL": "https://biosync-api.onrender.com"
       }
     },
+    "preview-simulator": {
+      "extends": "preview",
+      "ios": {
+        "simulator": true
+      }
+    },
     "production": {
       "autoIncrement": true,
       "env": {

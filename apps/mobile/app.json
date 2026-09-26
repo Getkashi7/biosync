@@ -12,7 +12,10 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "app.pulse.mobile"
+      "bundleIdentifier": "app.pulse.mobile",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "app.pulse.mobile",
