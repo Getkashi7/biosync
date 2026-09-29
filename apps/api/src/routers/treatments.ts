@@ -206,7 +206,7 @@ export const treatmentsRouter = router({
     if (!(await hasPractitionerLink(ctx.user.id))) {
       throw new TRPCError({
         code: "PRECONDITION_FAILED",
-        message: "You need to be connected to a practitioner before asking for a review.",
+        message: "You need to be connected to Biomeds before asking for a review.",
       });
     }
 

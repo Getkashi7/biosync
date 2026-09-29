@@ -26,8 +26,8 @@ import type { ConsentAudience } from "./photosApi";
 
 const AUDIENCES: { value: ConsentAudience; label: string }[] = [
   { value: "NONE", label: "Only me" },
-  { value: "TRAINER", label: "My trainer" },
-  { value: "PRACTITIONER", label: "My practitioner" },
+  { value: "TRAINER", label: "My PT" },
+  { value: "PRACTITIONER", label: "Biomeds" },
 ];
 
 export function PhotoAddSheet({
@@ -99,29 +99,29 @@ export function PhotoAddSheet({
     if (audience === "TRAINER") {
       if (!trainerConnected) {
         return {
-          text: "You're not connected to a trainer — no one sees this photo until you connect one.",
+          text: "You're not connected to a PT — no one sees this photo until you connect one.",
           warn: true,
         };
       }
       return {
         text:
           galleryDefault === "TRAINER"
-            ? "Your trainer will see photos you add. This is your Photos default."
-            : "Your trainer will see this photo — an override for this photo only.",
+            ? "Your PT will see photos you add. This is your Photos default."
+            : "Your PT will see this photo — an override for this photo only.",
         warn: false,
       };
     }
     if (!practitionerConnected) {
       return {
-        text: "You're not connected to a practitioner — no one sees this photo until you connect one.",
+        text: "You're not connected to Biomeds — no one sees this photo until you connect.",
         warn: true,
       };
     }
     return {
       text:
         galleryDefault === "PRACTITIONER"
-          ? "Your practitioner will see photos you add. This is your Photos default."
-          : "Your practitioner will see this photo — an override for this photo only.",
+          ? "Biomeds will see photos you add. This is your Photos default."
+          : "Biomeds will see this photo — an override for this photo only.",
       warn: false,
     };
   })();

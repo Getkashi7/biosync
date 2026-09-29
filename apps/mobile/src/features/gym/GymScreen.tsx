@@ -137,7 +137,7 @@ export function GymScreen({
 
         <View style={styles.tiles}>
           <Tile label="Check in" hint="You're here" onPress={onCheckIn} />
-          <Tile label="Coaches" hint="Find a trainer" onPress={onCoaches} />
+          <Tile label="Coaches" hint="Find a PT" onPress={onCoaches} />
           <Tile label="History" hint="Your visits" onPress={onHistory} />
         </View>
 

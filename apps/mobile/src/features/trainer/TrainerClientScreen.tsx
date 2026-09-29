@@ -193,8 +193,14 @@ export function TrainerClientScreen({
             </Svg>
           </View>
           <View style={styles.flex}>
-            <Text style={styles.scopeTitle}>Fitness &amp; activity only</Text>
-            <Text style={styles.scopeBody}>This client’s health data isn’t visible to you.</Text>
+            <Text style={styles.scopeTitle}>
+              {data.role === "PT" ? "Fitness & activity only" : "Only what they share"}
+            </Text>
+            <Text style={styles.scopeBody}>
+              {data.role === "PT"
+                ? "This client’s health data isn’t visible to you."
+                : "This client decides what you see, one category at a time."}
+            </Text>
           </View>
         </View>
 

@@ -33,11 +33,11 @@ import { z } from "zod";
  * present rather than trusting a screen to carry it.
  */
 export const TREATMENT_DISCLAIMER =
-  "Wellness suggestion only. A practitioner will review your booking.";
+  "Wellness suggestion only. The Biomeds doctor will review your booking.";
 
 /** Shown once a request exists, replacing the suggestion-time disclaimer. */
 export const TREATMENT_PENDING_NOTE =
-  "Nothing is booked. A practitioner reviews every request before anything goes ahead.";
+  "Nothing is booked. The Biomeds doctor reviews every request before anything goes ahead.";
 
 /**
  * The footer on every card in the practitioner's approvals queue (design 5B).
@@ -110,7 +110,7 @@ export const TREATMENT_PROTOCOLS: readonly TreatmentProtocol[] = [
     slug: "energy-review",
     name: "Energy review",
     summary:
-      "A practitioner reviews your recent energy readings and discusses whether any treatment is appropriate.",
+      "The Biomeds doctor reviews your recent energy readings and discusses whether any treatment is appropriate.",
     trigger: "LOW_ENERGY",
     threshold: 3,
   },
@@ -118,7 +118,7 @@ export const TREATMENT_PROTOCOLS: readonly TreatmentProtocol[] = [
     slug: "hydration-review",
     name: "Hydration review",
     summary:
-      "A practitioner reviews your hydration log and discusses whether any treatment is appropriate.",
+      "The Biomeds doctor reviews your hydration log and discusses whether any treatment is appropriate.",
     trigger: "LOW_HYDRATION",
     threshold: 3,
   },
@@ -126,7 +126,7 @@ export const TREATMENT_PROTOCOLS: readonly TreatmentProtocol[] = [
     slug: "sleep-review",
     name: "Sleep review",
     summary:
-      "A practitioner reviews your recent sleep readings and discusses whether any treatment is appropriate.",
+      "The Biomeds doctor reviews your recent sleep readings and discusses whether any treatment is appropriate.",
     trigger: "LOW_SLEEP",
     threshold: 3,
   },
@@ -134,7 +134,7 @@ export const TREATMENT_PROTOCOLS: readonly TreatmentProtocol[] = [
     slug: "recovery-review",
     name: "Recovery review",
     summary:
-      "A practitioner reviews your readiness trend and discusses whether any treatment is appropriate.",
+      "The Biomeds doctor reviews your readiness trend and discusses whether any treatment is appropriate.",
     trigger: "LOW_READINESS",
     threshold: 4,
   },

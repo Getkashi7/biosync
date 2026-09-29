@@ -27,7 +27,7 @@ const ALL: TreatmentStatus[] = ["REQUESTED", "APPROVED", "DECLINED", "WITHDRAWN"
 describe("the disclaimer", () => {
   it("is the exact sentence the API exports", () => {
     expect(TREATMENT_DISCLAIMER).toBe(
-      "Wellness suggestion only. A practitioner will review your booking.",
+      "Wellness suggestion only. The Biomeds doctor will review your booking.",
     );
   });
 
@@ -147,7 +147,7 @@ describe("the clinic hand-off", () => {
     if (CLINIC_BOOKING_URL.length === 0) {
       expect(canOpenClinic(true)).toBe(false);
       expect(bookingNote(true)).toBe(
-        "Your practitioner will arrange the appointment with you directly.",
+        "The Biomeds doctor will arrange the appointment with you directly.",
       );
     } else {
       expect(canOpenClinic(true)).toBe(true);

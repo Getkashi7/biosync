@@ -111,8 +111,10 @@ describe("the catalogue is safe to show the public", () => {
     }
   });
 
-  it("says a practitioner reviews, in the disclaimer itself", () => {
-    expect(TREATMENT_DISCLAIMER.toLowerCase()).toContain("practitioner");
+  // Named as a doctor, not just "Biomeds": the point of the line is that a
+  // clinician — not the app — decides.
+  it("says a doctor reviews, in the disclaimer itself", () => {
+    expect(TREATMENT_DISCLAIMER.toLowerCase()).toContain("doctor");
     expect(TREATMENT_DISCLAIMER.toLowerCase()).toContain("review");
   });
 

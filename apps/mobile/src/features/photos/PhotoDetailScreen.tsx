@@ -25,14 +25,21 @@ import { fetchWeightOn } from "./photoMetrics";
 
 const AUDIENCES: { value: ConsentAudience; label: string }[] = [
   { value: "NONE", label: "Only me" },
-  { value: "TRAINER", label: "My trainer" },
-  { value: "PRACTITIONER", label: "My practitioner" },
+  { value: "TRAINER", label: "My PT" },
+  { value: "PRACTITIONER", label: "Biomeds" },
 ];
 
 const AUDIENCE_WORD: Record<ConsentAudience, string> = {
   NONE: "Only me",
-  TRAINER: "My trainer",
-  PRACTITIONER: "My practitioner",
+  TRAINER: "My PT",
+  PRACTITIONER: "Biomeds",
+};
+
+/** Who, mid-sentence — never the label lower-cased ("my pt", "biomeds"). */
+const WHO: Record<ConsentAudience, string> = {
+  NONE: "only you",
+  TRAINER: "your PT",
+  PRACTITIONER: "Biomeds",
 };
 
 
@@ -181,7 +188,7 @@ export function PhotoDetailScreen({
           {isOverride ? (
             <View style={styles.overrideRow}>
               <Text style={styles.overrideText}>
-                Overrides your {AUDIENCE_WORD[galleryDefault].toLowerCase()} default.
+                Overrides your default ({AUDIENCE_WORD[galleryDefault]}).
               </Text>
               <Pressable
                 onPress={() => void applyAudience(galleryDefault)}
@@ -196,7 +203,7 @@ export function PhotoDetailScreen({
             <Text style={styles.defaultNote}>
               {galleryDefault === "NONE"
                 ? "Your Photos default — only you can see it."
-                : `Your Photos default — ${AUDIENCE_WORD[galleryDefault].toLowerCase()} can see it.`}
+                : `Your Photos default — ${WHO[galleryDefault]} can see it.`}
             </Text>
           )}
 

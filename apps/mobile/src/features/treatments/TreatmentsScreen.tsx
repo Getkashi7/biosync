@@ -186,7 +186,7 @@ export function TreatmentsScreen({ onBack }: { onBack: () => void }) {
           </Pressable>
           <View style={styles.flex}>
             <Text style={styles.title}>Treatments</Text>
-            <Text style={styles.subtitle}>REVIEWED BY A PRACTITIONER</Text>
+            <Text style={styles.subtitle}>REVIEWED BY BIOMEDS</Text>
           </View>
         </View>
 
@@ -248,9 +248,9 @@ function SuggestionCard({
           pressed && canAsk && styles.pressed,
         ]}
         accessibilityRole="button"
-        accessibilityLabel={`Ask a practitioner about ${suggestion.name}`}
+        accessibilityLabel={`Ask Biomeds about ${suggestion.name}`}
       >
-        <Text style={[styles.askText, !canAsk && styles.askTextOff]}>Ask a practitioner</Text>
+        <Text style={[styles.askText, !canAsk && styles.askTextOff]}>Ask Biomeds</Text>
       </Pressable>
     </View>
   );
@@ -288,7 +288,7 @@ function RequestRow({
 
       {request.decisionNote ? (
         <View style={styles.noteBox}>
-          <Text style={styles.noteLabel}>FROM YOUR PRACTITIONER</Text>
+          <Text style={styles.noteLabel}>FROM BIOMEDS</Text>
           <Text style={styles.noteText}>{request.decisionNote}</Text>
         </View>
       ) : null}
@@ -352,10 +352,10 @@ function NothingSuggested({ hasAny }: { hasAny: boolean }) {
 function NoPractitioner() {
   return (
     <View style={styles.noPractitioner}>
-      <Text style={styles.noPractitionerTitle}>You're not connected to a practitioner.</Text>
+      <Text style={styles.noPractitionerTitle}>You're not connected to Biomeds.</Text>
       <Text style={styles.quietBody}>
-        Requests are read and decided by a practitioner, so you'll need to be connected to one
-        before you can ask. Your trainer can't review these.
+        Requests are read and decided by the Biomeds doctor, so you'll need to be connected to
+        Biomeds before you can ask. Your PT can't review these.
       </Text>
     </View>
   );

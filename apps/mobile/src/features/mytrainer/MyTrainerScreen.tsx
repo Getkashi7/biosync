@@ -71,12 +71,12 @@ export function MyTrainerScreen({ onBack }: { onBack: () => void }) {
           <RefreshControl refreshing={refreshing} onRefresh={() => void onRefresh()} tintColor={bio.color.text} />
         }
       >
-        <ScreenHeader title="From your trainer" label="Plans & notes" onBack={onBack} />
+        <ScreenHeader title="From your PT" label="Plans & notes" onBack={onBack} />
 
         {feed === null ? (
           <View style={styles.centre}>
             {failed ? (
-              <LoadFailed what="what your trainer shared" kind={failed ?? "offline"} onRetry={() => void load()} />
+              <LoadFailed what="what your PT shared" kind={failed ?? "offline"} onRetry={() => void load()} />
             ) : (
               <Spinner tint={bio.color.text} />
             )}

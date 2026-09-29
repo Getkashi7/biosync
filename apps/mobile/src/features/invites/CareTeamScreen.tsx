@@ -163,7 +163,7 @@ export function CareTeamScreen({ onBack, onEnterCode, onTrainerFeed, refreshKey 
           <View style={styles.centre}>
             <Text style={styles.emptyTitle}>You're not connected to anyone</Text>
             <Text style={styles.emptyBody}>
-              When you connect with a trainer or practitioner, they'll appear here.
+              When you connect with your PT or Biomeds, they'll appear here.
             </Text>
             <Pressable
               onPress={() => {
@@ -212,7 +212,7 @@ export function CareTeamScreen({ onBack, onEnterCode, onTrainerFeed, refreshKey 
             ))}
             {hasFeed ? (
               <View style={styles.feed}>
-                <FlatRow label="From your trainer" value="Plans & notes" onPress={onTrainerFeed} />
+                <FlatRow label="From your PT" value="Plans & notes" onPress={onTrainerFeed} />
               </View>
             ) : null}
           </View>

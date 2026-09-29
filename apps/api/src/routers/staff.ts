@@ -285,6 +285,9 @@ export const staffRouter = router({
     return {
       name: link.client.fullName ?? link.client.email,
       since: link.createdAt,
+      // The capacity this link was formed in, so the screen can say what the
+      // viewer can see — a PT and the Biomeds doctor have different ceilings.
+      role: staffRole,
       visible,
       notShared,
       goals,

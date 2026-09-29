@@ -10,11 +10,11 @@
 
 /** Shown above every suggestion, before anything has been requested. */
 export const TREATMENT_DISCLAIMER =
-  "Wellness suggestion only. A practitioner will review your booking.";
+  "Wellness suggestion only. The Biomeds doctor will review your booking.";
 
 /** Replaces the disclaimer once a request exists. */
 export const TREATMENT_PENDING_NOTE =
-  "Nothing is booked. A practitioner reviews every request before anything goes ahead.";
+  "Nothing is booked. The Biomeds doctor reviews every request before anything goes ahead.";
 
 /**
  * Where an approved review is actually booked.
@@ -41,7 +41,7 @@ export function bookingNote(canBook: boolean): string {
   if (!canBook) return "";
   return canOpenClinic(canBook)
     ? "Booking happens on the clinic's own site — BIOSYNC doesn't take bookings."
-    : "Your practitioner will arrange the appointment with you directly.";
+    : "The Biomeds doctor will arrange the appointment with you directly.";
 }
 
 /** The footer on every card in the practitioner's approvals queue (design 5B). */
@@ -99,15 +99,15 @@ export function statusLabel(status: TreatmentStatus): string {
 export function statusBody(status: TreatmentStatus, expiresInDays: number | null): string {
   switch (status) {
     case "REQUESTED":
-      return "Your practitioner hasn't looked at this yet. Nothing is booked.";
+      return "The Biomeds doctor hasn't looked at this yet. Nothing is booked.";
     case "APPROVED":
       return expiresInDays === null
-        ? "Your practitioner approved this review."
+        ? "The Biomeds doctor approved this review."
         : expiresInDays <= 1
-          ? "Your practitioner approved this review. It lapses today."
-          : `Your practitioner approved this review. It lapses in ${expiresInDays} days.`;
+          ? "The Biomeds doctor approved this review. It lapses today."
+          : `The Biomeds doctor approved this review. It lapses in ${expiresInDays} days.`;
     case "DECLINED":
-      return "Your practitioner decided this isn't right for you.";
+      return "The Biomeds doctor decided this isn't right for you.";
     case "WITHDRAWN":
       return "You withdrew this request.";
     case "EXPIRED":

@@ -201,7 +201,7 @@ export function ReviewQueueScreen({ onBack }: { onBack: () => void }) {
             </Svg>
           </Pressable>
           <View style={styles.flex}>
-            <Text style={styles.eyebrow}>PRACTITIONER · APPROVALS</Text>
+            <Text style={styles.eyebrow}>BIOMEDS · APPROVALS</Text>
             <Text style={styles.title}>IV &amp; treatments</Text>
           </View>
           <View style={styles.countBlock}>
@@ -450,7 +450,7 @@ function chipFor(state: CardState): {
     };
   }
   return {
-    label: "Pending practitioner approval",
+    label: "Awaiting your decision",
     wrap: { backgroundColor: bio.alpha(0.04), borderColor: bio.alpha(0.16) },
     dot: { borderColor: bio.alpha(0.5) },
     text: { color: bio.alpha(0.65) },

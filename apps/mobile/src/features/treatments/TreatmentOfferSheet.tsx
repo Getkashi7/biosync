@@ -77,7 +77,7 @@ export function TreatmentOfferSheet({
         style={({ pressed }) => [styles.cta, pressed && styles.pressed]}
         accessibilityRole="button"
       >
-        <Text style={styles.ctaText}>Ask a practitioner</Text>
+        <Text style={styles.ctaText}>Ask Biomeds</Text>
       </Pressable>
 
       <Pressable onPress={onClose} style={styles.dismiss} accessibilityRole="button">

@@ -21,7 +21,7 @@ import { TreatmentSheet } from "./TreatmentSheet";
 import { requestReview, type Suggestion } from "./treatmentsApi";
 
 const STEPS = [
-  "A practitioner reads your request and the reading behind it.",
+  "The Biomeds doctor reads your request and the reading behind it.",
   "They decide whether a review is appropriate for you, and can decline.",
   "If they approve, they contact you to arrange it. BIOSYNC never books anything.",
 ];
@@ -33,7 +33,7 @@ function messageFor(err: unknown): string {
     return "You've already asked about this one. It's in your requests below.";
   }
   if (code === "PRECONDITION_FAILED") {
-    return "You need to be connected to a practitioner before asking for a review.";
+    return "You need to be connected to Biomeds before asking for a review.";
   }
   return classifyNetError(err) === "offline"
     ? "You look offline. Nothing has been sent — try again when you're back."

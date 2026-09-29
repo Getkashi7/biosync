@@ -185,7 +185,7 @@ export function EnterCodeScreen({ onBack, onOpenConsent, onConnected }: Props) {
           {step.kind === "entry" ? (
             <>
               <Text style={styles.lede}>
-                Your trainer or practitioner gives you an 8-character code. It connects your
+                Your PT or Biomeds gives you an 8-character code. It connects your
                 accounts — nothing more.
               </Text>
 

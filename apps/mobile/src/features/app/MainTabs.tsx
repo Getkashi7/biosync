@@ -660,6 +660,7 @@ export function MainTabs() {
         ) : (
           <TrainerRosterScreen
             trainerName="Your roster"
+            role={staffKinds.includes("PRACTITIONER") ? "PRACTITIONER" : "PT"}
             onOpenClient={setClient}
             onInvite={() => setInvite({ step: "list" })}
             onReviewQueue={canReviewTreatments ? () => setReviewQueue(true) : undefined}
@@ -924,7 +925,7 @@ export function MainTabs() {
                   {
                     // The roster is a PT's "Coach" side and a practitioner's
                     // clinic; name the one this account actually is.
-                    label: staffKinds.includes("PT") ? "Coach" : "Practitioner",
+                    label: staffKinds.includes("PT") ? "PT" : "Biomeds",
                     go: () => {
                       // switching shells persists, so a restart lands in the same place
                       void setAppIntent("professional");

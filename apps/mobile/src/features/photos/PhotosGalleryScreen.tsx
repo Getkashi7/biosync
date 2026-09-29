@@ -241,7 +241,7 @@ export function PhotosGalleryScreen({
 /** Who the gallery is shared with, stated plainly rather than left to a chip. */
 function SharingLine({ audience, privateCount }: { audience: ConsentAudience; privateCount: number }) {
   const who =
-    audience === "TRAINER" ? "your trainer" : audience === "PRACTITIONER" ? "your practitioner" : null;
+    audience === "TRAINER" ? "your PT" : audience === "PRACTITIONER" ? "Biomeds" : null;
   return (
     <Text style={styles.sharing}>
       {who === null ? (

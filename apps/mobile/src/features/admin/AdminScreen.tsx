@@ -46,8 +46,8 @@ import {
 } from "./adminApi";
 
 const KINDS: { key: StaffKind; label: string; scope: string }[] = [
-  { key: "PT", label: "Trainer", scope: "Fitness & activity only" },
-  { key: "PRACTITIONER", label: "Practitioner", scope: "Can see consented health data" },
+  { key: "PT", label: "PT", scope: "Fitness & activity only" },
+  { key: "PRACTITIONER", label: "Biomeds", scope: "Can see consented health data" },
 ];
 
 type Pending = { kind: StaffKind; action: "grant" | "revoke" } | null;

@@ -37,8 +37,8 @@ const COPY: Record<ConsentCategory, { name: string; description: string }> = {
 
 const AUDIENCES: { value: ConsentAudience; label: string }[] = [
   { value: "NONE", label: "No one" },
-  { value: "TRAINER", label: "My trainer" },
-  { value: "PRACTITIONER", label: "My practitioner" },
+  { value: "TRAINER", label: "My PT" },
+  { value: "PRACTITIONER", label: "Biomeds" },
 ];
 
 export function ConsentCentreScreen({

@@ -82,7 +82,7 @@ export function InviteCodeScreen({ invite, lockedTo, onDone }: Props) {
         ]}
         showsVerticalScrollIndicator={false}
       >
-        <ScreenHeader title="Share this code" label="Trainer · Invitations" onBack={onDone} />
+        <ScreenHeader title="Share this code" label="Invitations" onBack={onDone} />
 
         <Text style={styles.lede}>
           Read it out, or send it with Share. Your client redeems it in their app.
@@ -142,7 +142,7 @@ export function InviteCodeScreen({ invite, lockedTo, onDone }: Props) {
         </View>
 
         <View style={styles.facts}>
-          <Fact label="Capacity" value={invite.kind === "PT" ? "As trainer" : "As practitioner"} />
+          <Fact label="Capacity" value={invite.kind === "PT" ? "As PT" : "As Biomeds"} />
           <Fact label="Who can use it" value={lockedTo ?? "Anyone with the code"} />
           <Fact label="On accept" value="They see nothing until they share" />
         </View>

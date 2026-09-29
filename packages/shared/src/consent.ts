@@ -34,8 +34,8 @@ export const CONSENT_COPY: Record<ConsentCategory, { name: string; description: 
 
 export const AUDIENCE_LABEL: Record<ConsentAudience, string> = {
   NONE: "No one",
-  TRAINER: "My trainer",
-  PRACTITIONER: "My practitioner",
+  TRAINER: "My PT",
+  PRACTITIONER: "Biomeds",
 };
 
 export type ConsentRow = { category: ConsentCategory; audience: ConsentAudience };

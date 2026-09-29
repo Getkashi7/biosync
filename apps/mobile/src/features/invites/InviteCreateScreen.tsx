@@ -35,7 +35,7 @@ type Props = {
   onCreated: (invite: CreatedInvite) => void;
 };
 
-const CAP_LABEL: Record<StaffKind, string> = { PT: "As trainer", PRACTITIONER: "As practitioner" };
+const CAP_LABEL: Record<StaffKind, string> = { PT: "As PT", PRACTITIONER: "As Biomeds" };
 
 export function InviteCreateScreen({ capabilities, onBack, onCreated }: Props) {
   const insets = useSafeAreaInsets();
@@ -86,7 +86,7 @@ export function InviteCreateScreen({ capabilities, onBack, onCreated }: Props) {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <ScreenHeader title="New invitation" label="Trainer · Invitations" onBack={onBack} />
+          <ScreenHeader title="New invitation" label="Invitations" onBack={onBack} />
 
           <Text style={styles.lede}>
             Connecting a client shares nothing — they choose what you see, after they accept.

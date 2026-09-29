@@ -64,7 +64,7 @@ const POINTS: { hue: string; title: string; body: string }[] = [
   {
     hue: bio.color.blue,
     title: "Nothing is shared",
-    body: "Not with a trainer, not with anyone — unless you turn it on yourself, one category at a time.",
+    body: "Not with your PT, not with anyone — unless you turn it on yourself, one category at a time.",
   },
 ];
 

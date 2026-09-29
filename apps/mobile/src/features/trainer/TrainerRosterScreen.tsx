@@ -35,6 +35,7 @@ const NEEDS_CHECKIN_DAYS = 5;
 
 export function TrainerRosterScreen({
   trainerName,
+  role,
   onOpenClient,
   onInvite,
   onReviewQueue,
@@ -42,6 +43,12 @@ export function TrainerRosterScreen({
   onCoachProfile,
 }: {
   trainerName: string;
+  /**
+   * Which side of the practice this roster is. A PT sees fitness and activity
+   * only; the Biomeds doctor sees whatever each client shares — so the header
+   * and the scope line must not tell her she is "fitness only".
+   */
+  role: "PT" | "PRACTITIONER";
   onOpenClient: (id: string) => void;
   /** open the invitations surface — the only way a client can be added */
   onInvite: () => void;
@@ -102,7 +109,7 @@ export function TrainerRosterScreen({
       <View style={[styles.inner, { paddingTop: insets.top + 8, paddingBottom: insets.bottom + 96 }]}>
         <View style={styles.header}>
           <View style={styles.headerLeft}>
-            <Text style={styles.eyebrow}>TRAINER · ROSTER</Text>
+            <Text style={styles.eyebrow}>{role === "PT" ? "PT" : "BIOMEDS"} · ROSTER</Text>
             <Text style={styles.name}>{trainerName}</Text>
           </View>
           <View style={styles.countBlock}>
@@ -171,7 +178,7 @@ export function TrainerRosterScreen({
           </Pressable>
         ) : null}
 
-        <ScopeLine />
+        <ScopeLine role={role} />
 
         <View style={styles.search}>
           <Svg width={15} height={15} viewBox="0 0 15 15" fill="none">
@@ -244,7 +251,7 @@ export function TrainerRosterScreen({
 }
 
 /** the quiet scope reminder that rides on every trainer screen */
-export function ScopeLine() {
+export function ScopeLine({ role = "PT" }: { role?: "PT" | "PRACTITIONER" }) {
   return (
     <View style={styles.scope}>
       <View style={styles.scopeBars}>
@@ -252,7 +259,9 @@ export function ScopeLine() {
         <View style={[styles.scopeBar, { height: 10 }]} />
         <View style={[styles.scopeBar, { height: 7 }]} />
       </View>
-      <Text style={styles.scopeText}>Fitness &amp; activity only</Text>
+      <Text style={styles.scopeText}>
+        {role === "PT" ? "Fitness & activity only" : "Only what each client shares"}
+      </Text>
     </View>
   );
 }

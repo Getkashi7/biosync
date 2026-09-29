@@ -101,7 +101,7 @@ export function InviteListScreen({ onBack, onCreate, refreshKey = 0 }: Props) {
       >
         <ScreenHeader
           title="Invitations"
-          label="Trainer · Clients"
+          label="Your clients"
           onBack={onBack}
           right={
             <View style={styles.headRight}>
@@ -195,7 +195,7 @@ function Row({
   onRevoke: () => void;
 }) {
   const dim = invite.state === "expired" || invite.state === "revoked";
-  const capacity = invite.kind === "PT" ? "Trainer invite" : "Practitioner invite";
+  const capacity = invite.kind === "PT" ? "PT invite" : "Biomeds invite";
   const audience = invite.email ? `Locked to ${invite.email}` : "Anyone with the code";
   const who = invite.state === "accepted" && invite.acceptedBy ? `${invite.acceptedBy} · ` : "";
   const meta = `${who}${audience} · ${ago(new Date(invite.createdAt))}`;

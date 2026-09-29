@@ -25,7 +25,7 @@ type RoleInfo = {
 };
 
 const TRAINER: RoleInfo = {
-  title: "Your trainer",
+  title: "Your PT",
   blurb: "Fitness & activity only — never your health records.",
   hue: bio.color.violetLt,
   can: ["Activity — workouts, steps & load", "Progress photos you choose to share", "Check-in streaks (not the notes)"],
@@ -33,8 +33,8 @@ const TRAINER: RoleInfo = {
 };
 
 const PRACTITIONER: RoleInfo = {
-  title: "Your practitioner",
-  blurb: "Only the health data you explicitly share.",
+  title: "Biomeds",
+  blurb: "Your doctor — only the health data you explicitly share.",
   hue: bio.color.blueLt2,
   can: ["Biometrics you share", "Diagnostics & uploads", "Journal check-ins you share"],
   never: ["Anything set to “No one”", "Progress photos, unless shared", "Your login & credentials"],

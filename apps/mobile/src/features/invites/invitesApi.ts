@@ -66,7 +66,7 @@ export function classifyFailure(err: unknown): CodeFailure {
   return "invalid";
 }
 
-/** "PT" → "trainer", for sentences like "connect as your trainer". */
+/** "PT" → "PT", "PRACTITIONER" → "Biomeds doctor", for "connect as your PT". */
 export function kindNoun(kind: StaffKind): string {
-  return kind === "PT" ? "trainer" : "practitioner";
+  return kind === "PT" ? "PT" : "Biomeds doctor";
 }
