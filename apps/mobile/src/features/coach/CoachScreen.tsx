@@ -10,7 +10,7 @@
  * the keyboard is up — MainTabs handles that). No health values are logged.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Keyboard, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { Keyboard, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from "react-native";
 import Animated, {
   Easing,
   interpolate,
@@ -27,6 +27,7 @@ import { AuroraField } from "../../ui/bio/AuroraField";
 import { bio, fontFamily } from "../../ui/theme";
 import { pressHaptic } from "../../lib/haptics";
 import { dateLabel } from "../../lib/format";
+import { keyboardOverlap } from "../../lib/keyboard";
 import { PresenceOrb } from "./PresenceOrb";
 import { sendChat, type ChatMessage } from "./coachApi";
 import { fetchDigest, type Digest, type DigestCard } from "./digestApi";
@@ -55,10 +56,12 @@ const FAM: Record<DigestCard["family"], { hue: string; rgb: string }> = {
 
 export function CoachScreen() {
   const insets = useSafeAreaInsets();
+  const { height: windowHeight } = useWindowDimensions();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
-  const [kbVisible, setKbVisible] = useState(false);
+  /** How much of the screen the keyboard covers — 0 when it's down. */
+  const [kbOverlap, setKbOverlap] = useState(0);
   const [digest, setDigest] = useState<Digest | null>(null);
   const scrollRef = useRef<ScrollView>(null);
 
@@ -99,14 +102,19 @@ export function CoachScreen() {
     };
   }, []);
 
+  // Measure what the keyboard actually covers rather than assuming the window
+  // shrinks for it — on SDK 54's edge-to-edge Android window it doesn't, and
+  // the composer ended up underneath it. `keyboardOverlap` is right either way.
   useEffect(() => {
-    const show = Keyboard.addListener("keyboardDidShow", () => setKbVisible(true));
-    const hide = Keyboard.addListener("keyboardDidHide", () => setKbVisible(false));
+    const show = Keyboard.addListener("keyboardDidShow", (e) =>
+      setKbOverlap(keyboardOverlap(windowHeight, e.endCoordinates.screenY)),
+    );
+    const hide = Keyboard.addListener("keyboardDidHide", () => setKbOverlap(0));
     return () => {
       show.remove();
       hide.remove();
     };
-  }, []);
+  }, [windowHeight]);
 
   // Keep the newest message in view as the thread grows / the coach thinks.
   useEffect(() => {
@@ -123,7 +131,14 @@ export function CoachScreen() {
         ]}
       />
 
-      <View style={[styles.inner, { paddingTop: insets.top + 12, paddingBottom: kbVisible ? 12 : insets.bottom + 96 }]}>
+      {/* With the keyboard up the tab bar is hidden (MainTabs), so the only
+          thing to clear is the keyboard itself; with it down, the tab bar. */}
+      <View
+        style={[
+          styles.inner,
+          { paddingTop: insets.top + 12, paddingBottom: kbOverlap > 0 ? kbOverlap + 12 : insets.bottom + 96 },
+        ]}
+      >
         {mode !== "firstRun" ? (
           <View style={styles.header}>
             <View style={styles.headerLeft}>
@@ -181,6 +196,7 @@ export function CoachScreen() {
             horizontal
             showsHorizontalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
+            style={styles.pillScroll}
             contentContainerStyle={styles.pillRow}
           >
             {PILLS.map((p) => (
@@ -413,7 +429,10 @@ const styles = StyleSheet.create({
   askText: { fontFamily: fontFamily.bold, fontSize: 12, color: bio.color.tealLt },
 
   // follow-up pills
-  pillRow: { gap: 8, paddingVertical: 4, paddingHorizontal: 4 },
+  // A ScrollView grows by default; in this column it swallowed the spare height
+  // and stretched every pill into a tall oval. Size to content instead.
+  pillScroll: { flexGrow: 0 },
+  pillRow: { gap: 8, paddingVertical: 4, paddingHorizontal: 4, alignItems: "center" },
   pill: {
     paddingVertical: 10,
     paddingHorizontal: 14,
