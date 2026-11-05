@@ -26,7 +26,7 @@
 </head>
 <body>
   <h1>BIOSYNC Privacy Policy</h1>
-  <p class="last-updated">Last updated: August 2025</p>
+  <p class="last-updated">Last updated: November 2026</p>
 
   <h2>1. Who we are</h2>
   <p>BIOSYNC is a health and wellness platform built by Kaze. The app helps users track daily check-ins, metrics, nutrition, supplements, and readiness scores. This policy explains what data we collect, how we use it, and your rights over it.</p>
@@ -35,9 +35,12 @@
   <p>We collect only the data needed to operate the app:</p>
   <ul>
     <li><strong>Account data:</strong> email address, full name, and password (stored by our authentication provider, Supabase).</li>
-    <li><strong>Health data:</strong> daily check-ins (sleep, energy, mood), point metrics (heart rate, weight, HRV, glucose), nutrition logs, supplement logs, readiness scores, goals, and journal entries.</li>
-    <li><strong>Staff data (if applicable):</strong> if a trainer or practitioner uses the staff features, they can view limited client data only where the client has given explicit consent.</li>
-    <li><strong>Usage data:</strong> crash reports (via Sentry) and basic performance metrics to keep the app stable.</li>
+    <li><strong>Health data:</strong> daily check-ins (sleep, energy, mood), point metrics (heart rate, weight, HRV, glucose, hydration), nutrition logs, supplement logs, readiness scores, goals, and journal entries.</li>
+    <li><strong>Progress photos:</strong> only if you add them. They are held in private storage and are never public. No one else sees them unless you share that category with a named member of your care team.</li>
+    <li><strong>Training and classes:</strong> workout sessions you complete, plans and notes written for you by your PT, class bookings, and gym check-ins.</li>
+    <li><strong>Treatment requests:</strong> if you ask the Biomeds doctor to review a consultation category, we store the request, the readings of your own that prompted it, and the decision made on it. Asking is not booking, and nothing goes ahead without the doctor's decision.</li>
+    <li><strong>Staff data (if applicable):</strong> if a PT or the Biomeds doctor uses the staff features, they can view limited client data only where that client has given explicit consent, and only the categories that their role allows at all.</li>
+    <li><strong>Access records:</strong> each time a member of your care team opens your record we store who looked, what they looked at, and when — so you can see it. You can read your own access record in the app.</li>
   </ul>
 
   <h2>3. How we use your data</h2>
@@ -45,39 +48,44 @@
     <li>To provide the core app features (check-ins, dashboards, trends, coach, nutrition).</li>
     <li>To generate readiness scores and insights from your own data.</li>
     <li>To keep your account secure and authenticate you.</li>
-    <li>To fix crashes and improve stability.</li>
-    <li>We do <strong>not</strong> sell your data. We do <strong>not</strong> use your health data for advertising.</li>
+    <li>We do <strong>not</strong> sell your data. We do <strong>not</strong> use your health data for advertising. We do not profile you or make automated decisions about your care: a treatment request is decided by a person.</li>
   </ul>
 
   <h2>4. Data storage and security</h2>
-  <p>Your data is stored on <strong>Supabase</strong> (PostgreSQL) in the EU. Passwords are managed by Supabase Auth and are never visible to us. All API communication uses HTTPS. The mobile app authenticates with short-lived JWTs.</p>
+  <p>Your data is stored on <strong>Supabase</strong> (PostgreSQL) in <strong>London, United Kingdom</strong>. The API that serves the app runs on <strong>Render</strong> in <strong>Frankfurt, Germany</strong>. Passwords are managed by Supabase Auth and are never visible to us. Progress photos are held in a private bucket that the app reaches only through short-lived, single-file links. All communication with the API uses HTTPS, and the app authenticates with short-lived tokens.</p>
 
   <h2>5. Third-party services</h2>
   <ul>
-    <li><strong>Supabase:</strong> authentication, database, and storage. Privacy Policy: <a href="https://supabase.com/privacy" target="_blank" rel="noopener">supabase.com/privacy</a></li>
-    <li><strong>Render:</strong> API hosting. Privacy Policy: <a href="https://render.com/privacy" target="_blank" rel="noopener">render.com/privacy</a></li>
-    <li><strong>Groq:</strong> AI coach, nutrition estimates, and supplement suggestions. Privacy Policy: <a href="https://groq.com/privacy" target="_blank" rel="noopener">groq.com/privacy</a></li>
-    <li><strong>Sentry:</strong> crash reporting. Privacy Policy: <a href="https://sentry.io/privacy" target="_blank" rel="noopener">sentry.io/privacy</a></li>
+    <li><strong>Supabase:</strong> authentication, database, and photo storage (London, UK). Privacy Policy: <a href="https://supabase.com/privacy" target="_blank" rel="noopener">supabase.com/privacy</a></li>
+    <li><strong>Render:</strong> API hosting (Frankfurt, Germany). Privacy Policy: <a href="https://render.com/privacy" target="_blank" rel="noopener">render.com/privacy</a></li>
+    <li><strong>Groq:</strong> the AI coach, nutrition estimates, and supplement suggestions, processed in the <strong>United States</strong>. Privacy Policy: <a href="https://groq.com/privacy" target="_blank" rel="noopener">groq.com/privacy</a></li>
   </ul>
+  <p>We use no advertising, analytics or tracking services, and the app contains no crash-reporting service.</p>
 
-  <h2>6. Your rights</h2>
+  <h2>6. Data leaving the UK</h2>
+  <p>Your records are held in the UK, and the API that reads them is in Germany. The <strong>AI features</strong> send data further. When you ask the coach a question, generate a day plan, estimate a meal's macros, or ask for supplement suggestions, what is sent to Groq in the <strong>United States</strong> is: a summary of your own recent figures (or the meal you described) and the words you typed. That summary is health data. It carries no name, no email and no account identifier — Groq is not told whose numbers they are — and nothing is sent unless you use one of those features. If you would rather none of your data left the UK, don't use them: check-ins, metrics, trends, training, classes, photos, consent and treatment requests all work without any AI feature.</p>
+
+  <h2>7. Your rights</h2>
   <ul>
-    <li><strong>Access:</strong> you can view all your data inside the app.</li>
-    <li><strong>Correction:</strong> you can edit or delete individual logs, metrics, meals, and supplements.</li>
-    <li><strong>Deletion:</strong> you can delete your account at any time from Settings. This permanently removes all your data from our database and your auth account from Supabase.</li>
-    <li><strong>Export:</strong> contact us if you want a copy of your data in a portable format.</li>
+    <li><strong>Access:</strong> you can view all your data inside the app, including the record of who on your care team has opened it.</li>
+    <li><strong>Correction:</strong> in the app you can replace a day's check-in by logging it again, and delete individual meals, supplements and progress photos. Recorded metrics (heart rate, weight, HRV, glucose, hydration) cannot yet be edited or removed in the app — email us and we will correct or delete them for you.</li>
+    <li><strong>Consent:</strong> you choose which categories of your data each member of your care team can see, and you can withdraw any of it at any time, which takes effect immediately. Nothing is shared by default.</li>
+    <li><strong>Deletion:</strong> you can delete your account at any time from the <strong>You</strong> tab, under Account. This removes your records from our database and your login from Supabase. <a href="/delete-account">How to delete your account</a> explains exactly what goes and what does not.</li>
+    <li><strong>Export:</strong> the app can copy your data out for you, and you can email us for a copy in a portable file.</li>
+    <li><strong>Complaints:</strong> if you think we have handled your data wrongly, you can complain to the UK Information Commissioner's Office at <a href="https://ico.org.uk/make-a-complaint/" target="_blank" rel="noopener">ico.org.uk</a>.</li>
   </ul>
 
-  <h2>7. Data retention</h2>
-  <p>We retain your data for as long as your account is active. When you delete your account, all associated data is permanently removed within 30 days.</p>
+  <h2>8. Data retention</h2>
+  <p>We retain your data for as long as your account is active. When you delete your account, your records are removed from the live database straight away.</p>
+  <p>One copy outlives that, and you should know about it: the database is backed up every night, encrypted, so that a fault or a bad change cannot lose everyone's records. Each backup is destroyed <strong>90 days</strong> after it is taken. So a deleted account can still exist inside an encrypted backup for up to 90 days, and no longer. Those backups are only ever used to recover from a failure — never to bring back an account you asked us to delete. Progress photo files are not yet included in that nightly backup.</p>
 
-  <h2>8. Children's privacy</h2>
+  <h2>9. Children's privacy</h2>
   <p>BIOSYNC is not intended for users under 16. We do not knowingly collect data from children.</p>
 
-  <h2>9. Changes to this policy</h2>
+  <h2>10. Changes to this policy</h2>
   <p>If we make material changes, we will notify you in the app and update this page. Continued use after changes means you accept the updated policy.</p>
 
-  <h2>10. Contact</h2>
+  <h2>11. Contact</h2>
   <p>For privacy questions or requests, contact us at: <strong>biosync.privacy@gmail.com</strong></p>
 </body>
 </html>

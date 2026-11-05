@@ -4,7 +4,7 @@
     "slug": "pulse",
     "owner": "kaze7777",
     "scheme": "pulse",
-    "version": "0.1.0",
+    "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
     "icon": "./assets/icon.png",

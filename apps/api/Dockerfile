@@ -38,6 +38,7 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY packages/shared packages/shared
 COPY apps/api apps/api
 COPY privacy.html privacy.html
+COPY delete-account.html delete-account.html
 
 # Drop root — nothing here needs it.
 USER node

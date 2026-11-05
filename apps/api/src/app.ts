@@ -19,7 +19,7 @@ import { createContext } from "./context";
 import { allowedOrigins, featureConfig } from "./env";
 import { RateLimiter, clientKey } from "./lib/rateLimit";
 import { prisma } from "./db";
-import { servePrivacy } from "./lib/privacy";
+import { serveLegal } from "./lib/legal";
 import { probeStorage } from "./lib/storage";
 
 /** Largest request we'll accept. Payloads here are check-ins and chat turns. */
@@ -140,7 +140,7 @@ export function createApiServer(): http.Server {
       return;
     }
 
-    if (servePrivacy(req, res)) return;
+    if (serveLegal(req, res)) return;
 
     const { allowed, retryAfterSec } = limiter.check(
       clientKey(req.headers["x-forwarded-for"], req.socket.remoteAddress),
