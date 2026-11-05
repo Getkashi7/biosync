@@ -273,3 +273,21 @@ say truthfully; none is a defect in the design, they are just decisions it could
   looks like a failed photo. The speed half is not: ask Supabase for a resized render
   (`/render/image/...?width=`) in `createSignedReadUrl` when the caller wants a thumbnail. Worth
   doing before anyone has a gallery of more than a handful.
+
+## From the stability pass on 2026-11-01
+
+- **Recorded metrics can't be edited or deleted in the app.** `metrics` exposes `log`, `range` and
+  `list` — no update, no remove — so a mistyped weight or glucose reading is stuck in someone's
+  history until they delete the whole account. Check-ins have no delete either, though
+  `logs.checkin` upserts on `(userId, date)`, so logging a day again replaces it. Meals,
+  supplements and photos *can* be removed, which is why the privacy policy used to claim all five.
+  The policy now says what is true and routes metric corrections through email, so this is a real
+  manual burden on whoever reads that inbox, not just a missing screen. A `metrics.remove` scoped
+  to `ctx.user.id` plus a long-press on a row in `MetricsScreen` is most of it; the open question
+  is the readiness snapshot derived from a deleted reading, which `insights.list` would need to
+  recompute rather than trust.
+- **The data controller in the privacy policy is still "built by Kaze".** For a clinic app the
+  controller is the clinic, and the contact address is a personal Gmail. That is the doctor's
+  decision to make, not a code change: it needs the registered business name, its address, and an
+  address at that domain before the Play Store listing goes live. Everything else in the policy was
+  corrected on 2026-11-01 to match what the code actually does.

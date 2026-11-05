@@ -38,3 +38,6 @@ Thumbs.db
 # projects are build output. CI regenerates them on every build.
 apps/mobile/android/
 apps/mobile/ios/
+
+# demo-video.ts state: demo logins + what clean must undo
+apps/api/scripts/.demo-state.json

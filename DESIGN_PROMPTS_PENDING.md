@@ -6,12 +6,12 @@ Nine screens in three groups. Everything else is already drawn.
 
 Your Claude Design project already holds these; they need **implementing**, not designing:
 
-| In the project | Status |
-|---|---|
-| `fitness/a1-classes` · `a2-checkin` · `a3-coaches` · `a4-history` · `a5-coach-classes` | drawn, not built |
-| `fitness/a6-coach-profile` | drawn, **built** |
+| In the project                                                                                      | Status           |
+| --------------------------------------------------------------------------------------------------- | ---------------- |
+| `fitness/a1-classes` · `a2-checkin` · `a3-coaches` · `a4-history` · `a5-coach-classes`              | drawn, not built |
+| `fitness/a6-coach-profile`                                                                          | drawn, **built** |
 | `practitioner/9c-photos-*` (6 states) · `9d-photo-viewer` · `9e-photo-compare` · `9f-access-record` | drawn, not built |
-| `consent/` · `invites/` · `nutrition/` · `photos/` · `supplements/` · `trainer/` | drawn |
+| `consent/` · `invites/` · `nutrition/` · `photos/` · `supplements/` · `trainer/`                    | drawn            |
 
 ## How to use
 
@@ -23,7 +23,7 @@ nine.
 
 ---
 
-## §0 — System header  *(paste before EVERY brief)*
+## §0 — System header _(paste before EVERY brief)_
 
 ```
 You're designing for BIOSYNC, a dark health app, in its RESTRAINED register — the one used for
@@ -70,12 +70,13 @@ fuller than the product:
 
 ---
 
-# Group 1 — Navigation  *(do these first)*
+# Group 1 — Navigation _(do these first)_
 
 The current You tab is 7 section headers and 15 rows, and the things people open daily are buried
 inside it. This group is the fix.
 
-## §N1 — Bottom bar  *(accent: teal)*
+## §N1 — Bottom bar _(accent: teal)_
+
 Four tabs around a raised centre FAB: **Home · Train · [FAB] · Ask · You**.
 
 - Only one thing changes from today: the second slot becomes **Train** with a new glyph. Home, the
@@ -90,7 +91,8 @@ Four tabs around a raised centre FAB: **Home · Train · [FAB] · Ask · You**.
 Also draw: the bar with a **4th tab active and the keyboard up** — it is hidden entirely in that
 case, so show the screen bottom without it, to confirm nothing else shifts.
 
-## §N2 — You  *(accent: violet)*
+## §N2 — You _(accent: violet)_
+
 The whole point of this brief is what is **removed**. Seven sections become three, fifteen rows
 become eight, and it must fit one screen with no scroll.
 
@@ -120,7 +122,8 @@ that helpfully keeps them defeats the point:
 States: **member** · **member + staff/admin** (the extra row) · and one frame showing the whole
 screen at 390×844 with the tab bar, proving no scroll.
 
-## §N3 — Train  *(accent: teal)*
+## §N3 — Train _(accent: teal)_
+
 The new tab, and the only genuinely new screen in this document. It is a tab root, so **no back
 chevron**.
 
@@ -141,12 +144,13 @@ and drawing one turns a layout change into an API change.
 
 ---
 
-# Group 2 — Admin  *(accent: blue #6CA8FF — five screens, no designs exist)*
+# Group 2 — Admin _(accent: blue #6CA8FF — five screens, no designs exist)_
 
 Platform administration. Blue, not teal: an admin is explicitly **not** on anyone's care team, and
 the colour is what keeps that legible.
 
 ## §B1 — Admin home
+
 Extend the screen that exists — it has a 4-stat row and an exact-email lookup.
 
 - Add one section `PLATFORM` above the lookup: four flat rows with chevrons — **Audit log**
@@ -155,6 +159,7 @@ Extend the screen that exists — it has a 4-stat row and an exact-email lookup.
 - Draw the whole screen so the new section can be judged in place.
 
 ## §B2 — Audit log
+
 Dense, readable, unglamorous. A compliance record, not a feed.
 
 - Chip row: All · Capabilities · Client access · Approvals · Declines · Deletions · Trail reads.
@@ -169,6 +174,7 @@ Dense, readable, unglamorous. A compliance record, not a feed.
 States: populated (≥8 mixed rows) · empty · failed.
 
 ## §B3 — Members
+
 - Two pill tabs: **Recent** · **Search**.
 - Recent: a 38% line — "The newest 25 accounts. There's no way to page further back — that's
   deliberate." — then rows.
@@ -179,6 +185,7 @@ States: populated (≥8 mixed rows) · empty · failed.
 States: recent · results · too short (button dimmed) · no matches · failed.
 
 ## §B4 — Trends
+
 The restraint clause matters most here.
 
 - Three pill tabs: 7d · 30d · 90d.
@@ -199,6 +206,7 @@ The restraint clause matters most here.
 line would be invented. Do not add one.
 
 ## §B5 — Venues
+
 - An outlined **Add a venue** pill; the form replaces it in place: NAME · ADDRESS · TIME ZONE, a
   33% hint, an **Active** switch row, then Cancel + **Save**.
 - Venue card: name, `Europe/London · 14 Bell St` at 45%, `12 classes · 340 visits` at 33%. A grey
@@ -212,9 +220,10 @@ preview.
 
 ---
 
-# Group 3 — Account  *(accent: violet)*
+# Group 3 — Account _(accent: violet)_
 
 ## §C1 — Your data
+
 The counterpart to Delete account, reached from You → Download your data.
 
 - Lede: "Everything BIOSYNC holds for your account, as one JSON file you can keep or take
