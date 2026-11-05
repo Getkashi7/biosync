@@ -267,6 +267,15 @@ export function MainTabs() {
     setRefreshKey((k) => k + 1);
   }, []);
 
+  /** Every consumer area that renders above Nutrition and Supplements. */
+  const clearAbovePushedAreas = () => {
+    setProfileArea("none");
+    setComparing(null);
+    setOpenPhoto(null);
+    setPhotosView("none");
+    setConsent("none");
+  };
+
   // Re-derive the scheduled reminder whenever the app returns to the foreground
   // (a check-in may have happened elsewhere, or a day may have rolled over).
   useEffect(() => {
@@ -1007,8 +1016,20 @@ export function MainTabs() {
           onClose={() => setSheet("none")}
           onCheckin={() => setSheet("checkin")}
           onQuickLog={() => setSheet("quicklog")}
-          onNutrition={() => setNutrition("today")}
-          onSupplements={() => setSupplements("stack")}
+          // The ＋ opens over any screen, and every area above Nutrition and
+          // Supplements in the render chain outranks them — so opening one from
+          // the Journal, Treatments or a photo used to change nothing visible.
+          // Clear what sits above first. Found recording the demo, 2026-10-01.
+          onNutrition={() => {
+            clearAbovePushedAreas();
+            setSupplements("none");
+            setNutrition("today");
+          }}
+          onSupplements={() => {
+            clearAbovePushedAreas();
+            setNutrition("none");
+            setSupplements("stack");
+          }}
         />
       ) : null}
 
