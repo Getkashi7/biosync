@@ -1,6 +1,6 @@
 /**
  * AI Coach — a conversational wellness guide grounded in the user's own BIOSYNC
- * data (latest readiness, most recent check-in, recent point metrics). Sends the
+ * data (the last 30 days of readiness, check-ins and point metrics). Sends the
  * conversation to Groq (Llama 3.3 70B — free tier, OpenAI-compatible API) with a
  * non-diagnostic system prompt.
  *
@@ -10,11 +10,12 @@
  */
 import { z } from "zod";
 import { MetricType } from "@prisma/client";
-import { computeDigest, digestInput, type MetricWindow } from "@pulse/shared";
+import { computeDigest, dateStringSchema, digestInput, type MetricWindow } from "@pulse/shared";
 import { router, ownerProcedure } from "../trpc";
 import { prisma } from "../db";
 import { toDbDate, fromDbDate } from "../dbDate";
 import { groqChat, hasGroqKey } from "../lib/groq";
+import { buildCoachContext } from "../lib/coachContext";
 
 const userProcedure = ownerProcedure;
 
@@ -38,70 +39,18 @@ const chatInput = z.object({
     )
     .min(1)
     .max(40),
+  /** the device-local "today" the context window ends on; builds that predate it fall back to UTC */
+  today: dateStringSchema.optional(),
 });
 
 const SYSTEM = `You are the BIOSYNC Coach — a calm, encouraging wellness guide inside a personal health app ("your body, in tune"). You help the user understand their own body data (readiness, sleep, energy, mood, resting heart rate, HRV, glucose, weight) and build better daily habits.
 
 How to answer:
 - Ground every reply in the user's data provided below. Refer to their actual numbers.
+- That block is the last 30 days, and each line says how many logs it rests on. Never imply more than it lists: with four check-ins, say what four days show — don't call it a month, a pattern or a trend.
 - You are NOT a doctor. Give general wellness guidance only — never diagnose, never name conditions, never prescribe or give medical treatment advice. If something sounds medical or worrying, gently suggest they speak with a healthcare professional.
 - Be concise and warm: 2–5 short sentences unless they ask for more. No filler openers like "Great question".
 - If their data is sparse, say what you'd be able to tell them once they've logged more, and encourage a check-in.`;
-
-const METRIC_LABEL: Record<string, string> = {
-  RESTING_HR: "resting HR",
-  HRV: "HRV",
-  GLUCOSE: "glucose",
-  WEIGHT: "weight",
-  SLEEP_HOURS: "sleep hours",
-  SLEEP_QUALITY: "sleep quality",
-  HYDRATION: "hydration",
-  ENERGY: "energy",
-  MOOD: "mood",
-};
-
-/** A compact, plain-text snapshot of the user's recent data for the system prompt. */
-async function buildContext(userId: string): Promise<string> {
-  const since = new Date(Date.now() - 14 * DAY_MS);
-  const [snapshot, lastLog, metrics] = await Promise.all([
-    prisma.readinessSnapshot.findFirst({
-      where: { userId },
-      orderBy: { date: "desc" },
-      select: { score: true, date: true },
-    }),
-    prisma.dailyLog.findFirst({
-      where: { userId },
-      orderBy: { date: "desc" },
-      select: { sleepHours: true, energy: true, mood: true, date: true },
-    }),
-    prisma.metric.findMany({
-      where: { userId, recordedAt: { gte: since } },
-      orderBy: { recordedAt: "desc" },
-      select: { type: true, value: true },
-      take: 80,
-    }),
-  ]);
-
-  // Most recent value seen per metric type.
-  const latest = new Map<string, number>();
-  for (const m of metrics) if (!latest.has(m.type)) latest.set(m.type, m.value);
-
-  const lines: string[] = [];
-  lines.push(
-    snapshot ? `Readiness (most recent): ${snapshot.score}/100.` : "Readiness: nothing scored yet.",
-  );
-  if (lastLog) {
-    lines.push(
-      `Last daily check-in: sleep ${Number(lastLog.sleepHours.toFixed(1))}h, energy ${lastLog.energy}/5, mood ${lastLog.mood}/5.`,
-    );
-  } else {
-    lines.push("Daily check-in: none logged yet.");
-  }
-  for (const [type, value] of latest) {
-    lines.push(`Latest ${METRIC_LABEL[type] ?? type.toLowerCase()}: ${Number(value.toFixed(1))}.`);
-  }
-  return lines.join("\n");
-}
 
 const ERR_REPLY = "I hit a snag reaching my brain just now. Give it a moment and try again.";
 
@@ -112,6 +61,8 @@ const NO_KEY_REPLY =
 const planInput = z.object({
   /** what the plan should lean toward */
   focus: z.enum(["training", "recovery", "balanced"]).default("balanced"),
+  /** the device-local "today" the data window ends on; see `buildCoachContext` */
+  today: dateStringSchema.optional(),
 });
 
 /** A generated, non-diagnostic day plan; validated before it leaves the server. */
@@ -234,7 +185,7 @@ export const assistantRouter = router({
    */
   plan: userProcedure.input(planInput).mutation(async ({ ctx, input }) => {
     if (!hasGroqKey()) return { plan: PLAN_NO_KEY, configured: false as const };
-    const context = await buildContext(ctx.user.id);
+    const context = await buildCoachContext(ctx.user.id, input.today);
     const result = await groqChat(
       [
         { role: "system", content: `${PLAN_SYSTEM}\n\n--- The user's current data ---\n${context}` },
@@ -258,7 +209,7 @@ export const assistantRouter = router({
     if (!hasGroqKey()) {
       return { reply: NO_KEY_REPLY, configured: false as const };
     }
-    const context = await buildContext(ctx.user.id);
+    const context = await buildCoachContext(ctx.user.id, input.today);
     const result = await groqChat([
       { role: "system", content: `${SYSTEM}\n\n--- The user's current data ---\n${context}` },
       ...input.messages.map((m) => ({ role: m.role, content: m.content })),
