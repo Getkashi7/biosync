@@ -12,7 +12,7 @@
  * There is no model in this path, and the screen never adds a sentence about
  * what a treatment would do.
  */
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Svg, { Path } from "react-native-svg";
@@ -57,14 +57,37 @@ export function TreatmentsScreen({ onBack }: { onBack: () => void }) {
   const [failed, setFailed] = useState<NetFailure | null>(null);
   const [asking, setAsking] = useState<Suggestion | null>(null);
 
+  /**
+   * Reloads can overlap — sending a request reloads, and so does withdrawing
+   * one, and nothing stops the user doing both inside a second. Whichever
+   * response lands last would win, which is not the same as the newest one
+   * winning: an earlier read that was slower would quietly put the old list
+   * back, and this screen's whole job is telling someone the current state of
+   * a request a clinician has to act on. So each load takes a number and only
+   * the newest is allowed to write, and a response that arrives after the
+   * screen has gone writes nothing at all.
+   */
+  const loadSeq = useRef(0);
+  const mounted = useRef(true);
+  useEffect(
+    () => () => {
+      mounted.current = false;
+    },
+    [],
+  );
+
   const load = useCallback(async () => {
+    const seq = ++loadSeq.current;
+    const current = () => mounted.current && seq === loadSeq.current;
     setFailed(null);
     try {
       const [s, r] = await Promise.all([fetchSuggestions(), fetchRequests()]);
+      if (!current()) return;
       setSuggestions(s.suggestions);
       setHasPractitioner(s.hasPractitioner);
       setRequests(r);
     } catch (e) {
+      if (!current()) return;
       setFailed(classifyNetError(e));
     }
   }, []);
